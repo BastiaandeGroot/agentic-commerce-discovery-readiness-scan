@@ -92,6 +92,47 @@ export function addQuestion(
   return record(next, setId, question.id, 'added', undefined, label.nl);
 }
 
+/**
+ * Til een eigen attribuut op tot echte vraag.
+ *
+ * Pas hier telt het mee. De merchant formuleert zelf de kopersvraag, want een
+ * kolomnaam is geen vraag: "shine" wordt "is de stof mat of glanzend?", en dat
+ * onderscheid is precies wat een werklijst bruikbaar maakt.
+ */
+export function promoteSuggestion(
+  state: QuestionSetState,
+  setId: string,
+  suggestionId: string,
+  label: { nl: string; en: string },
+  requires: string[],
+): QuestionSetState {
+  const set = state.sets.find((s) => s.id === setId);
+  const suggestion = set?.suggestions.find((s) => s.id === suggestionId);
+  if (!set || !suggestion || requires.length === 0) return state;
+
+  const question: Question = {
+    id: `c${Date.now().toString(36)}`,
+    label,
+    requires,
+    mode: 'any',
+    custom: true,
+    origin: 'derived',
+  };
+  const next = {
+    ...state,
+    sets: state.sets.map((s) =>
+      s.id !== setId
+        ? s
+        : {
+            ...s,
+            questions: [...s.questions, question],
+            suggestions: s.suggestions.filter((x) => x.id !== suggestionId),
+          },
+    ),
+  };
+  return record(next, setId, question.id, 'added', suggestion.column, label.nl);
+}
+
 /** Merchant bevestigt de set. Geen mutatie, dus geen versieverhoging. */
 export function markValidated(state: QuestionSetState, setId: string): QuestionSetState {
   return {
