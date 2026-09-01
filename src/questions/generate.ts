@@ -16,7 +16,9 @@
 // De generator is bewust deterministisch. Waar de rationale een LLM voorziet,
 // is dit de plek waar die binnenkomt: dezelfde in- en uitvoer, rijkere vragen.
 
-import type { Dataset, Question, QuestionSet, QuestionSetState } from '../domain/types';
+import type {
+  AttributeSuggestion, Dataset, DatasetRole, Question, QuestionSet, QuestionSetState,
+} from '../domain/types';
 import { ARCHETYPES } from './archetypes';
 import { isBlank, str } from '../intake/normalize';
 
@@ -24,10 +26,10 @@ import { isBlank, str } from '../intake/normalize';
 const MAX_SETS = 30;
 /** Vanaf welke vulgraad een eigen kolom een kandidaatvraag wordt. */
 const DERIVED_FILL_THRESHOLD = 0.4;
-const MAX_DERIVED_PER_SET = 6;
+const MAX_DERIVED_PER_SET = 8;
 
 /**
- * Kolommen die nooit een koperssvraag opleveren: administratie, kanaalsturing en
+ * Kolommen die nooit een kopersvraag opleveren: administratie, kanaalsturing en
  * boekhouding. Een Channable-feed zit er vol mee. Zonder deze filter wordt de
  * eerste voorgestelde vraag "Wat is de custom label 0?", en dan is het scherm
  * meteen zijn geloofwaardigheid kwijt.
@@ -110,18 +112,23 @@ function archetypeFor(category: string) {
 }
 
 /**
- * Vragen die uit de data van de merchant zelf komen: kolommen die we niet in de
- * specificatie konden plaatsen maar die in deze categorie stelselmatig gevuld
- * zijn. Dat is het dichtste dat we deterministisch bij "wat vraagt een koper in
- * deze categorie" komen — en het maakt de gaten zichtbaar bij de producten waar
- * de merchant het attribuut juist NIET heeft ingevuld.
+ * Attributen die de merchant zelf bijhoudt, als KANDIDAAT voor een vraag.
+ *
+ * Eerder maakte deze functie er rechtstreeks vragen van. Dat was fout: dan komt
+ * de meetlat van de merchant zelf, en meet je of zijn feed zijn eigen velden
+ * draagt in plaats van of zijn data een koper bedient. Wie niets registreert kan
+ * dan niet zakken, en wie alles netjes bijhoudt krijgt de strengste lat.
+ *
+ * Ze blijven wel zichtbaar. Dat iemand "waterafstotend" bijhoudt is een signaal
+ * dat het in zijn markt speelt; alleen bepaalt hij zelf of er een kopersvraag
+ * bij hoort en hoe die luidt.
  */
-function derivedQuestions(
+function attributeSuggestions(
   feed: Dataset,
   catalog: Dataset | undefined,
   category: string,
   covered: Set<string>,
-): Question[] {
+): AttributeSuggestion[] {
   const members = feed.products.filter((p) => mainCategory(p.values) === category);
   if (members.length < 3) return [];
 
@@ -133,10 +140,12 @@ function derivedQuestions(
     }
   }
 
-  // Ook uit de catalogus afleiden. Juist daar staan de kenmerken die de merchant
-  // wél bijhoudt maar niet doorzet naar de feed — en dat is precies het
-  // mappinggat dat we willen laten zien. Een kenmerk dat het PIM stelselmatig
-  // vult is een sterke kandidaat voor een vraag die ertoe doet.
+  // Ook uit de catalogus. Juist daar staan de kenmerken die de merchant wél
+  // bijhoudt maar niet doorzet naar de feed; als er een kopersvraag bij hoort,
+  // is dat straks een mappinggat en geen echt gat.
+  const sources = new Map<string, DatasetRole>();
+  for (const column of fill.keys()) sources.set(column, 'feed');
+
   if (catalog) {
     const share = new Map<string, number>();
     for (const product of catalog.products) {
@@ -146,9 +155,11 @@ function derivedQuestions(
       }
     }
     for (const [column, count] of share) {
-      if (count / catalog.products.length < DERIVED_FILL_THRESHOLD) continue;
-      // Tel mee alsof de feed hem niet heeft; dat is het punt van de vraag.
-      if (!fill.has(column)) fill.set(column, Math.round(members.length * 0.999));
+      const rate = count / catalog.products.length;
+      if (rate < DERIVED_FILL_THRESHOLD) continue;
+      if (fill.has(column)) continue;
+      fill.set(column, Math.round(members.length * rate));
+      sources.set(column, 'catalog');
     }
   }
 
@@ -161,20 +172,12 @@ function derivedQuestions(
     })
     .sort((a, b) => b[1] - a[1])
     .slice(0, MAX_DERIVED_PER_SET)
-    .map(([column], index) => {
-      const human = humanise(column);
-      return {
-        id: `d${index + 1}`,
-        origin: 'derived' as const,
-        mode: 'all' as const,
-        // Anker op precies deze kolom, niet op een los patroon.
-        requires: [`attr:^${column.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`],
-        label: {
-          nl: `Wat is bekend over "${human}"?`,
-          en: `What is known about "${human}"?`,
-        },
-      };
-    });
+    .map(([column, n]) => ({
+      id: `s-${slug(column)}`,
+      column,
+      source: sources.get(column) ?? 'feed',
+      fillRate: n / members.length,
+    }));
 }
 
 /**
@@ -191,10 +194,10 @@ export function generateQuestionSets(feed: Dataset, catalog?: Dataset): Question
     const covered = new Set(
       archetype.questions.flatMap((q) => [q.label.nl.toLowerCase(), ...q.requires.map(humanise)]),
     );
-    const questions: Question[] = [
-      ...archetype.questions.map((q) => ({ ...q, origin: 'archetype' as const })),
-      ...derivedQuestions(feed, catalog, category.name, covered),
-    ];
+    const questions: Question[] = archetype.questions.map((q) => ({
+      ...q,
+      origin: 'archetype' as const,
+    }));
 
     return {
       id: slug(category.name),
@@ -205,6 +208,7 @@ export function generateQuestionSets(feed: Dataset, catalog?: Dataset): Question
       productCount: category.count,
       archetypeId: archetype.id,
       questions,
+      suggestions: attributeSuggestions(feed, catalog, category.name, covered),
       validated: false,
     };
   });
@@ -223,6 +227,7 @@ export function generateQuestionSets(feed: Dataset, catalog?: Dataset): Question
       productCount: tail.reduce((sum, c) => sum + c.count, 0),
       archetypeId: fallback.id,
       questions: fallback.questions.map((q) => ({ ...q, origin: 'archetype' as const })),
+      suggestions: [],
       validated: false,
     });
   }
