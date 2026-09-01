@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: mijn-tweede-app
+    name: agentic-commerce-discovery-readiness-scan
     runtime: node
     plan: free
     region: frankfurt
@@ -10,4 +10,4 @@ services:
     autoDeploy: true
     envVars:
       - key: NODE_VERSION
-        value: "20"
+        value: "22"
