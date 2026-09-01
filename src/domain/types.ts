@@ -198,6 +198,8 @@ export interface ProductResult {
   key: string;
   title?: string;
   category?: string;
+  /** Hoofdafbeelding uit de feed; een product zonder is zelf een bevinding. */
+  image?: string;
   /** Toegepaste vragenset, of undefined als het product nergens op matchte. */
   setId?: string;
   /** Product zonder categorie: geflagd en geteld, niet gescoord (§6). */

@@ -211,6 +211,7 @@ export function evaluateProduct(
   return {
     key: product.key,
     title: str(product.values.title),
+    image: str(product.values.image),
     category: str(product.values.product_type) ?? str(product.values.product_category),
     setId: set?.id,
     unmatched: set === undefined,
