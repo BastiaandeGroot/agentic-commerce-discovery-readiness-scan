@@ -1,26 +1,66 @@
 @import "tailwindcss";
 
+/* Ontwerptokens. Licht als basis, donker als variant — de kleuren dragen
+   betekenis (tier, gap-oorzaak) en moeten in beide standen leesbaar blijven. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --bg: #fbfaf8;
+  --surface: #ffffff;
+  --surface-2: #f4f2ee;
+  --border: #e3ded6;
+  --text: #1c1a17;
+  --muted: #6b645a;
+  --accent: #1f6f5c;
+  --accent-soft: #e6f0ec;
+  --warn: #9a5b12;
+  --warn-soft: #fbf0e0;
+  --danger: #8f2f2a;
+  --danger-soft: #f9e8e6;
+  --ok: #2f6b3a;
+  --ok-soft: #e8f1e8;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #14130f;
+    --surface: #1c1a17;
+    --surface-2: #24211d;
+    --border: #35312b;
+    --text: #f0ece5;
+    --muted: #a49b8e;
+    --accent: #5cbfa3;
+    --accent-soft: #17302a;
+    --warn: #d69a4e;
+    --warn-soft: #2f2418;
+    --danger: #e08b84;
+    --danger-soft: #2f1c1a;
+    --ok: #7cc088;
+    --ok-soft: #1a2b1d;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
 }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-feature-settings: "cv05", "ss01";
+}
+
+/* Getallen in de trechter en tabellen uitlijnen op cijferbreedte. */
+.tnum { font-variant-numeric: tabular-nums; }
