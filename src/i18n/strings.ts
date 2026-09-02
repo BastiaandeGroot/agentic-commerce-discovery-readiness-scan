@@ -86,6 +86,21 @@ export const STRINGS = {
       competitive: 'concurrerend',
       findableExplain: 'Elke fit-vraag van de eigen categorie is beantwoord.',
       competitiveExplain: 'De volledige Selection-checklist is aanwezig en bruikbaar.',
+      status: {
+        complete: 'Alle vragen beantwoord',
+        partial: 'Meer dan de helft beantwoord',
+        early: 'Minder dan de helft beantwoord',
+      } as Record<string, string>,
+      statusExplain: {
+        complete:
+          'Je data beantwoordt elke vraag die in deze categorie speelt. Dit is wat vindbaar betekent.',
+        partial:
+          'Je data beantwoordt de meeste vragen al. Je bent pas goed vindbaar als ze állemaal te beantwoorden zijn — de laatste paar bepalen of een agent jouw product durft aan te raden.',
+        early:
+          'De basis staat, maar een agent kan nog te weinig controleren. Je bent pas goed vindbaar als alle vragen te beantwoorden zijn.',
+      } as Record<string, string>,
+      statusScale: 'van de',
+      statusAnswered: 'vragen beantwoord',
       avgAnsweredLine: 'Gemiddeld beantwoordt een product',
       avgAnsweredOf: 'van de',
       avgAnsweredSuffix: 'fit-vragen van zijn categorie.',
@@ -279,6 +294,21 @@ export const STRINGS = {
       competitive: 'competitive',
       findableExplain: 'Every fit question for the product category is answered.',
       competitiveExplain: 'The full Selection checklist is present and usable.',
+      status: {
+        complete: 'Every question answered',
+        partial: 'More than half answered',
+        early: 'Less than half answered',
+      } as Record<string, string>,
+      statusExplain: {
+        complete:
+          'Your data answers every question that matters in this category. That is what findable means.',
+        partial:
+          'Your data already answers most questions. You are only properly findable once they can all be answered — the last few decide whether an agent dares to recommend your product.',
+        early:
+          'The basics are there, but an agent can still check too little. You are only properly findable once every question can be answered.',
+      } as Record<string, string>,
+      statusScale: 'of',
+      statusAnswered: 'questions answered',
       avgAnsweredLine: 'On average a product answers',
       avgAnsweredOf: 'of the',
       avgAnsweredSuffix: 'fit questions for its category.',

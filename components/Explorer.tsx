@@ -9,7 +9,7 @@
 import { useMemo, useState } from 'react';
 import type { Locale, ProductResult, Protocol, ScanReport } from '../src/domain/types';
 import type { Strings } from '../src/i18n/strings';
-import { Badge, Bar, Button, Card, CardTitle } from './ui';
+import { Badge, Bar, Button, Card, CardTitle, TrafficLight, statusOf } from './ui';
 
 const PAGE_SIZE = 25;
 type Filter = 'all' | 'not-findable' | 'not-competitive' | 'unmatched';
@@ -45,11 +45,11 @@ function CategoryTable({ s, report, protocol, locale }: {
                 <td className="py-2.5 pr-3 font-medium">{row.category}</td>
                 <td className="tnum py-2.5 pr-3 text-right">{n(row.total)}</td>
                 <td className="py-2.5 pr-3">
-                  <span className="tnum text-xs text-muted">
-                    {row.avgAnswered.toFixed(1)} / {row.avgApplicable.toFixed(0)}
-                  </span>
-                  <div className="mt-1 w-24">
-                    <Bar value={row.avgAnswered} total={row.avgApplicable} tone="accent" />
+                  <div className="flex items-center gap-2">
+                    <TrafficLight status={statusOf(row.avgAnswered, row.avgApplicable)} size="sm" />
+                    <span className="tnum text-xs text-muted">
+                      {row.avgAnswered.toFixed(1)} / {row.avgApplicable.toFixed(0)}
+                    </span>
                   </div>
                 </td>
                 <td className="tnum py-2.5 pr-3 text-right">{n(row.findable)}</td>
