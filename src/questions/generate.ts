@@ -13,8 +13,9 @@
 // Stap 4 is geen formaliteit. Een gegenereerde set is een hypothese; zonder
 // validatielus is de eerste aanwijzing dat een set fout was een klacht (S6).
 //
-// De generator is bewust deterministisch. Waar de rationale een LLM voorziet,
-// is dit de plek waar die binnenkomt: dezelfde in- en uitvoer, rijkere vragen.
+// De generator is deterministisch en blijft dat. De vragen worden beantwoord uit
+// gestructureerde attributen, niet uit lopende tekst, en er komt geen model aan
+// te pas — de uitkomst is daarmee reproduceerbaar en kost niets per scan.
 
 import type {
   AttributeSuggestion, Dataset, DatasetRole, Question, QuestionSet, QuestionSetState,

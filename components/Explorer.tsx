@@ -75,6 +75,41 @@ function CategoryTable({ s, report, protocol, locale }: {
   );
 }
 
+/**
+ * Productminiatuur, rechtstreeks van de mediaserver van de merchant.
+ *
+ * Geen next/image: de domeinen verschillen per merchant en zijn vooraf niet
+ * bekend, dus een vaste remotePatterns-lijst werkt hier niet. Blokkeert een shop
+ * hotlinken, dan vangt onError dat op — de rij blijft dan gewoon leesbaar.
+ */
+function Thumb({ s, product }: { s: Strings; product: ProductResult }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!product.image || failed) {
+    return (
+      <div
+        className="flex size-11 shrink-0 items-center justify-center rounded-md border border-line bg-surface-2 text-[10px] leading-tight text-muted"
+        title={s.explorer.noImage}
+      >
+        —
+      </div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={product.image}
+      alt={product.title ?? product.key}
+      // Geen loading="lazy": in een ingebedde weergave slaat de lazy-observer
+      // soms nooit aan en blijft de miniatuur leeg. Er staan er maar 25 per
+      // pagina, dus uitstellen levert niets op.
+      decoding="async"
+      onError={() => setFailed(true)}
+      className="size-11 shrink-0 rounded-md border border-line bg-surface-2 object-cover"
+    />
+  );
+}
+
 function ProductRow({ s, product, protocol, locale }: {
   s: Strings; product: ProductResult; protocol: Protocol; locale: Locale;
 }) {
@@ -85,32 +120,37 @@ function ProductRow({ s, product, protocol, locale }: {
 
   return (
     <li className="border-b border-line/60 py-3">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="font-mono text-xs text-muted">{product.key}</span>
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">{product.title ?? '—'}</span>
-        {product.unmatched ? (
-          <Badge tone="warn">{s.explorer.unmatchedBadge}</Badge>
-        ) : (
-          <>
-            <span className="tnum text-xs text-muted">
-              {answered}/{result.questions.length} {s.explorer.answered}
-            </span>
-            <Badge tone={result.findable ? 'ok' : 'neutral'}>
-              {result.findable ? s.explorer.findableYes : s.explorer.findableNo}
-            </Badge>
-            <Badge tone={result.competitive ? 'ok' : 'neutral'}>
-              {result.competitive ? s.explorer.competitiveYes : s.explorer.competitiveNo}
-            </Badge>
-          </>
-        )}
-        <Button variant="quiet" onClick={() => setOpen(!open)}>
-          {open ? s.explorer.closeDetail : s.explorer.openDetail}
-        </Button>
-      </div>
+      <div className="flex items-start gap-3">
+        <Thumb s={s} product={product} />
+        <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="font-mono text-xs text-muted">{product.key}</span>
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">{product.title ?? '—'}</span>
+          {product.unmatched ? (
+            <Badge tone="warn">{s.explorer.unmatchedBadge}</Badge>
+          ) : (
+            <>
+              <span className="tnum text-xs text-muted">
+                {answered}/{result.questions.length} {s.explorer.answered}
+              </span>
+              <Badge tone={result.findable ? 'ok' : 'neutral'}>
+                {result.findable ? s.explorer.findableYes : s.explorer.findableNo}
+              </Badge>
+              <Badge tone={result.competitive ? 'ok' : 'neutral'}>
+                {result.competitive ? s.explorer.competitiveYes : s.explorer.competitiveNo}
+              </Badge>
+            </>
+          )}
+          <Button variant="quiet" onClick={() => setOpen(!open)}>
+            {open ? s.explorer.closeDetail : s.explorer.openDetail}
+          </Button>
+        </div>
 
-      {product.category ? (
-        <p className="mt-0.5 text-xs text-muted">{product.category}</p>
-      ) : null}
+        {product.category ? (
+          <p className="mt-0.5 text-xs text-muted">{product.category}</p>
+        ) : null}
+        </div>
+      </div>
 
       {open ? (
         <div className="mt-3 grid gap-4 rounded-lg bg-surface-2 p-3 sm:grid-cols-2">
