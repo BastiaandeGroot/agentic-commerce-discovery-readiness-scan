@@ -20,6 +20,7 @@
 import type { Dataset, Question, QuestionSet, QuestionSetState } from '../domain/types';
 import { ARCHETYPES } from './archetypes';
 import { str } from '../intake/normalize';
+import { indexCatalog, lookupCatalog, mainCategory } from '../engine/join';
 
 /** Hoeveel categorieen een eigen set krijgen; de staart wordt samengevoegd. */
 const MAX_SETS = 30;
@@ -29,36 +30,41 @@ export interface CategoryStat {
 }
 
 /**
- * De hoofdcategorie van een product: het eerste segment van het eigen
- * categoriepad.
+ * Tel de categorieen, aflopend op aantal producten.
  *
- * De Google-productcategorie is bewust de laatste optie en alleen als hij een
- * pad is, geen ID. Een feed die daar "2669" invult geeft geen categorienaam maar
- * een verwijzing naar Googles taxonomie; daar een vragenset op bouwen levert een
- * set met de naam "2669" op, en dat is voor niemand een categorie.
+ * Is er een catalogus, dan is die leidend: daar staat de boom zoals de merchant
+ * hem onderhoudt. De feed geeft een afgevlakte versie waarin subcategorieen als
+ * losse thema's ogen en een hoofdcategorie zomaar kan ontbreken.
  */
-export function mainCategory(values: Record<string, string>): string | undefined {
-  const own = str(values.product_type);
-  const google = str(values.product_category);
-  const raw = own ?? (google && !/^\d+$/.test(google) ? google : undefined);
-  if (!raw) return undefined;
-  const first = raw.split(/\s*[>/|]\s*/)[0];
-  const cleaned = first.replace(/\s+/g, ' ').trim();
-  if (cleaned === '' || /^\d+$/.test(cleaned)) return undefined;
-  return cleaned;
-}
-
-/** Tel de categorieen in de feed, aflopend op aantal producten. */
-export function deriveCategories(feed: Dataset): CategoryStat[] {
+export function deriveCategories(feed: Dataset, catalog?: Dataset): CategoryStat[] {
+  const index = indexCatalog(catalog);
   const counts = new Map<string, number>();
   for (const product of feed.products) {
-    const category = mainCategory(product.values);
+    const category = mainCategory(product, lookupCatalog(index, product));
     if (!category) continue;
     counts.set(category, (counts.get(category) ?? 0) + 1);
   }
   return [...counts.entries()]
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+
+/**
+ * Verkoopt deze merchant ook gebruikte of gerefurbishte producten?
+ *
+ * De vraag "is het nieuw of gebruikt?" is zinloos in een catalogus waar alles
+ * nieuw is: hij staat gegarandeerd onbeantwoord zodra het veld leeg is, en
+ * beantwoord zodra het gevuld is, zonder dat een koper er ooit naar vroeg.
+ *
+ * De specificatie helpt hier: condition staat standaard op "new". Ontbreekt het
+ * veld overal, dan is dat geen gat maar de standaardwaarde. Pas als er ergens
+ * iets anders dan nieuw in staat, wordt het een echte keuze voor de koper.
+ */
+function sellsNonNew(feed: Dataset): boolean {
+  return feed.products.some((product) => {
+    const value = str(product.values.condition)?.toLowerCase();
+    return value !== undefined && value !== 'new' && value !== 'nieuw';
+  });
 }
 
 function slug(value: string): string {
@@ -82,17 +88,21 @@ function archetypeFor(category: string) {
  * Bouw de vragensets voor deze merchant. Levert versie 1 met een lege changelog;
  * elke bewerking daarna verhoogt de versie en schrijft een regel bij (S8).
  */
-export function generateQuestionSets(feed: Dataset): QuestionSetState {
-  const categories = deriveCategories(feed);
+export function generateQuestionSets(feed: Dataset, catalog?: Dataset): QuestionSetState {
+  const categories = deriveCategories(feed, catalog);
+  // Vragen die in deze catalogus niets te vragen hebben, laten we weg in plaats
+  // van ze als permanent gat te laten staan.
+  const askCondition = sellsNonNew(feed);
+  const applicable = (question: Question) =>
+    askCondition || !question.requires.includes('condition');
   const named = categories.slice(0, MAX_SETS);
   const tail = categories.slice(MAX_SETS);
 
   const sets: QuestionSet[] = named.map((category) => {
     const archetype = archetypeFor(category.name);
-    const questions: Question[] = archetype.questions.map((q) => ({
-      ...q,
-      origin: 'archetype' as const,
-    }));
+    const questions: Question[] = archetype.questions
+      .filter(applicable)
+      .map((q) => ({ ...q, origin: 'archetype' as const }));
 
     return {
       id: slug(category.name),
@@ -120,7 +130,9 @@ export function generateQuestionSets(feed: Dataset): QuestionSetState {
       category: undefined,
       productCount: tail.reduce((sum, c) => sum + c.count, 0),
       archetypeId: fallback.id,
-      questions: fallback.questions.map((q) => ({ ...q, origin: 'archetype' as const })),
+      questions: fallback.questions
+        .filter(applicable)
+        .map((q) => ({ ...q, origin: 'archetype' as const })),
       validated: false,
     });
   }

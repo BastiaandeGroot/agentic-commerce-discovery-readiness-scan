@@ -96,7 +96,11 @@ export const STRINGS = {
       unmatchedExplain:
         'Deze producten worden geteld maar niet gescoord. Een catalogus waarin een deel nergens op matcht, heeft een taxonomieprobleem dat op zichzelf het melden waard is.',
       questionsHeading: 'Welke vragen blijven onbeantwoord',
-      questionsIntro: 'De onbeantwoorde vragen zijn de werklijst.',
+      questionsIntro:
+        'De onbeantwoorde vragen zijn de werklijst. Er staat bij of het antwoord toch ergens ligt: wat je feed niet beantwoordt maar je PIM wel, is geen ontbrekende informatie maar onbenutte informatie.',
+      fromFeed: 'uit je feed',
+      enrichable: 'verrijkbaar uit je PIM',
+      neither: 'nergens beschikbaar',
       answeredBy: 'beantwoord door',
       ofProducts: 'van de producten',
       selectionHeading: 'Selection-checklist',
@@ -285,7 +289,11 @@ export const STRINGS = {
       unmatchedExplain:
         'These products are counted but not scored. A catalogue where part of it matches nothing has a taxonomy problem worth reporting in its own right.',
       questionsHeading: 'Which questions go unanswered',
-      questionsIntro: 'The unanswered questions are the work list.',
+      questionsIntro:
+        'The unanswered questions are the work list. It says whether the answer sits somewhere after all: what your feed cannot answer but your PIM can is not missing information but unused information.',
+      fromFeed: 'from your feed',
+      enrichable: 'available in your PIM',
+      neither: 'nowhere available',
       answeredBy: 'answered by',
       ofProducts: 'of products',
       selectionHeading: 'Selection checklist',

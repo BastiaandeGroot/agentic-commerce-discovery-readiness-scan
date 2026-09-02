@@ -154,7 +154,13 @@ export interface Gap {
 export interface QuestionOutcome {
   questionId: string;
   label: Bilingual;
+  /** Beantwoord uit de FEED — dat is wat de agent ziet. */
   answered: boolean;
+  /**
+   * Niet uit de feed te beantwoorden, wél uit de catalogus. Dan is het geen gat
+   * maar onbenutte data: de feed kan verrijkt worden vanuit het PIM.
+   */
+  enrichable: boolean;
   /** Bij onbeantwoord: welke velden ontbraken. */
   missing: string[];
 }
@@ -214,7 +220,10 @@ export interface ProtocolReport {
     setId: string;
     questionId: string;
     label: Bilingual;
+    /** Beantwoord uit de feed. */
     answered: number;
+    /** Niet uit de feed, wel uit de catalogus: verrijkbaar. */
+    enrichable: number;
     applicable: number;
   }[];
   /** Per Selection-item: hoeveel producten het hebben. */

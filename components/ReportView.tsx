@@ -64,6 +64,7 @@ function QuestionCoverage({ s, report, protocol, locale }: {
   const rows = report.protocols[protocol].questionCoverage
     .filter((q) => q.answered < q.applicable)
     .slice(0, 14);
+  const hasCatalog = report.sources.catalog !== undefined;
 
   if (rows.length === 0) return null;
 
@@ -86,14 +87,32 @@ function QuestionCoverage({ s, report, protocol, locale }: {
                 {n(row.answered)}/{n(row.applicable)} {s.report.ofProducts}
               </span>
             </div>
-            <div className="mt-1">
-              <Bar
-                value={row.answered}
-                total={row.applicable}
-                tone={row.answered / Math.max(row.applicable, 1) < 0.5 ? 'warn' : 'accent'}
+            {/* Twee lagen: wat de feed beantwoordt, en wat het PIM alsnog kan
+                aanvullen. Dat verschil bepaalt of dit doorzetwerk of invulwerk is. */}
+            <div className="mt-1 flex h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
+              <div
+                className="h-full bg-accent"
+                style={{ width: `${(row.answered / Math.max(row.applicable, 1)) * 100}%` }}
+              />
+              <div
+                className="h-full bg-warn"
+                style={{ width: `${(row.enrichable / Math.max(row.applicable, 1)) * 100}%` }}
               />
             </div>
-            <p className="mt-0.5 text-xs text-muted">{categoryName.get(row.setId) ?? row.setId}</p>
+            <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted">
+              <span>{categoryName.get(row.setId) ?? row.setId}</span>
+              <span className="tnum">
+                <span className="text-accent">{n(row.answered)}</span> {s.report.fromFeed}
+              </span>
+              {hasCatalog && row.enrichable > 0 ? (
+                <span className="tnum">
+                  <span className="text-warn">{n(row.enrichable)}</span> {s.report.enrichable}
+                </span>
+              ) : null}
+              <span className="tnum">
+                {n(row.applicable - row.answered - row.enrichable)} {s.report.neither}
+              </span>
+            </p>
           </li>
         ))}
       </ul>
