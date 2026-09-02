@@ -99,30 +99,8 @@ export interface Question {
   disabled?: boolean;
   /** Toegevoegd door de merchant in plaats van door de generator. */
   custom?: boolean;
-  /** 'archetype' = uit de bibliotheek, 'derived' = afgeleid uit de eigen data. */
-  origin?: 'archetype' | 'derived';
-}
-
-/**
- * Een attribuut dat de merchant zelf bijhoudt, als kandidaat voor een vraag.
- *
- * Bewust GEEN vraag. Dat de merchant iets registreert zegt niets over wat een
- * koper vraagt; er zelf een vraag van maken zou de meetlat door de merchant
- * laten bepalen, en dan meet je of zijn feed zijn eigen PIM-velden draagt in
- * plaats van of zijn data een koper bedient. Een goed gevuld PIM zou dan een
- * strengere meetlat krijgen dan een leeg PIM — precies verkeerd om.
- *
- * Weggooien is ook zonde: "waterafstotend" en "toepassing" zijn wel degelijk
- * dingen waar een koper naar vraagt. Dus tonen we ze apart, en pas als de
- * merchant er een echte kopersvraag van maakt, telt hij mee.
- */
-export interface AttributeSuggestion {
-  id: string;
-  /** Kolomnaam zoals hij in de bron staat. */
-  column: string;
-  source: DatasetRole;
-  /** Aandeel producten in deze categorie waarvoor het attribuut gevuld is. */
-  fillRate: number;
+  /** 'archetype' = uit de bibliotheek, 'custom' = door de merchant toegevoegd. */
+  origin?: 'archetype' | 'custom';
 }
 
 export interface QuestionSet {
@@ -139,8 +117,6 @@ export interface QuestionSet {
   archetypeId?: string;
   /** Door de merchant bevestigd. Een set telt pas als hij gezien is (S6). */
   validated?: boolean;
-  /** Eigen attributen als kandidaat-vragen; tellen niet mee tot ze opgetild zijn. */
-  suggestions: AttributeSuggestion[];
 }
 
 export type ChangeLogAction = 'edited' | 'disabled' | 'enabled' | 'added' | 'removed';

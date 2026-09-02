@@ -25,13 +25,10 @@ const categories = deriveCategories(feed);
 console.log(`\nCATEGORIEEN (${categories.length}) — top 8:`);
 for (const c of categories.slice(0, 8)) console.log(`  ${String(c.count).padStart(6)}  ${c.name}`);
 
-const questions = generateQuestionSets(feed, catalog);
+const questions = generateQuestionSets(feed);
 console.log(`\nVRAGENSETS: ${questions.sets.length}, versie ${questions.version}`);
 for (const set of questions.sets.slice(0, 3)) {
   console.log(`  ${set.label.nl} (archetype ${set.archetypeId}, ${set.questions.length} vragen)`);
-  for (const q of set.questions.filter((x) => x.origin === 'derived')) {
-    console.log(`     uit data: ${q.label.nl}`);
-  }
 }
 
 const report = runScan(feed, catalog, questions);

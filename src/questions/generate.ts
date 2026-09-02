@@ -17,37 +17,12 @@
 // gestructureerde attributen, niet uit lopende tekst, en er komt geen model aan
 // te pas — de uitkomst is daarmee reproduceerbaar en kost niets per scan.
 
-import type {
-  AttributeSuggestion, Dataset, DatasetRole, Question, QuestionSet, QuestionSetState,
-} from '../domain/types';
+import type { Dataset, Question, QuestionSet, QuestionSetState } from '../domain/types';
 import { ARCHETYPES } from './archetypes';
-import { isBlank, str } from '../intake/normalize';
+import { str } from '../intake/normalize';
 
 /** Hoeveel categorieen een eigen set krijgen; de staart wordt samengevoegd. */
 const MAX_SETS = 30;
-/** Vanaf welke vulgraad een eigen kolom een kandidaatvraag wordt. */
-const DERIVED_FILL_THRESHOLD = 0.4;
-const MAX_DERIVED_PER_SET = 8;
-
-/**
- * Kolommen die nooit een kopersvraag opleveren: administratie, kanaalsturing en
- * boekhouding. Een Channable-feed zit er vol mee. Zonder deze filter wordt de
- * eerste voorgestelde vraag "Wat is de custom label 0?", en dan is het scherm
- * meteen zijn geloofwaardigheid kwijt.
- */
-const DERIVED_DENYLIST = [
-  /custom_label/i, /^ads?_/i, /_ads?$/i, /ads_/i, /cost_of_goods/i, /auto_pricing/i,
-  /identifier_exists/i, /expiration/i, /^link$/i, /_link$/i, /image/i, /^id$/i, /_id$/i,
-  /shipping/i, /handling/i, /cutoff/i, /free_shipping/i, /bulk_price/i, /promotion/i,
-  /^status$/i, /^visibility$/i, /created_at/i, /updated_at/i, /^type_id$/i, /manage_stock/i,
-  /^qty$/i, /backorder/i, /^price/i, /_price$/i, /^min_/i, /^max_/i, /excl_/i, /incl_/i,
-  /^sku$/i, /^ean$/i, /tax/i, /^url/i, /seo/i, /^supplier$/i, /is_bundle/i, /categor/i,
-];
-
-function isUsefulAttribute(column: string): boolean {
-  return !DERIVED_DENYLIST.some((re) => re.test(column));
-}
-
 export interface CategoryStat {
   name: string;
   count: number;
@@ -94,15 +69,6 @@ function slug(value: string): string {
     .slice(0, 40) || 'categorie';
 }
 
-function humanise(column: string): string {
-  return column
-    .replace(/^\s*[a-z]+:/i, '')
-    .replace(/[_.]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-}
-
 /** Kies het archetype dat bij deze categorienaam past. */
 function archetypeFor(category: string) {
   for (const archetype of ARCHETYPES) {
@@ -113,88 +79,16 @@ function archetypeFor(category: string) {
 }
 
 /**
- * Attributen die de merchant zelf bijhoudt, als KANDIDAAT voor een vraag.
- *
- * Eerder maakte deze functie er rechtstreeks vragen van. Dat was fout: dan komt
- * de meetlat van de merchant zelf, en meet je of zijn feed zijn eigen velden
- * draagt in plaats van of zijn data een koper bedient. Wie niets registreert kan
- * dan niet zakken, en wie alles netjes bijhoudt krijgt de strengste lat.
- *
- * Ze blijven wel zichtbaar. Dat iemand "waterafstotend" bijhoudt is een signaal
- * dat het in zijn markt speelt; alleen bepaalt hij zelf of er een kopersvraag
- * bij hoort en hoe die luidt.
- */
-function attributeSuggestions(
-  feed: Dataset,
-  catalog: Dataset | undefined,
-  category: string,
-  covered: Set<string>,
-): AttributeSuggestion[] {
-  const members = feed.products.filter((p) => mainCategory(p.values) === category);
-  if (members.length < 3) return [];
-
-  const fill = new Map<string, number>();
-  for (const product of members) {
-    for (const [column, value] of Object.entries(product.unmapped)) {
-      if (isBlank(value) || !isUsefulAttribute(column)) continue;
-      fill.set(column, (fill.get(column) ?? 0) + 1);
-    }
-  }
-
-  // Ook uit de catalogus. Juist daar staan de kenmerken die de merchant wél
-  // bijhoudt maar niet doorzet naar de feed; als er een kopersvraag bij hoort,
-  // is dat straks een mappinggat en geen echt gat.
-  const sources = new Map<string, DatasetRole>();
-  for (const column of fill.keys()) sources.set(column, 'feed');
-
-  if (catalog) {
-    const share = new Map<string, number>();
-    for (const product of catalog.products) {
-      for (const [column, value] of Object.entries(product.unmapped)) {
-        if (isBlank(value) || !isUsefulAttribute(column)) continue;
-        share.set(column, (share.get(column) ?? 0) + 1);
-      }
-    }
-    for (const [column, count] of share) {
-      const rate = count / catalog.products.length;
-      if (rate < DERIVED_FILL_THRESHOLD) continue;
-      if (fill.has(column)) continue;
-      fill.set(column, Math.round(members.length * rate));
-      sources.set(column, 'catalog');
-    }
-  }
-
-  return [...fill.entries()]
-    .filter(([column, n]) => {
-      if (n / members.length < DERIVED_FILL_THRESHOLD) return false;
-      const human = humanise(column);
-      // Niet dubbelen met een vraag die het archetype al stelt.
-      return ![...covered].some((c) => c.includes(human) || human.includes(c));
-    })
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, MAX_DERIVED_PER_SET)
-    .map(([column, n]) => ({
-      id: `s-${slug(column)}`,
-      column,
-      source: sources.get(column) ?? 'feed',
-      fillRate: n / members.length,
-    }));
-}
-
-/**
  * Bouw de vragensets voor deze merchant. Levert versie 1 met een lege changelog;
  * elke bewerking daarna verhoogt de versie en schrijft een regel bij (S8).
  */
-export function generateQuestionSets(feed: Dataset, catalog?: Dataset): QuestionSetState {
+export function generateQuestionSets(feed: Dataset): QuestionSetState {
   const categories = deriveCategories(feed);
   const named = categories.slice(0, MAX_SETS);
   const tail = categories.slice(MAX_SETS);
 
   const sets: QuestionSet[] = named.map((category) => {
     const archetype = archetypeFor(category.name);
-    const covered = new Set(
-      archetype.questions.flatMap((q) => [q.label.nl.toLowerCase(), ...q.requires.map(humanise)]),
-    );
     const questions: Question[] = archetype.questions.map((q) => ({
       ...q,
       origin: 'archetype' as const,
@@ -209,7 +103,6 @@ export function generateQuestionSets(feed: Dataset, catalog?: Dataset): Question
       productCount: category.count,
       archetypeId: archetype.id,
       questions,
-      suggestions: attributeSuggestions(feed, catalog, category.name, covered),
       validated: false,
     };
   });
@@ -228,7 +121,6 @@ export function generateQuestionSets(feed: Dataset, catalog?: Dataset): Question
       productCount: tail.reduce((sum, c) => sum + c.count, 0),
       archetypeId: fallback.id,
       questions: fallback.questions.map((q) => ({ ...q, origin: 'archetype' as const })),
-      suggestions: [],
       validated: false,
     });
   }

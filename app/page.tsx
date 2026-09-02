@@ -36,7 +36,7 @@ export default function Home() {
   function handleReady(nextFeed: Dataset, nextCatalog?: Dataset) {
     setFeed(nextFeed);
     setCatalog(nextCatalog);
-    setQuestionState(generateQuestionSets(nextFeed, nextCatalog));
+    setQuestionState(generateQuestionSets(nextFeed));
     setStep('questions');
   }
 
