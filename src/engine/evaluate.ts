@@ -8,7 +8,7 @@ import type {
 import { FIELD_BY_KEY } from '../spec/fields';
 import { isBlank, parseBool, str } from '../intake/normalize';
 import { OUT_CHECKS, SELECTION_CHECKLIST } from './checklists';
-import { mainCategory } from '../questions/generate';
+import { mainCategory } from './join';
 
 /**
  * Kwaliteitsdrempels. Aanwezigheid is niet hetzelfde als bruikbaarheid: een
@@ -70,8 +70,12 @@ function answersQuestion(product: ProductRecord, requires: string[], mode: 'any'
  * dus daar matchen we ook op. Anders valt "Fietsbanden > Racefiets" buiten de
  * set die juist voor Fietsbanden is gemaakt.
  */
-export function pickSet(product: ProductRecord, sets: QuestionSet[]): QuestionSet | undefined {
-  const category = mainCategory(product.values);
+export function pickSet(
+  product: ProductRecord,
+  sets: QuestionSet[],
+  catalogProduct?: ProductRecord,
+): QuestionSet | undefined {
+  const category = mainCategory(product, catalogProduct);
   if (!category) return undefined; // geen categorie -> geflagd en geteld, niet gescoord (§6)
 
   for (const set of sets) {
@@ -138,14 +142,22 @@ function evaluateProtocol(
   product: ProductRecord,
   set: QuestionSet | undefined,
   protocol: Protocol,
+  catalogProduct: ProductRecord | undefined,
 ): ProtocolProductResult {
   const questions: QuestionOutcome[] = [];
   if (set) {
     for (const question of set.questions) {
       if (question.disabled) continue;
       if (!applicableTo(question.requires, protocol)) continue;
+      // Eerst de feed: dat is wat de agent daadwerkelijk leest.
       const { answered, missing } = answersQuestion(product, question.requires, question.mode);
-      questions.push({ questionId: question.id, label: question.label, answered, missing });
+      // Pas als de feed het antwoord niet heeft, kijken we of de catalogus het wél
+      // heeft. Dan is het geen ontbrekende informatie maar onbenutte informatie.
+      const enrichable =
+        !answered &&
+        catalogProduct !== undefined &&
+        answersQuestion(catalogProduct, question.requires, question.mode).answered;
+      questions.push({ questionId: question.id, label: question.label, answered, enrichable, missing });
     }
   }
 
@@ -180,11 +192,11 @@ export function evaluateProduct(
   /** Het bijbehorende catalogusrecord, al opgezocht door de aanroeper. */
   catalogProduct: ProductRecord | undefined,
 ): ProductResult {
-  const set = pickSet(product, sets);
+  const set = pickSet(product, sets, catalogProduct);
 
   const perProtocol = {
-    acp: evaluateProtocol(product, set, 'acp'),
-    ucp: evaluateProtocol(product, set, 'ucp'),
+    acp: evaluateProtocol(product, set, 'acp', catalogProduct),
+    ucp: evaluateProtocol(product, set, 'ucp', catalogProduct),
   };
 
   // Verzamel de ontbrekende velden uit beide protocollen, zonder dubbelingen.
@@ -212,7 +224,7 @@ export function evaluateProduct(
     key: product.key,
     title: str(product.values.title),
     image: str(product.values.image),
-    category: str(product.values.product_type) ?? str(product.values.product_category),
+    category: mainCategory(product, catalogProduct),
     setId: set?.id,
     unmatched: set === undefined,
     perProtocol,

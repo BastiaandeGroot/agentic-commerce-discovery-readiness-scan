@@ -12,7 +12,7 @@ import { useMemo, useState } from 'react';
 import type { Dataset, Locale, Question, QuestionSetState } from '../src/domain/types';
 import { FIELDS, FIELD_BY_KEY } from '../src/spec/fields';
 import {
-  addQuestion, allValidated, editQuestion, markValidated, promoteSuggestion, toggleQuestion,
+  addQuestion, allValidated, editQuestion, toggleQuestion, toggleValidated,
 } from '../src/questions/mutate';
 import type { Strings } from '../src/i18n/strings';
 import { Badge, Button, Card, CardTitle } from './ui';
@@ -77,8 +77,8 @@ function QuestionRow({
 
       {!editing ? (
         <div className="flex shrink-0 items-center gap-1.5">
-          <Badge tone={question.origin === 'derived' ? 'accent' : 'neutral'}>
-            {question.origin === 'derived' ? s.questions.fromData : s.questions.fromArchetype}
+          <Badge tone={question.origin === 'custom' ? 'accent' : 'neutral'}>
+            {question.origin === 'custom' ? s.questions.fromData : s.questions.fromArchetype}
           </Badge>
           <Button variant="quiet" onClick={() => setEditing(true)}>{s.questions.edit}</Button>
           <Button variant="quiet" onClick={() => onChange(toggleQuestion(state, setId, question.id))}>
@@ -99,22 +99,13 @@ export function QuestionSetStep({ s, locale, feed, state, onChange, onRun }: Pro
   const [openSet, setOpenSet] = useState<string | undefined>(state.sets[0]?.id);
   const [newLabel, setNewLabel] = useState('');
   const [newField, setNewField] = useState('');
-  /** Welke suggestie wordt opgetild; bepaalt of het formulier hem verwijdert. */
-  const [promoting, setPromoting] = useState<string | undefined>();
 
   // Keuzelijst: de canonieke velden plus de eigen kolommen die we niet plaatsten.
   const fieldOptions = useMemo(() => {
     const canonical = FIELDS.map((f) => ({ value: f.key, label: f.label[locale] }));
     const own = feed.unmappedColumns.map((c) => ({ value: columnPattern(c), label: c }));
-    // Ook PIM-kolommen, zodat een opgetilde suggestie een geldige eis heeft.
-    const fromSets = state.sets.flatMap((set) =>
-      set.suggestions.map((x) => ({ value: columnPattern(x.column), label: x.column })),
-    );
-    const seen = new Set<string>();
-    return [...canonical, ...own, ...fromSets].filter((o) =>
-      seen.has(o.value) ? false : (seen.add(o.value), true),
-    );
-  }, [feed.unmappedColumns, locale, state.sets]);
+    return [...canonical, ...own];
+  }, [feed.unmappedColumns, locale]);
 
   const ready = allValidated(state);
 
@@ -152,13 +143,17 @@ export function QuestionSetStep({ s, locale, feed, state, onChange, onRun }: Pro
                   </span>
                 </span>
               </button>
-              {set.validated ? (
-                <Badge tone="ok">✓ {s.questions.validated}</Badge>
-              ) : (
-                <Button variant="secondary" onClick={() => onChange(markValidated(state, set.id))}>
-                  {s.questions.validate}
+              {/* Terugdraaibaar: wie halverwege bedenkt dat een set toch niet
+                  klopt, moet dat kunnen terugnemen zonder opnieuw te beginnen. */}
+              <div className="flex shrink-0 items-center gap-2">
+                {set.validated ? <Badge tone="ok">✓ {s.questions.validated}</Badge> : null}
+                <Button
+                  variant={set.validated ? 'quiet' : 'secondary'}
+                  onClick={() => onChange(toggleValidated(state, set.id))}
+                >
+                  {set.validated ? s.questions.unvalidate : s.questions.validate}
                 </Button>
-              )}
+              </div>
             </div>
 
             {open ? (
@@ -172,47 +167,6 @@ export function QuestionSetStep({ s, locale, feed, state, onChange, onRun }: Pro
                     />
                   ))}
                 </ul>
-
-                {/* Eigen attributen. Bewust naast de vragen en niet ertussen:
-                    ze tellen pas mee als de merchant er een koperssvraag van
-                    maakt, want wat hij registreert bepaalt niet wat een koper
-                    vraagt. */}
-                <div className="mt-4 rounded-lg border border-line p-3">
-                  <h4 className="text-sm font-medium">{s.questions.suggestionsTitle}</h4>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">
-                    {s.questions.suggestionsIntro}
-                  </p>
-                  {set.suggestions.length === 0 ? (
-                    <p className="mt-2 text-sm text-muted">{s.questions.noSuggestions}</p>
-                  ) : (
-                    <ul className="mt-2 divide-y divide-line">
-                      {set.suggestions.map((suggestion) => (
-                        <li key={suggestion.id} className="flex flex-wrap items-center gap-2 py-2">
-                          <span className="min-w-0 flex-1 font-mono text-sm">{suggestion.column}</span>
-                          <Badge tone={suggestion.source === 'catalog' ? 'warn' : 'neutral'}>
-                            {suggestion.source === 'catalog'
-                              ? s.questions.suggestionFromCatalog
-                              : s.questions.suggestionFromFeed}
-                          </Badge>
-                          <span className="tnum text-xs text-muted">
-                            {Math.round(suggestion.fillRate * 100)}% {s.questions.suggestionFilled}
-                          </span>
-                          <Button
-                            variant="secondary"
-                            onClick={() => {
-                              setPromoting(suggestion.id);
-                              setNewField(columnPattern(suggestion.column));
-                              setNewLabel('');
-                              setOpenSet(set.id);
-                            }}
-                          >
-                            {s.questions.promote}
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
 
                 <div className="mt-4 flex flex-wrap items-end gap-2 rounded-lg bg-surface-2 p-3">
                   <label className="min-w-0 flex-1 text-xs text-muted">
@@ -239,13 +193,8 @@ export function QuestionSetStep({ s, locale, feed, state, onChange, onRun }: Pro
                   <Button
                     disabled={newLabel.trim() === '' || newField === ''}
                     onClick={() => {
-                      const label = { nl: newLabel, en: newLabel };
-                      onChange(
-                        promoting
-                          ? promoteSuggestion(state, set.id, promoting, label, [newField])
-                          : addQuestion(state, set.id, label, [newField]),
-                      );
-                      setNewLabel(''); setNewField(''); setPromoting(undefined);
+                      onChange(addQuestion(state, set.id, { nl: newLabel, en: newLabel }, [newField]));
+                      setNewLabel(''); setNewField('');
                     }}
                   >
                     {s.questions.add}

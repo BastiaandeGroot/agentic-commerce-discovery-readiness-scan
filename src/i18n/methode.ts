@@ -60,9 +60,9 @@ export const METHODE = {
     questionsBody:
       'De vragenlijsten bestaan nog niet als je hier binnenkomt. Ze worden gemaakt zodra je je bestanden hebt aangeleverd, en ze gaan over jouw eigen categorieën — niet over een indeling die wij hebben bedacht.',
     questionsSources:
-      'Ze komen uit twee hoeken. Ten eerste uit onze bibliotheek met vragen die in dat soort categorieën normaal gesproken spelen. Ten tweede uit je eigen data: als je in het PIM voor bijna elk product netjes een kenmerk als "motief" of "waterafstotend" bijhoudt, is dat blijkbaar belangrijk in jouw assortiment — en dan hoort er een vraag over te bestaan.',
+      'Ze komen uit onze bibliotheek met vragen die in dat soort categorieën normaal gesproken spelen. Wat we bewust níét doen is vragen afleiden uit je eigen bestanden. Dat je een kenmerk bijhoudt zegt namelijk nog niet dat een koper ernaar vraagt — en zouden we jouw kolommen tot vragenlijst maken, dan meten we of je feed je eigen velden draagt in plaats van of je data een koper bedient. Wie niets bijhoudt zou dan ook niet kunnen zakken.',
     questionsValidation:
-      'Daarna kijk jij ze na, en dat is het belangrijkste moment van de hele scan. Wij kennen jouw markt niet. Je kunt vragen anders formuleren, weghalen wat niet relevant is, en toevoegen wat wij gemist hebben. Pas als jij ze hebt bevestigd, draait de scan.',
+      'Daarna kijk jij ze na, en dat is het belangrijkste moment van de hele scan. Wij kennen jouw markt niet. Je kunt vragen anders formuleren, weghalen wat niet relevant is, en zelf toevoegen wat wij gemist hebben — ook gekoppeld aan een eigen kolom uit je feed. Pas als jij een set bevestigt telt hij mee, en je kunt die bevestiging altijd weer intrekken.',
     questionsLog:
       'Elke wijziging leggen we vast met datum en tijd. Dat lijkt bureaucratisch, maar het is nodig: als je over een half jaar opnieuw scant en de uitkomst is anders, wil je weten of je data is verbeterd of dat de vraagstelling is veranderd.',
     questionsFuture:
@@ -158,9 +158,9 @@ export const METHODE = {
     questionsBody:
       'The question lists do not exist yet when you arrive here. They are built once you have supplied your files, and they are about your own categories — not a classification we invented.',
     questionsSources:
-      'They come from two directions. First, our library of questions that normally matter in that kind of category. Second, your own data: if your PIM diligently records something like "pattern" or "water resistant" for almost every product, then it evidently matters in your range — and there should be a question about it.',
+      'They come from our library of questions that normally matter in that kind of category. What we deliberately do not do is derive questions from your own files. The fact that you record something does not yet mean a buyer asks for it — and turning your columns into the question list would measure whether your feed carries your own fields rather than whether your data serves a buyer. Someone who records nothing could then never fail.',
     questionsValidation:
-      'Then you review them, and that is the most important moment in the whole scan. We do not know your market. You can reword questions, remove what is irrelevant, and add what we missed. Only once you confirm them does the scan run.',
+      'Then you review them, and that is the most important moment in the whole scan. We do not know your market. You can reword questions, remove what is irrelevant, and add what we missed yourself — including bound to one of your own feed columns. A set counts only once you confirm it, and you can always withdraw that confirmation.',
     questionsLog:
       'Every change is recorded with date and time. That may look bureaucratic, but it is necessary: if you scan again in six months and the outcome differs, you want to know whether your data improved or the questions changed.',
     questionsFuture:

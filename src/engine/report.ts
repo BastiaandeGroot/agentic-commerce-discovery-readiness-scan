@@ -15,57 +15,10 @@ import type {
 } from '../domain/types';
 import { OUT_CHECKS, SELECTION_CHECKLIST } from './checklists';
 import { evaluateProduct } from './evaluate';
-import { normalizeColumnName } from '../intake/fieldmap';
+import { indexCatalog, lookupCatalog } from './join';
 import { SPEC_SNAPSHOT_ID } from '../spec/snapshot';
 
 const PROTOCOLS: Protocol[] = ['acp', 'ucp'];
-
-/**
- * Kolommen die als join-sleutel kunnen dienen.
- *
- * Feed en catalogus koppelen op één veld is fragiel (§11): een Channable-feed
- * zet vaak de SKU in g:id terwijl het PIM daarnaast een eigen intern id voert.
- * Koppelen we alleen op dat id, dan matcht niets en lijkt élk gat een echt gat —
- * precies de verkeerde conclusie. Daarom indexeren we op alle bruikbare
- * sleutels en proberen we ze in volgorde.
- */
-const JOIN_COLUMNS = /^(sku|ean|upc|gtin|mpn|barcode|artikelnummer|artikelcode|productcode)$/;
-
-function joinValues(product: ProductRecord): string[] {
-  const values: string[] = [];
-  for (const key of ['item_id', 'mpn', 'gtin'] as const) {
-    const value = product.values[key];
-    if (value) values.push(value.trim());
-  }
-  for (const [column, value] of Object.entries(product.unmapped)) {
-    if (value && JOIN_COLUMNS.test(normalizeColumnName(column))) values.push(value.trim());
-  }
-  return values;
-}
-
-function indexCatalog(catalog: Dataset | undefined): Map<string, ProductRecord> | undefined {
-  if (!catalog) return undefined;
-  const index = new Map<string, ProductRecord>();
-  for (const product of catalog.products) {
-    for (const value of joinValues(product)) {
-      // Eerste voorkomen wint; dubbele sleutels zijn zelf een bevinding.
-      if (!index.has(value)) index.set(value, product);
-    }
-  }
-  return index;
-}
-
-function lookupCatalog(
-  index: Map<string, ProductRecord> | undefined,
-  product: ProductRecord,
-): ProductRecord | undefined {
-  if (!index) return undefined;
-  for (const value of joinValues(product)) {
-    const hit = index.get(value);
-    if (hit) return hit;
-  }
-  return undefined;
-}
 
 /** Tel gaps samen over een verzameling producten, op veld en oorzaak. */
 function aggregateGaps(results: ProductResult[]): Gap[] {
@@ -138,7 +91,7 @@ function buildProtocolReport(
   // Per vraag: hoeveel producten die de set gebruiken, beantwoorden hem?
   const coverage = new Map<string, {
     setId: string; questionId: string; label: { nl: string; en: string };
-    answered: number; applicable: number;
+    answered: number; enrichable: number; applicable: number;
   }>();
   for (const result of scored) {
     for (const question of result.perProtocol[protocol].questions) {
@@ -148,10 +101,12 @@ function buildProtocolReport(
         questionId: question.questionId,
         label: question.label,
         answered: 0,
+        enrichable: 0,
         applicable: 0,
       };
       entry.applicable += 1;
       if (question.answered) entry.answered += 1;
+      else if (question.enrichable) entry.enrichable += 1;
       coverage.set(id, entry);
     }
   }

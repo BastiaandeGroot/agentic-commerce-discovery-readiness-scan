@@ -21,17 +21,14 @@ if (catalog) {
   console.log(`         ${Object.keys(catalog.mapping).length} kolommen herkend, ${catalog.unmappedColumns.length} niet geplaatst`);
 }
 
-const categories = deriveCategories(feed);
+const categories = deriveCategories(feed, catalog);
 console.log(`\nCATEGORIEEN (${categories.length}) — top 8:`);
 for (const c of categories.slice(0, 8)) console.log(`  ${String(c.count).padStart(6)}  ${c.name}`);
 
 const questions = generateQuestionSets(feed, catalog);
 console.log(`\nVRAGENSETS: ${questions.sets.length}, versie ${questions.version}`);
-for (const set of questions.sets.slice(0, 3)) {
+for (const set of questions.sets) {
   console.log(`  ${set.label.nl} (archetype ${set.archetypeId}, ${set.questions.length} vragen)`);
-  for (const q of set.questions.filter((x) => x.origin === 'derived')) {
-    console.log(`     uit data: ${q.label.nl}`);
-  }
 }
 
 const report = runScan(feed, catalog, questions);
@@ -54,9 +51,10 @@ for (const g of report.protocols.acp.gaps.slice(0, 10)) {
   console.log(`  ${String(g.affected).padStart(6)}  ${g.field.padEnd(26)} ${g.tier.padEnd(10)} ${g.cause.padEnd(12)} ${g.owner}`);
 }
 
-console.log(`\nONBEANTWOORDE VRAGEN (ACP, top 8)`);
-for (const q of report.protocols.acp.questionCoverage.slice(0, 8)) {
-  console.log(`  ${String(q.answered).padStart(6)}/${String(q.applicable).padEnd(6)} ${q.label.nl}`);
+console.log(`\nONBEANTWOORDE VRAGEN (ACP, top 10)`);
+console.log(`  ${'uit feed'.padStart(9)} ${'verrijkbaar'.padStart(12)} ${'totaal'.padStart(7)}  vraag`);
+for (const q of report.protocols.acp.questionCoverage.slice(0, 10)) {
+  console.log(`  ${String(q.answered).padStart(9)} ${String(q.enrichable).padStart(12)} ${String(q.applicable).padStart(7)}  ${q.label.nl}`);
 }
 
 console.log(`\nPER CATEGORIE (ACP)`);
