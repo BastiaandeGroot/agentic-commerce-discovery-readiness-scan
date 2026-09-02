@@ -10,7 +10,7 @@ import type { Locale, Protocol, ScanReport } from '../src/domain/types';
 import { SPEC_SOURCES } from '../src/spec/snapshot';
 import { UCP_TRUST_NOTE } from '../src/engine/checklists';
 import type { Strings } from '../src/i18n/strings';
-import { Badge, Bar, Button, Card, CardTitle } from './ui';
+import { Badge, Bar, Button, Card, CardTitle, TrafficLight, statusOf } from './ui';
 import { Explorer } from './Explorer';
 
 const PROTOCOLS: Protocol[] = ['acp', 'ucp'];
@@ -21,6 +21,7 @@ function n(value: number): string {
 
 function FunnelCard({ s, report, protocol }: { s: Strings; report: ScanReport; protocol: Protocol }) {
   const { funnel } = report.protocols[protocol];
+  const status = statusOf(funnel.avgAnswered, funnel.avgApplicable);
   const rows = [
     { label: s.report.total, value: funnel.total, tone: 'neutral' as const, explain: undefined },
     { label: s.report.findable, value: funnel.findable, tone: 'accent' as const, explain: s.report.findableExplain },
@@ -44,14 +45,23 @@ function FunnelCard({ s, report, protocol }: { s: Strings; report: ScanReport; p
           </div>
         ))}
       </div>
-      {/* De trechter is binair; dit getal laat zien hoe ver een product komt. */}
-      <p className="mt-4 border-t border-line pt-3 text-sm">
-        {s.report.avgAnsweredLine}{' '}
-        <strong className="tnum">{funnel.avgAnswered.toFixed(1)}</strong>{' '}
-        {s.report.avgAnsweredOf}{' '}
-        <strong className="tnum">{funnel.avgApplicable.toFixed(0)}</strong>{' '}
-        {s.report.avgAnsweredSuffix}
-      </p>
+      {/* De trechter is binair en zegt vaak nul. Dit laat zien hoe ver een
+          product komt, zonder te doen alsof gedeeltelijk ook goed is. */}
+      <div className="mt-4 border-t border-line pt-4">
+        <div className="flex items-center gap-3">
+          <TrafficLight status={status} />
+          <div className="min-w-0">
+            <p className="font-medium">{s.report.status[status]}</p>
+            <p className="tnum text-sm text-muted">
+              {funnel.avgAnswered.toFixed(1)} {s.report.statusScale}{' '}
+              {funnel.avgApplicable.toFixed(0)} {s.report.statusAnswered}
+            </p>
+          </div>
+        </div>
+        <p className="mt-2.5 text-sm leading-relaxed text-muted">
+          {s.report.statusExplain[status]}
+        </p>
+      </div>
     </Card>
   );
 }
