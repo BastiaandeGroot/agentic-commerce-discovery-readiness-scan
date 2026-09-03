@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "npx esbuild tests/index.ts --bundle --platform=node --format=esm --outfile=.test-build/tests.mjs --log-level=warning && node --test .test-build/tests.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "lucide-react": "^1.39.0",

@@ -6,10 +6,11 @@
 // over tijd betekenisloos, en kun je echte vooruitgang niet onderscheiden van
 // een verschoven definitie.
 
-import type { ChangeLogAction, Question, QuestionSetState } from '../domain/types';
+import type { ChangeLogAction, Question, QuestionSet, QuestionSetState } from '../domain/types';
 
 function record(
   state: QuestionSetState,
+  at: string,
   setId: string,
   questionId: string,
   action: ChangeLogAction,
@@ -22,13 +23,29 @@ function record(
     version: state.version + 1,
     changeLog: [
       ...state.changeLog,
-      { at: new Date().toISOString(), setId, questionId, action, before, after },
+      { at, setId, questionId, action, before, after },
     ],
   };
 }
 
+/**
+ * Volgnummer voor een zelf toegevoegde vraag.
+ *
+ * Bewust geen tijdstempel: dan hangt de inhoud van een vragenset af van wanneer
+ * iemand op de knop drukte, en zijn twee sets met dezelfde vragen toch niet
+ * gelijk. Dit telt door op wat er al staat.
+ */
+function nextCustomId(set: QuestionSet): string {
+  const hoogste = set.questions
+    .map((q) => /^c(\d+)$/.exec(q.id)?.[1])
+    .filter((n): n is string => n !== undefined)
+    .reduce((max, n) => Math.max(max, Number(n)), 0);
+  return `c${hoogste + 1}`;
+}
+
 export function editQuestion(
   state: QuestionSetState,
+  at: string,
   setId: string,
   questionId: string,
   label: { nl: string; en: string },
@@ -45,12 +62,13 @@ export function editQuestion(
       s.id !== setId ? s : { ...s, questions: s.questions.map((q) => (q.id === questionId ? { ...q, label } : q)) },
     ),
   };
-  return record(next, setId, questionId, 'edited', before, label.nl);
+  return record(next, at, setId, questionId, 'edited', before, label.nl);
 }
 
 /** Uitzetten in plaats van weggooien: de vraag blijft zichtbaar, telt niet mee. */
 export function toggleQuestion(
   state: QuestionSetState,
+  at: string,
   setId: string,
   questionId: string,
 ): QuestionSetState {
@@ -65,11 +83,12 @@ export function toggleQuestion(
       s.id !== setId ? s : { ...s, questions: s.questions.map((q) => (q.id === questionId ? { ...q, disabled } : q)) },
     ),
   };
-  return record(next, setId, questionId, disabled ? 'disabled' : 'enabled');
+  return record(next, at, setId, questionId, disabled ? 'disabled' : 'enabled');
 }
 
 export function addQuestion(
   state: QuestionSetState,
+  at: string,
   setId: string,
   label: { nl: string; en: string },
   requires: string[],
@@ -78,7 +97,7 @@ export function addQuestion(
   if (!set || requires.length === 0) return state;
 
   const question: Question = {
-    id: `c${Date.now().toString(36)}`,
+    id: nextCustomId(set),
     label,
     requires,
     mode: 'any',
@@ -89,7 +108,7 @@ export function addQuestion(
     ...state,
     sets: state.sets.map((s) => (s.id !== setId ? s : { ...s, questions: [...s.questions, question] })),
   };
-  return record(next, setId, question.id, 'added', undefined, label.nl);
+  return record(next, at, setId, question.id, 'added', undefined, label.nl);
 }
 
 /**

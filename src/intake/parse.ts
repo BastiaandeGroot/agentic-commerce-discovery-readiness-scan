@@ -35,18 +35,33 @@ export function detectFormat(filename: string, text: string): RawFormat {
   return 'delimited';
 }
 
-/** Kies het scheidingsteken op basis van de kopregel. */
+/**
+ * Kies het scheidingsteken op basis van de kopregel.
+ *
+ * Tellen gebeurt buiten de aanhalingstekens om. Een kolomnaam als
+ * "naam, volledig" in een puntkomma-bestand zou anders een komma opleveren, en
+ * dan valt het hele bestand als één kolom uit de parser.
+ */
 export function detectDelimiter(text: string): { char: string; label: string } {
-  const firstLine = text.split('\n')[0] ?? '';
-  const counts: [string, string, number][] = [
-    [',', 'komma', (firstLine.match(/,/g) || []).length],
-    [';', 'puntkomma', (firstLine.match(/;/g) || []).length],
-    ['\t', 'tab', (firstLine.match(/\t/g) || []).length],
-    ['|', 'pipe', (firstLine.match(/\|/g) || []).length],
-  ];
-  counts.sort((a, b) => b[2] - a[2]);
-  const [char, label, n] = counts[0];
-  return n > 0 ? { char, label } : { char: ',', label: 'komma' };
+  const counts = new Map<string, number>([[',', 0], [';', 0], ['\t', 0], ['|', 0]]);
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') {
+      // "" binnen een veld is een ontsnapt aanhalingsteken, geen einde.
+      if (inQuotes && text[i + 1] === '"') { i++; continue; }
+      inQuotes = !inQuotes;
+    } else if (!inQuotes && ch === '\n') {
+      break; // einde van de kopregel
+    } else if (!inQuotes && counts.has(ch)) {
+      counts.set(ch, counts.get(ch)! + 1);
+    }
+  }
+
+  const labels: Record<string, string> = { ',': 'komma', ';': 'puntkomma', '\t': 'tab', '|': 'pipe' };
+  const [char, n] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  return n > 0 ? { char, label: labels[char] } : { char: ',', label: 'komma' };
 }
 
 /**
@@ -197,9 +212,15 @@ export function parseXmlDocument(text: string): Record<string, string>[] {
     if (!blocks || blocks.length === 0) continue;
     return blocks.map((block) => {
       const row: Record<string, string> = {};
+      // De omhullende knoop er eerst af: anders matcht de regex hieronder
+      // <item> ... </item> in zijn geheel, slaan we die over als gelijknamig,
+      // en komen de kindknopen nooit aan bod — een rij vol niets.
+      const inner = block
+        .replace(new RegExp(`^<${name}[^>]*>`, 'i'), '')
+        .replace(new RegExp(`</${name}>$`, 'i'), '');
       const re = /<([A-Za-z_][\w:.-]*)[^>]*>([\s\S]*?)<\/\1>/g;
       let m: RegExpExecArray | null;
-      while ((m = re.exec(block)) !== null) {
+      while ((m = re.exec(inner)) !== null) {
         const key = m[1];
         if (key.toLowerCase() === name.toLowerCase()) continue;
         const val = m[2].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim();

@@ -236,6 +236,8 @@ export interface ProtocolReport {
 
 /** §8: elke score verwijst naar spec-snapshot én vragenset-versie. */
 export interface VersionStamp {
+  /** Versie van de scanregels zelf; zonder dit is vergelijken over tijd blind. */
+  scanVersion: string;
   specSnapshot: string;
   questionSetVersion: number;
   scannedAt: string;

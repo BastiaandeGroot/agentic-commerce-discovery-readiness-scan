@@ -40,7 +40,7 @@ export default function Home() {
 
   function handleRun() {
     if (!feed || !questionState) return;
-    setReport(runScan(feed, catalog, questionState));
+    setReport(runScan(feed, catalog, questionState, { scannedAt: new Date().toISOString() }));
     setStep('report');
   }
 

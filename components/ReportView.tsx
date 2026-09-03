@@ -414,7 +414,11 @@ export function ReportView({ s, locale, report, onRestart }: {
 
       <Card>
         <CardTitle sub={s.report.stampExplain}>{s.report.stampHeading}</CardTitle>
-        <dl className="grid gap-3 text-sm sm:grid-cols-3">
+        <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <dt className="text-xs text-muted">{s.report.scanVersion}</dt>
+            <dd className="tnum font-medium">v{report.stamp.scanVersion}</dd>
+          </div>
           <div>
             <dt className="text-xs text-muted">{s.report.specSnapshot}</dt>
             <dd className="tnum font-medium">{report.stamp.specSnapshot}</dd>

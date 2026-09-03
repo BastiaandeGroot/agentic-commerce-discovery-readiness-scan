@@ -59,9 +59,13 @@ in de browser en straks serverzijdig.
 
 - **Nooit scanlogica in een component.** Zie je het toch gebeuren, breng het
   terug naar de motor en importeer het.
-- Verandert een regel die de uitkomst beïnvloedt, dan gaat de spec-snapshot
-  omhoog. Zonder dat is vergelijken over tijd betekenisloos.
-- Elk resultaat draagt zijn spec-snapshot én vragenset-versie.
+- **De motor heeft geen klok.** Tijd komt binnen als argument: `runScan` krijgt
+  `scannedAt` mee, de mutaties krijgen `at` mee. Anders geeft dezelfde invoer
+  twee keer een ander rapport.
+- Verandert een regel die de uitkomst op ongewijzigde data kan veranderen, dan
+  gaat `SCAN_VERSION` in `src/engine/version.ts` omhoog. Zonder dat lijkt een
+  verschoven definitie op vooruitgang.
+- Elk resultaat draagt scanversie, spec-snapshot én vragenset-versie.
 
 ## Merchant-data
 
@@ -72,7 +76,9 @@ login is. Achteraf toevoegen betekent een migratie op data die er al staat.
 
 - Imports **zonder** `.ts`/`.tsx`-extensie; Next lost ze zelf op en TypeScript
   weigert ze anders.
-- Controleren doe je met `npx tsc --noEmit` en `npm run build`.
+- Controleren doe je met `npm test`, `npm run typecheck` en `npm run build`.
+  De tests draaien op `node --test` via een esbuild-bundel; ze hebben geen
+  browser nodig en bewaken onder meer dat de motor puur blijft.
 - De motor headless draaien op echte bestanden:
   ```
   npx esbuild scripts/scan-cli.ts --bundle --platform=node --format=esm --outfile=/tmp/scan-cli.mjs
