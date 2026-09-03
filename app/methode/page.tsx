@@ -165,7 +165,7 @@ export default function MethodePage() {
                   <Badge tone={cause === 'mapping' ? 'accent' : cause === 'no-source' ? 'danger' : 'warn'}>
                     {s.report.causes[cause]}
                   </Badge>
-                  <span className="text-xs text-muted">{s.report.causeCost[cause]}</span>
+                  <span className="text-xs text-muted">{s.report.causeEffort[cause]}</span>
                 </div>
                 <p className="mt-1.5 text-sm leading-relaxed">{body}</p>
               </div>

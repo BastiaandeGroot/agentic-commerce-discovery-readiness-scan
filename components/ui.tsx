@@ -3,7 +3,7 @@
 // Kleine, gedeelde bouwstenen. Bewust klein gehouden: de betekenis zit in het
 // rapport, niet in de versiering.
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
@@ -39,6 +39,68 @@ export function Badge({ children, tone = 'neutral' }: { children: ReactNode; ton
     >
       {children}
     </span>
+  );
+}
+
+/**
+ * Het "i"-knopje. De uitleg zelf zet de aanroeper eronder, niet als zwevend
+ * paneel: twee open tooltips in dezelfde kaart gingen over elkaar heen, en een
+ * paneel dat alleen op hover verschijnt bestaat niet op een telefoon. Inline
+ * schuift de kaart een stukje op en blijft alles leesbaar.
+ */
+export function InfoButton({ label, open, onToggle }: {
+  label: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-label={label}
+      title={label}
+      className={`inline-flex size-4 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold leading-none transition ${
+        open
+          ? 'border-transparent bg-accent text-white'
+          : 'border-line text-muted hover:border-accent hover:text-accent'
+      }`}
+    >
+      i
+    </button>
+  );
+}
+
+/** De uitleg zelf, in de taal van de merchant. */
+export function InfoPanel({ children }: { children: ReactNode }) {
+  return (
+    <p className="mt-2 rounded-lg border border-line bg-surface-2 p-3 text-xs leading-relaxed text-muted">
+      {children}
+    </p>
+  );
+}
+
+/** Keuzelijst voor filters. Een lijst en geen knoppenrij: het aantal
+ *  categorieen verschilt per merchant en kan flink oplopen. */
+export function Select({ label, value, onChange, options }: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <label className="flex items-center gap-2 text-xs text-muted">
+      {label}
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 

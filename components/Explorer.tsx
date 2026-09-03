@@ -9,9 +9,10 @@
 import { useMemo, useState } from 'react';
 import type { Locale, ProductResult, Protocol, ScanReport } from '../src/domain/types';
 import type { Strings } from '../src/i18n/strings';
-import { Badge, Bar, Button, Card, CardTitle, TrafficLight, statusOf } from './ui';
+import { Badge, Bar, Button, Card, CardTitle, Select, TrafficLight, statusOf } from './ui';
 
-const PAGE_SIZE = 25;
+/** Stappen voor "hoeveel wil je zien"; 0 betekent alles op één pagina. */
+const PAGE_SIZES = [25, 50, 100, 250, 0];
 type Filter = 'all' | 'not-findable' | 'not-competitive' | 'unmatched';
 
 function n(value: number): string {
@@ -177,7 +178,6 @@ function ProductRow({ s, product, protocol, locale }: {
                     {s.report.causes[gap.cause]}
                   </Badge>
                   <span>{gap.label[locale]}</span>
-                  <span className="text-xs text-muted">— {s.report.owners[gap.owner]}</span>
                 </li>
               ))}
             </ul>
@@ -193,8 +193,12 @@ export function Explorer({ s, locale, report }: {
 }) {
   const [protocol, setProtocol] = useState<Protocol>('acp');
   const [filter, setFilter] = useState<Filter>('all');
+  const [category, setCategory] = useState('all');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
+
+  const categories = report.protocols[protocol].categories;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -202,6 +206,7 @@ export function Explorer({ s, locale, report }: {
       if (filter === 'unmatched' && !product.unmatched) return false;
       if (filter === 'not-findable' && (product.unmatched || product.perProtocol[protocol].findable)) return false;
       if (filter === 'not-competitive' && (product.unmatched || product.perProtocol[protocol].competitive)) return false;
+      if (category !== 'all' && product.setId !== category) return false;
       if (q === '') return true;
       return (
         product.key.toLowerCase().includes(q) ||
@@ -209,11 +214,13 @@ export function Explorer({ s, locale, report }: {
         (product.category ?? '').toLowerCase().includes(q)
       );
     });
-  }, [report.products, filter, query, protocol]);
+  }, [report.products, filter, category, query, protocol]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  // pageSize 0 is "alles": één pagina, hoeveel producten er ook staan.
+  const size = pageSize === 0 ? Math.max(filtered.length, 1) : pageSize;
+  const pageCount = Math.max(1, Math.ceil(filtered.length / size));
   const safePage = Math.min(page, pageCount - 1);
-  const shown = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+  const shown = filtered.slice(safePage * size, safePage * size + size);
 
   const filters: { id: Filter; label: string }[] = [
     { id: 'all', label: s.explorer.filterAll },
@@ -260,6 +267,17 @@ export function Explorer({ s, locale, report }: {
             placeholder={s.explorer.search}
             className="min-w-56 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm"
           />
+          {categories.length > 1 ? (
+            <Select
+              label={s.explorer.filterCategory}
+              value={category}
+              onChange={(value) => { setCategory(value); setPage(0); }}
+              options={[
+                { value: 'all', label: s.explorer.allCategories },
+                ...categories.map((c) => ({ value: c.setId, label: `${c.category} (${n(c.total)})` })),
+              ]}
+            />
+          ) : null}
           <div className="flex flex-wrap gap-1">
             {filters.map((entry) => (
               <button
@@ -289,10 +307,21 @@ export function Explorer({ s, locale, report }: {
         )}
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <span className="tnum text-xs text-muted">
-            {s.explorer.showing} {n(safePage * PAGE_SIZE + 1)}–
-            {n(Math.min((safePage + 1) * PAGE_SIZE, filtered.length))} {s.explorer.of} {n(filtered.length)}
-          </span>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="tnum text-xs text-muted">
+              {s.explorer.showing} {n(filtered.length === 0 ? 0 : safePage * size + 1)}–
+              {n(Math.min((safePage + 1) * size, filtered.length))} {s.explorer.of} {n(filtered.length)}
+            </span>
+            <Select
+              label={s.explorer.perPage}
+              value={String(pageSize)}
+              onChange={(value) => { setPageSize(Number(value)); setPage(0); }}
+              options={PAGE_SIZES.map((value) => ({
+                value: String(value),
+                label: value === 0 ? s.explorer.allRecords : String(value),
+              }))}
+            />
+          </div>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => setPage(safePage - 1)} disabled={safePage === 0}>
               {s.explorer.prev}
