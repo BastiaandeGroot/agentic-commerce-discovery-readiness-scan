@@ -86,6 +86,11 @@ export const STRINGS = {
       competitive: 'concurrerend',
       findableExplain: 'Elke fit-vraag van de eigen categorie is beantwoord.',
       competitiveExplain: 'De volledige Selection-checklist is aanwezig en bruikbaar.',
+      infoLabel: 'Wat betekent dit?',
+      findableInfo:
+        'Kan een agent jouw product beoordelen? Dat kan pas als élke vraag die in jouw categorie speelt uit je data te beantwoorden is: samenstelling, breedte, onderhoud, waarvoor het geschikt is. Blijft er één over, dan weet de agent niet of jouw product past bij wat de koper vroeg, en laat hij het liever weg. Daarom is er geen "bijna": het zijn alle vragen, of het telt niet.',
+      competitiveInfo:
+        'Durft een agent jouw product ook te kiezen? Daarvoor kijkt hij niet naar je categorie, maar naar een korte vaste lijst die voor elk product hetzelfde is: prijs, voorraad, een code waarmee hij je product herkent (GTIN of MPN), een vertrouwenssignaal en je retourbeleid. Die gegevens liggen vaak niet in je PIM maar in je webshop, je reviewplatform of bij je klantenservice. Het is geen vervolgstap op vindbaar: beide worden apart geteld, dus een product kan hier compleet zijn en toch niet vindbaar.',
       status: {
         complete: 'Alle vragen beantwoord',
         partial: 'Meer dan de helft beantwoord',
@@ -125,13 +130,23 @@ export const STRINGS = {
       notEligible: 'producten niet afrekenbaar',
       gapsHeading: 'Waar komt elk gat vandaan',
       gapsIntro:
-        'Merchant Center en de Upload History van OpenAI kunnen alleen "ontbreekt" zeggen. Geen van beide ziet de catalogus achter de feed.',
+        'Omdat "ontbreekt" geen werkopdracht is. Merchant Center en de Upload History van OpenAI kunnen alleen zeggen dát een veld leeg is; geen van beide ziet de catalogus áchter je feed. Deze tabel voegt de vraag toe die daar wel uit volgt: is dit doorzetwerk of nieuw werk?',
+      gapsWhy:
+        'Drie uitkomsten. Een mappinggat betekent dat het antwoord al in je PIM staat en alleen de feed niet haalt — lage inspanning. Een verrijkingsgat betekent dat niemand het ergens heeft vastgelegd en dat iemand het per product moet aanvullen — hoge inspanning. Geen bron betekent dat het uit een systeem moet komen dat je nu niet uitleest, zoals je reviewplatform — middelhoge inspanning, want het is één keuze die daarna voor je hele catalogus geldt. Dat onderscheid kan alleen omdat de scan je feed én je catalogus naast elkaar legt, en het bepaalt waar je begint.',
       gapField: 'Veld',
-      gapTier: 'Tier',
+      gapTier: 'Waar het aan raakt',
       gapCause: 'Oorzaak',
-      gapOwner: 'Eigenaar',
       gapAffected: 'Producten',
-      gapCost: 'Orde van grootte',
+      gapColumnInfo: {
+        field:
+          'Het gegeven dat ontbreekt. Staat er een rij met schuine strepen, dan is dat geen veldnaam uit een specificatie maar een zoekpatroon: we kijken in je eigen kolommen of een van deze woorden voorkomt, zodat je kolom "wasvoorschrift" ook meetelt als het protocol hem "care" noemt.',
+        tier:
+          'Waar dit gegeven voor nodig is. "Vindbaar" betekent dat een agent zonder dit veld niet kan beoordelen of je product past bij de vraag. "Concurrerend" betekent dat hij het wel snapt, maar je product niet durft te kiezen boven een alternatief dat het wel heeft.',
+        cause:
+          'Waarom het ontbreekt, en daarmee wat voor werk het is. Een mappinggat is doorzetwerk: het antwoord ligt al in je PIM en haalt de feed alleen niet. Een verrijkingsgat betekent dat niemand het ergens heeft vastgelegd. "Geen bron" betekent dat het uit een systeem moet komen dat je nu niet uitleest, zoals je reviewplatform.',
+        affected:
+          'Hoeveel van je producten dit gat hebben. Bovenaan staat wat de meeste producten raakt — dat is meestal ook de grootste winst per handeling, omdat één ingreep in je PIM of feedregel ze allemaal tegelijk oplost.',
+      } as Record<string, string>,
       noCatalogWarning:
         'Je hebt geen catalogus-export aangeleverd. Daardoor kunnen we een mappinggat niet onderscheiden van een echt gat: alles wat een PIM zou kunnen dragen is hieronder als enrichment geclassificeerd. Lever de PIM-export aan voor volledige attributie.',
       causes: {
@@ -144,22 +159,24 @@ export const STRINGS = {
         enrichment: 'Staat in geen van beide bronnen',
         'no-source': 'Staat in geen systeem dat je kunt uitlezen',
       } as Record<string, string>,
-      causeCost: {
-        mapping: 'Een middag',
-        enrichment: 'Maanden',
-        'no-source': 'Een systeemkeuze',
+      causeEffort: {
+        mapping: 'Lage inspanning',
+        enrichment: 'Hoge inspanning',
+        'no-source': 'Middelhoge inspanning',
       } as Record<string, string>,
-      owners: {
-        pim: 'Productteam / PIM', content: 'Contentteam', ecommerce: 'E-commerceplatform',
-        erp: 'ERP / pricing', reviews: 'Reviewplatform', returns: 'Retouren / klantenservice',
-        legal: 'Legal / compliance', payments: 'Payments', marketing: 'Marketing', ops: 'Operatie',
+      tiers: {
+        core: 'Vindbaar',
+        selection: 'Concurrerend',
+        out: 'Buiten de score',
       } as Record<string, string>,
-      tiers: { core: 'Core', selection: 'Selection', out: 'Out' } as Record<string, string>,
       tierMeaning: {
-        core: 'Past dit product bij de behoefte?',
-        selection: 'Kiest de agent ons boven een gelijkwaardig alternatief?',
-        out: 'Buiten de score; wel gerapporteerd',
+        core: 'Zonder dit veld kan een agent niet beoordelen of je product past',
+        selection: 'Hiermee durft een agent je te kiezen boven een gelijkwaardig alternatief',
+        out: 'Telt niet mee; gaat over afrekenen',
       } as Record<string, string>,
+      filterCategory: 'Categorie',
+      allCategories: 'Alle categorieën',
+      allAnswered: 'In deze categorie is elke vraag beantwoord.',
       stampHeading: 'Versiestempel',
       stampExplain:
         'Een score kan bewegen zonder dat je iets deed: doordat een specificatie veranderde, of doordat je vragenset veranderde. Beide staan hieronder, zodat je echte vooruitgang kunt onderscheiden van een verschoven definitie.',
@@ -196,7 +213,7 @@ export const STRINGS = {
       next: 'Volgende',
       answered: 'vragen beantwoord',
       unanswered: 'Onbeantwoorde vragen',
-      productGaps: 'Gaten en wie ze oplost',
+      productGaps: 'Ontbrekende velden',
       noResults: 'Geen producten gevonden.',
       findableYes: 'Vindbaar',
       findableNo: 'Niet vindbaar',
@@ -206,6 +223,10 @@ export const STRINGS = {
       noImage: 'geen afbeelding',
       openDetail: 'Toon details',
       closeDetail: 'Verberg details',
+      filterCategory: 'Categorie',
+      allCategories: 'Alle categorieën',
+      perPage: 'Toon per pagina',
+      allRecords: 'Alle',
     },
 
     errors: {
@@ -294,6 +315,11 @@ export const STRINGS = {
       competitive: 'competitive',
       findableExplain: 'Every fit question for the product category is answered.',
       competitiveExplain: 'The full Selection checklist is present and usable.',
+      infoLabel: 'What does this mean?',
+      findableInfo:
+        'Can an agent judge your product? Only once every question that matters in your category can be answered from your data: composition, width, care, what it is suitable for. Leave one unanswered and the agent cannot tell whether your product matches what the buyer asked for, so it leaves it out. That is why there is no "almost": it is every question, or it does not count.',
+      competitiveInfo:
+        'Will an agent dare to pick your product? For that it does not look at your category but at a short fixed list that is the same for every product: price, stock, a code it can identify your product by (GTIN or MPN), a trust signal and your return policy. That data often does not live in your PIM but in your webshop, your review platform or with your customer service. It is not a step after findable: the two are counted separately, so a product can be complete here and still not be findable.',
       status: {
         complete: 'Every question answered',
         partial: 'More than half answered',
@@ -333,13 +359,23 @@ export const STRINGS = {
       notEligible: 'products not checkout-eligible',
       gapsHeading: 'Where each gap comes from',
       gapsIntro:
-        'Merchant Center and OpenAI\'s Upload History can only say "missing". Neither sees the catalogue behind the feed.',
+        'Because "missing" is not a work order. Merchant Center and OpenAI\'s Upload History can only tell you that a field is empty; neither sees the catalogue behind your feed. This table adds the question that follows from it: is this plumbing, or new work?',
+      gapsWhy:
+        'Three outcomes. A mapping gap means the answer already sits in your PIM and simply does not reach the feed — low effort. An enrichment gap means nobody has recorded it anywhere and someone has to fill it in product by product — high effort. No source means it has to come from a system you do not read out today, such as your reviews platform — medium effort, because it is one decision that then covers your whole catalogue. That distinction is only possible because the scan reads your feed and your catalogue side by side, and it decides where you start.',
       gapField: 'Field',
-      gapTier: 'Tier',
+      gapTier: 'What it affects',
       gapCause: 'Cause',
-      gapOwner: 'Owner',
       gapAffected: 'Products',
-      gapCost: 'Rough cost',
+      gapColumnInfo: {
+        field:
+          'The piece of information that is missing. A row with slashes is not a field name from a specification but a search pattern: we look through your own columns for any of these words, so your column "wasvoorschrift" still counts when the protocol calls it "care".',
+        tier:
+          'What this information is needed for. "Findable" means that without this field an agent cannot judge whether your product fits the request. "Competitive" means it understands your product but will not pick it over an alternative that does have the field.',
+        cause:
+          'Why it is missing, and therefore what kind of work it is. A mapping gap is plumbing: the answer already sits in your PIM and simply does not reach the feed. An enrichment gap means nobody has recorded it anywhere. "No source" means it has to come from a system you do not read out today, such as your reviews platform.',
+        affected:
+          'How many of your products have this gap. What affects the most products sits at the top — usually the biggest win per action too, because one change in your PIM or feed rule fixes them all at once.',
+      } as Record<string, string>,
       noCatalogWarning:
         'You supplied no catalogue export. That means we cannot distinguish a mapping gap from a real gap: everything a PIM could carry is classified below as enrichment. Supply the PIM export for full attribution.',
       causes: {
@@ -352,22 +388,24 @@ export const STRINGS = {
         enrichment: 'In neither source',
         'no-source': 'In no system you can read',
       } as Record<string, string>,
-      causeCost: {
-        mapping: 'An afternoon',
-        enrichment: 'Months',
-        'no-source': 'A systems decision',
+      causeEffort: {
+        mapping: 'Low effort',
+        enrichment: 'High effort',
+        'no-source': 'Medium effort',
       } as Record<string, string>,
-      owners: {
-        pim: 'Product team / PIM', content: 'Content team', ecommerce: 'E-commerce platform',
-        erp: 'ERP / pricing', reviews: 'Reviews platform', returns: 'Returns / customer service',
-        legal: 'Legal / compliance', payments: 'Payments', marketing: 'Marketing', ops: 'Operations',
+      tiers: {
+        core: 'Findable',
+        selection: 'Competitive',
+        out: 'Outside the score',
       } as Record<string, string>,
-      tiers: { core: 'Core', selection: 'Selection', out: 'Out' } as Record<string, string>,
       tierMeaning: {
-        core: 'Does this product fit the need?',
-        selection: 'Would the agent pick us over an equal alternative?',
-        out: 'Excluded from the score; reported anyway',
+        core: 'Without this field an agent cannot judge whether your product fits',
+        selection: 'This is what makes an agent pick you over an equal alternative',
+        out: 'Does not count; concerns checkout',
       } as Record<string, string>,
+      filterCategory: 'Category',
+      allCategories: 'All categories',
+      allAnswered: 'Every question in this category is answered.',
       stampHeading: 'Version stamp',
       stampExplain:
         'A score can move without you doing anything: because a specification changed, or because your question set changed. Both are recorded below, so you can tell real progress from a shifted definition.',
@@ -404,7 +442,7 @@ export const STRINGS = {
       next: 'Next',
       answered: 'questions answered',
       unanswered: 'Unanswered questions',
-      productGaps: 'Gaps and who fixes them',
+      productGaps: 'Missing fields',
       noResults: 'No products found.',
       findableYes: 'Findable',
       findableNo: 'Not findable',
@@ -412,6 +450,10 @@ export const STRINGS = {
       competitiveNo: 'Not competitive',
       unmatchedBadge: 'No category',
       noImage: 'no image',
+      filterCategory: 'Category',
+      allCategories: 'All categories',
+      perPage: 'Show per page',
+      allRecords: 'All',
       openDetail: 'Show details',
       closeDetail: 'Hide details',
     },

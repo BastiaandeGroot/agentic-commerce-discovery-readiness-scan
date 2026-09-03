@@ -77,13 +77,13 @@ export const METHODE = {
     gapsBody:
       'Dit is het deel dat je nergens anders krijgt. Google en OpenAI kijken alleen naar je feed, en kunnen dus alleen zeggen dát er iets ontbreekt. Door je feed naast je PIM-export te leggen, kunnen we zeggen waaróm het ontbreekt. En dat maakt voor jou een enorm verschil in werk.',
     gapMapping:
-      'De informatie staat gewoon in je PIM, maar komt niet mee in je feed. Dit is een instelling aanpassen. Vaak een middag werk voor je feedbeheerder.',
+      'De informatie staat gewoon in je PIM, maar komt niet mee in je feed. Dit is een instelling aanpassen: voor je feedbeheerder de laagste inspanning van de drie.',
     gapEnrichment:
-      'De informatie staat nergens: niet in je feed, niet in je PIM. Iemand moet hem per product gaan invullen. Reken op maanden.',
+      'De informatie staat nergens: niet in je feed, niet in je PIM. Iemand moet hem per product gaan invullen, en dat is de hoogste inspanning van de drie.',
     gapNoSource:
       'De informatie bestaat in geen enkel systeem dat je kunt uitlezen. Denk aan reviewcijfers als je geen reviewplatform hebt, of retourpercentages die alleen in je ERP zitten. Dit is geen invulwerk maar een beslissing over je systemen.',
     gapsWhy:
-      'Zonder dat onderscheid zou je lijst met ontbrekende velden er even lang uitzien, maar zou je niet weten of je een middag of een half jaar bezig bent.',
+      'Zonder dat onderscheid zou je lijst met ontbrekende velden er even lang uitzien, maar zou je niet weten of je voor lage of voor hoge inspanning staat.',
     gapsJoin:
       'We koppelen je twee bestanden op meerdere kenmerken tegelijk: artikelnummer, EAN, fabrikantcode en intern id. Dat is nodig omdat feeds en PIM-systemen zelden hetzelfde nummer vooraan zetten. Zouden we op één veld koppelen en dat matcht niet, dan lijkt plotseling alles te ontbreken.',
     gapsNoCatalog:
@@ -175,13 +175,13 @@ export const METHODE = {
     gapsBody:
       'This is the part you get nowhere else. Google and OpenAI only look at your feed, so they can only tell you that something is missing. By reading your feed alongside your PIM export, we can tell you why it is missing. And that makes an enormous difference to your workload.',
     gapMapping:
-      'The information is sitting in your PIM but does not travel into your feed. This is a setting to change. Often an afternoon for whoever manages your feed.',
+      'The information is sitting in your PIM but does not travel into your feed. This is a setting to change: for whoever manages your feed, the lowest effort of the three.',
     gapEnrichment:
-      'The information is nowhere: not in your feed, not in your PIM. Someone has to fill it in product by product. Expect months.',
+      'The information is nowhere: not in your feed, not in your PIM. Someone has to fill it in product by product, and that is the highest effort of the three.',
     gapNoSource:
       'The information exists in no system you can read. Think ratings when you have no reviews platform, or return rates that live only in your ERP. This is not data entry but a decision about your systems.',
     gapsWhy:
-      'Without that distinction your list of missing fields would look just as long, but you would not know whether you are facing an afternoon or half a year.',
+      'Without that distinction your list of missing fields would look just as long, but you would not know whether you are facing low or high effort.',
     gapsJoin:
       'We join your two files on several identifiers at once: article number, EAN, manufacturer code and internal id. That is necessary because feeds and PIM systems rarely lead with the same number. Join on one field and miss, and suddenly everything looks missing.',
     gapsNoCatalog:

@@ -85,19 +85,18 @@ trechter, in een eigen blok (besloten: optie B). Ontworpen, nooit gebouwd.
 Vraagt geen model. Volgende stap: classificatie van alle 51 velden mét motivering
 per veld, ter review.
 
-**Stoplicht** — gebouwd op branch `stoplicht`, gepusht, nog geen PR. Wacht op
-akkoord. Bij te stellen: de grens rood/oranje (nu op de helft), de teksten, en
-of de labels de meting noemen of een oordeel.
+**Stoplicht** — gemerged (PR #5). Bij te stellen: de grens rood/oranje (nu op de
+helft), de teksten, en of de labels de meting noemen of een oordeel.
 
 **Echte kwaliteitscontroles** — nu alleen een woordentelling op titel en
 omschrijving. Kandidaten: schijn-volledigheid (veld overal dezelfde waarde),
 de GTIN-checksum die al in `isValidGtin()` staat maar nergens wordt aangeroepen,
 ontbrekende eenheden, en enum-controle op availability en condition.
 
-**Onverklaard verschil** — de opdrachtgever zag in de UI 6,2 van de 10 en 23
-zonder categorie; dezelfde bestanden lokaal geven 5,4 van de 12 en 21. De 10 wijst
-op uitgezette vragen, maar dan zou het gemiddelde niet moeten stijgen. Nog uit te
-zoeken.
+**Herkomst op het rapport** — een rapport noemt zijn spec-snapshot en
+vragensetversie, maar niet de bestanden waarop het draaide. Dat maakte het
+verschil hieronder onnodig lang onverklaarbaar; `Dataset.filename` ligt al klaar
+in `report.sources`, het staat alleen niet in het stempelblok van `ReportView`.
 
 **Snapshot-opslag** — rapporten worden nergens bewaard. De rapportvorm is er wel
 op voorbereid, dus dat kan later zonder migratie.
@@ -123,6 +122,26 @@ Verwachte uitkomst op die bestanden (regressiecontrole):
   producten wél in Magento en niet in de feed
 - Lichtdoorlatendheid, keuringen en onderhoud staan in geen van beide bronnen
 - Geen enkel product is checkout-eligible in ACP of UCP
+
+### Er zijn twee feeds, en dat verklaarde het "onverklaarde verschil"
+
+In dezelfde map staat ook `ChannableFeedDeGrootStoffenverrijkt - ...csv`: dezelfde
+3.557 producten, maar met breedte, samenstelling, lichtdoorlatendheid en keuringen
+aangevuld. Die feed geeft 23 producten zonder categorie en gemiddeld 7,4 van de 12,
+tegen 21 en 5,4 voor de originele feed. De 23 die de opdrachtgever zag was dus geen
+afwijking maar een ander bestand — nagerekend, beide reproduceren exact.
+
+De 10 kan de motor niet zelf produceren. `applicableTo()` kijkt alleen naar de
+protocolspec en niet naar de data, dus het archetype woontextiel levert altijd 12
+vragen, in ACP en in UCP, bij elke feed en in elke commit sinds `40d030d`. De enige
+plek die een vraag laat vervallen is `question.disabled` in `evaluate.ts`, en dat
+zet de merchant zelf om in stap 2. Twee uitgezette vragen dus.
+
+Daarmee valt de tegenstrijdigheid weg: het gemiddelde stéég niet. Het zakte van 7,4
+naar 6,2, en dat is precies wat uitzetten van beantwoorde vragen doet. Welke twee is
+uit de cijfers niet hard te maken (baanbreedte plus samenstelling of gewicht komt
+uit op 6,2, maar per set uitzetten geeft meer combinaties); de changelog van die run
+zegt het exact, en de vragensetversie zou v3 hebben gestaan in plaats van v1.
 
 ## Achtergrond
 

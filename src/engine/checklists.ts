@@ -81,14 +81,22 @@ export interface OutCheck {
 export const OUT_CHECKS: Record<Protocol, OutCheck[]> = {
   acp: [
     {
-      id: 'eligible_checkout',
-      label: { nl: 'Afrekenbaar in ChatGPT', en: 'Eligible for checkout' },
-      field: 'is_eligible_checkout',
-    },
-    {
       id: 'eligible_search',
       label: { nl: 'Zichtbaar in ChatGPT-zoeken', en: 'Eligible for search' },
       field: 'is_eligible_search',
+      note: {
+        nl: 'Dit gaat over gevonden wórden: mag je product als resultaat in ChatGPT verschijnen? Staat dit op nee, dan ziet niemand het, hoe compleet je data verder ook is. Dit is de eerste van de twee en de belangrijkste.',
+        en: 'This is about being found: may your product appear as a result in ChatGPT at all? If this is no, nobody sees it, however complete the rest of your data is. It is the first of the two and the more important one.',
+      },
+    },
+    {
+      id: 'eligible_checkout',
+      label: { nl: 'Afrekenbaar in ChatGPT', en: 'Eligible for checkout' },
+      field: 'is_eligible_checkout',
+      note: {
+        nl: 'Dit gaat over afrekenen: mag de koper de bestelling binnen ChatGPT afronden, zonder naar je webshop te gaan? Staat dit op nee terwijl zoeken op ja staat, dan is je product wel te vinden maar stuurt de agent de koper door naar je site. Het is dus geen vervanging voor zichtbaarheid maar een stap erna.',
+        en: 'This is about paying: may the buyer complete the order inside ChatGPT, without going to your webshop? If this is no while search is yes, your product can still be found but the agent sends the buyer through to your site. It is not a replacement for visibility but a step after it.',
+      },
     },
   ],
   ucp: [
