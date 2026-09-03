@@ -9,10 +9,10 @@ export default function PricingPage() {
   const s = STRINGS[locale];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header className="max-w-2xl">
-        <h1 className="text-2xl font-semibold tracking-tight">{s.pages.pricing.title}</h1>
-        <p className="mt-3 text-base leading-relaxed text-muted">{s.pages.pricing.intro}</p>
+        <h1 className="font-display text-2xl font-semibold tracking-tight">{s.pages.pricing.title}</h1>
+        <p className="mt-4 max-w-xl text-base leading-relaxed text-muted">{s.pages.pricing.intro}</p>
       </header>
 
       <div className="grid gap-4 md:grid-cols-2">

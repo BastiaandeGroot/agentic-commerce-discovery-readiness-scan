@@ -9,10 +9,10 @@ export default function AboutPage() {
   const s = STRINGS[locale];
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl space-y-8">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">{s.pages.about.title}</h1>
-        <p className="mt-3 text-base leading-relaxed text-muted">{s.pages.about.intro}</p>
+        <h1 className="font-display text-2xl font-semibold tracking-tight">{s.pages.about.title}</h1>
+        <p className="mt-4 max-w-xl text-base leading-relaxed text-muted">{s.pages.about.intro}</p>
       </header>
 
       <Card>

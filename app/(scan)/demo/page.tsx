@@ -13,14 +13,14 @@ export default function DemoPage() {
   const s = STRINGS[locale];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header className="max-w-2xl">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">{s.pages.demo.title}</h1>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">{s.pages.demo.title}</h1>
           {/* Duidelijk gemarkeerd: dit zijn niet de cijfers van de bezoeker. */}
           <Badge tone="warn">{s.pages.demo.badge}</Badge>
         </div>
-        <p className="mt-3 text-base leading-relaxed text-muted">{s.pages.demo.intro}</p>
+        <p className="mt-4 max-w-xl text-base leading-relaxed text-muted">{s.pages.demo.intro}</p>
       </header>
 
       <Card>

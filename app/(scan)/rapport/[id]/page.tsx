@@ -20,7 +20,7 @@ export default function ReportPage() {
   return (
     <div className="space-y-6">
       <header className="max-w-2xl">
-        <h1 className="text-2xl font-semibold tracking-tight">{s.pages.report.title}</h1>
+        <h1 className="font-display text-2xl font-semibold tracking-tight">{s.pages.report.title}</h1>
         <p className="mt-3 text-base leading-relaxed text-muted">{s.pages.report.intro}</p>
       </header>
 

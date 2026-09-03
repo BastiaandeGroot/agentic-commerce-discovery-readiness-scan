@@ -29,7 +29,7 @@ export function SiteHeader() {
   return (
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
-        <Link href="/" className="mr-auto min-w-0 text-sm font-semibold tracking-tight">
+        <Link href="/" className="mr-auto min-w-0 font-display text-base font-semibold tracking-tight">
           {s.appName}
         </Link>
 
