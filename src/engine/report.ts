@@ -17,6 +17,7 @@ import { OUT_CHECKS, SELECTION_CHECKLIST } from './checklists';
 import { evaluateProduct } from './evaluate';
 import { indexCatalog, lookupCatalog } from './join';
 import { SPEC_SNAPSHOT_ID } from '../spec/snapshot';
+import { SCAN_VERSION } from './version';
 
 const PROTOCOLS: Protocol[] = ['acp', 'ucp'];
 
@@ -153,6 +154,9 @@ export function runScan(
   feed: Dataset,
   catalog: Dataset | undefined,
   questionState: QuestionSetState,
+  /** Het tijdstip komt van de aanroeper: een motor met een eigen klok geeft op
+   *  dezelfde invoer twee keer een ander rapport. */
+  options: { scannedAt: string },
 ): ScanReport {
   const catalogIndex = indexCatalog(catalog);
   const products = feed.products.map((product) =>
@@ -161,9 +165,10 @@ export function runScan(
 
   return {
     stamp: {
+      scanVersion: SCAN_VERSION,
       specSnapshot: SPEC_SNAPSHOT_ID,
       questionSetVersion: questionState.version,
-      scannedAt: new Date().toISOString(),
+      scannedAt: options.scannedAt,
     },
     sources: { feed, catalog },
     productCount: products.length,

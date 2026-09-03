@@ -269,6 +269,7 @@ export const STRINGS = {
       stampHeading: 'Versiestempel',
       stampExplain:
         'Een score kan bewegen zonder dat je iets deed: doordat een specificatie veranderde, of doordat je vragenset veranderde. Beide staan hieronder, zodat je echte vooruitgang kunt onderscheiden van een verschoven definitie.',
+      scanVersion: 'Scanversie',
       specSnapshot: 'Spec-snapshot',
       questionVersion: 'Vragenset-versie',
       scannedAt: 'Gescand op',
@@ -587,6 +588,7 @@ export const STRINGS = {
       stampHeading: 'Version stamp',
       stampExplain:
         'A score can move without you doing anything: because a specification changed, or because your question set changed. Both are recorded below, so you can tell real progress from a shifted definition.',
+      scanVersion: 'Scan version',
       specSnapshot: 'Spec snapshot',
       questionVersion: 'Question set version',
       scannedAt: 'Scanned at',

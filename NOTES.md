@@ -88,6 +88,11 @@ per veld, ter review.
 **Stoplicht** — gemerged (PR #5). Bij te stellen: de grens rood/oranje (nu op de
 helft), de teksten, en of de labels de meting noemen of een oordeel.
 
+**Papa Parse** — het bouwplan schrijft streamend parsen voor. De eigen parser
+haalt de randgevallen (BOM, puntkomma, quotes met scheidingstekens en newlines,
+CRLF, rafelige regels) en staat onder test, maar leest het hele bestand in het
+geheugen. Pas relevant bij de Web Worker en de bestandsgrens uit stap 5.
+
 **Echte kwaliteitscontroles** — nu alleen een woordentelling op titel en
 omschrijving. Kandidaten: schijn-volledigheid (veld overal dezelfde waarde),
 de GTIN-checksum die al in `isValidGtin()` staat maar nergens wordt aangeroepen,
@@ -102,6 +107,27 @@ in `report.sources`, het staat alleen niet in het stempelblok van `ReportView`.
 op voorbereid, dus dat kan later zonder migratie.
 
 ---
+
+## Tests
+
+`npm test` draait `node --test` op een esbuild-bundel; geen browser nodig. Wat de
+suite bewaakt: de randgevallen van de intake, de beloftes van de motor (vindbaar
+is alles-of-niets, verrijkbaar vereist een catalogus, geen categorie betekent
+geteld maar niet gescoord), determinisme, en dat de motor puur blijft — die
+laatste test scant de bron op `new Date()`, `Date.now()`, `Math.random()`,
+`fetch` en `node:`-imports.
+
+De tests vonden twee echte fouten die niemand had gezien:
+
+- **Scheidingstekendetectie telde binnen aanhalingstekens.** Een puntkomma-feed
+  met een komma in een kolomnaam viel als één kolom uit de parser.
+- **De XML-fallback leverde lege rijen.** De blokregex matchte `<item>…</item>`
+  in zijn geheel, sloeg die over als gelijknamig, en kwam nooit bij de
+  kindknopen. Alleen zichtbaar buiten de browser, want daar draait de DOMParser.
+
+Beide gerepareerd. De uitkomst op de echte feed is ongewijzigd — 3.557 producten,
+zes categorieën, gemiddeld 5,3 tot 5,5 van de 12 — dus `SCAN_VERSION` blijft op
+1.0.0.
 
 ## Testdata
 

@@ -45,7 +45,7 @@ function QuestionRow({
 
   function save() {
     const label = { ...question.label, [locale]: draft } as { nl: string; en: string };
-    onChange(editQuestion(state, setId, question.id, label));
+    onChange(editQuestion(state, new Date().toISOString(), setId, question.id, label));
     setEditing(false);
   }
 
@@ -81,7 +81,7 @@ function QuestionRow({
             {question.origin === 'custom' ? s.questions.fromData : s.questions.fromArchetype}
           </Badge>
           <Button variant="quiet" onClick={() => setEditing(true)}>{s.questions.edit}</Button>
-          <Button variant="quiet" onClick={() => onChange(toggleQuestion(state, setId, question.id))}>
+          <Button variant="quiet" onClick={() => onChange(toggleQuestion(state, new Date().toISOString(), setId, question.id))}>
             {question.disabled ? s.questions.enable : s.questions.disable}
           </Button>
         </div>
@@ -193,7 +193,7 @@ export function QuestionSetStep({ s, locale, feed, state, onChange, onRun }: Pro
                   <Button
                     disabled={newLabel.trim() === '' || newField === ''}
                     onClick={() => {
-                      onChange(addQuestion(state, set.id, { nl: newLabel, en: newLabel }, [newField]));
+                      onChange(addQuestion(state, new Date().toISOString(), set.id, { nl: newLabel, en: newLabel }, [newField]));
                       setNewLabel(''); setNewField('');
                     }}
                   >

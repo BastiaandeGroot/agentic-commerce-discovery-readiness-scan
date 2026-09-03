@@ -31,7 +31,7 @@ for (const set of questions.sets) {
   console.log(`  ${set.label.nl} (archetype ${set.archetypeId}, ${set.questions.length} vragen)`);
 }
 
-const report = runScan(feed, catalog, questions);
+const report = runScan(feed, catalog, questions, { scannedAt: new Date().toISOString() });
 console.log(`\nTRECHTER`);
 for (const p of ['acp', 'ucp'] as const) {
   const f = report.protocols[p].funnel;
