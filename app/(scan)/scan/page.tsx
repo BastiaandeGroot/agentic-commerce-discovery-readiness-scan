@@ -5,21 +5,19 @@
 // data er is, want ze gaan over de eigen categorieen van de merchant (S6).
 
 import { useState } from 'react';
-import Link from 'next/link';
-import type { Dataset, QuestionSetState, ScanReport } from '../src/domain/types';
-import { generateQuestionSets } from '../src/questions/generate';
-import { runScan } from '../src/engine/report';
-import { STRINGS } from '../src/i18n/strings';
-import { useLocale } from '../src/i18n/useLocale';
-import { LanguageToggle } from '../components/LanguageToggle';
-import { UploadStep } from '../components/UploadStep';
-import { QuestionSetStep } from '../components/QuestionSetStep';
-import { ReportView } from '../components/ReportView';
+import type { Dataset, QuestionSetState, ScanReport } from '../../../src/domain/types';
+import { generateQuestionSets } from '../../../src/questions/generate';
+import { runScan } from '../../../src/engine/report';
+import { STRINGS } from '../../../src/i18n/strings';
+import { useLocale } from '../../../src/i18n/useLocale';
+import { UploadStep } from '../../../components/UploadStep';
+import { QuestionSetStep } from '../../../components/QuestionSetStep';
+import { ReportView } from '../../../components/ReportView';
 
 type Step = 'upload' | 'questions' | 'report';
 
 export default function Home() {
-  const [locale, setLocale] = useLocale();
+  const [locale] = useLocale();
   const [step, setStep] = useState<Step>('upload');
   const [feed, setFeed] = useState<Dataset>();
   const [catalog, setCatalog] = useState<Dataset>();
@@ -53,22 +51,10 @@ export default function Home() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
+    <div className="mx-auto max-w-5xl">
       <header className="mb-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{s.appName}</h1>
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">{s.tagline}</p>
-          </div>
-
-          {/* Taalwissel en uitleg. Beide talen zijn volwaardig; er is geen "hoofdtaal". */}
-          <div className="flex shrink-0 items-center gap-3">
-            <Link href="/methode" className="text-sm text-accent underline underline-offset-2">
-              {locale === 'nl' ? 'Wat we controleren' : 'What we check'}
-            </Link>
-            <LanguageToggle locale={locale} onChange={setLocale} label={s.language} />
-          </div>
-        </div>
+        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{steps.find((x) => x.id === step)?.label}</h1>
+        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">{s.tagline}</p>
 
         <ol className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           {steps.map((entry, index) => {

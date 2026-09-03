@@ -8,34 +8,30 @@
 // die stilletjes uit de pas gaat lopen is erger dan geen uitleg.
 
 import Link from 'next/link';
-import { SELECTION_CHECKLIST, OUT_CHECKS } from '../../src/engine/checklists';
-import { MIN_WORDS } from '../../src/engine/evaluate';
-import { FIELD_BY_KEY } from '../../src/spec/fields';
-import { SPEC_SNAPSHOT_ID, SPEC_SOURCES, tierCounts } from '../../src/spec/snapshot';
-import { METHODE } from '../../src/i18n/methode';
-import { STRINGS } from '../../src/i18n/strings';
-import { useLocale } from '../../src/i18n/useLocale';
-import { LanguageToggle } from '../../components/LanguageToggle';
-import { Badge, Card, CardTitle } from '../../components/ui';
-import type { Protocol } from '../../src/domain/types';
+import { SELECTION_CHECKLIST, OUT_CHECKS } from '../../../src/engine/checklists';
+import { MIN_WORDS } from '../../../src/engine/evaluate';
+import { FIELD_BY_KEY } from '../../../src/spec/fields';
+import { SPEC_SNAPSHOT_ID, SPEC_SOURCES, tierCounts } from '../../../src/spec/snapshot';
+import { METHODE } from '../../../src/i18n/methode';
+import { STRINGS } from '../../../src/i18n/strings';
+import { useLocale } from '../../../src/i18n/useLocale';
+import { Badge, Card, CardTitle } from '../../../components/ui';
+import type { Protocol } from '../../../src/domain/types';
 
 const PROTOCOLS: Protocol[] = ['acp', 'ucp'];
 
 export default function MethodePage() {
-  const [locale, setLocale] = useLocale();
+  const [locale] = useLocale();
   const m = METHODE[locale];
   const s = STRINGS[locale];
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
-      <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{m.title}</h1>
-          <Link href="/" className="mt-2 inline-block text-sm text-accent underline underline-offset-2">
-            ← {m.backToScan}
-          </Link>
-        </div>
-        <LanguageToggle locale={locale} onChange={setLocale} label={s.language} />
+    <div className="mx-auto max-w-3xl">
+      <header className="mb-8">
+        <h1 className="text-2xl font-semibold tracking-tight">{m.title}</h1>
+        <Link href="/scan" className="mt-2 inline-block text-sm text-accent underline underline-offset-2">
+          {m.backToScan}
+        </Link>
       </header>
 
       <div className="space-y-4">
