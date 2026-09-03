@@ -11,6 +11,95 @@ export const STRINGS = {
     tagline: 'Is jouw productdata goed genoeg om door een AI-agent gevonden te worden?',
     language: 'Taal',
 
+    shell: {
+      nav: {
+        home: 'Home',
+        scan: 'Scan starten',
+        demo: 'Voorbeeldrapport',
+        methode: 'Wat we controleren',
+        prijzen: 'Prijzen',
+        over: 'Over',
+        dashboard: 'Dashboard',
+      } as Record<string, string>,
+      primaryAction: 'Bekijk een voorbeeldrapport',
+      skipToContent: 'Naar de inhoud',
+      menu: 'Menu',
+      footerNote:
+        'De gratis scan draait volledig in je browser. Je bestand wordt niet geüpload en verlaat je apparaat niet.',
+      footerRights: 'Alle rechten voorbehouden.',
+      appNav: {
+        overview: 'Overzicht',
+        scans: 'Scans',
+        settings: 'Instellingen',
+      } as Record<string, string>,
+      account: 'Account',
+      accountPlaceholder: 'Nog geen account',
+      backToSite: 'Terug naar de site',
+    },
+
+    pages: {
+      home: {
+        title: 'Zie wat een AI-agent van jouw producten begrijpt',
+        intro:
+          'Een koper vraagt een AI-agent om een product. Die agent leest jouw feed en moet daaruit opmaken of jouw product past bij wat er gevraagd is. Deze scan laat zien welke van die vragen jouw data kan beantwoorden, en welke niet.',
+        secondary: 'Geen account nodig. De scan draait op je eigen apparaat.',
+        todo: 'TODO — stap 7 vult deze pagina met de uitleg in drie stappen, het privacyblok, de FAQ en een echt stuk rapport.',
+      },
+      demo: {
+        title: 'Voorbeeldrapport',
+        intro:
+          'Een volledig rapport op verzonnen voorbeelddata, zodat je ziet wat je krijgt voordat je je eigen bestand kiest.',
+        badge: 'Voorbeelddata',
+        todo: 'TODO — hier komt het rapport op de voorbeeldfeed, meteen zichtbaar en zonder upload.',
+      },
+      report: {
+        title: 'Rapport',
+        intro: 'Het resultaat van een scan, op een eigen adres zodat je het kunt delen.',
+        notFound: 'Dit rapport bestaat niet of is verlopen',
+        notFoundBody:
+          'Rapporten worden nu nog niet bewaard: een scan leeft zolang je hem open hebt staan. Draai de scan opnieuw op je bestand om een vers rapport te krijgen.',
+        runScan: 'Nieuwe scan starten',
+      },
+      pricing: {
+        title: 'Prijzen',
+        intro:
+          'De scan zelf is gratis en blijft dat. Je betaalt pas als je resultaten wilt bewaren, vergelijken en delen — niet om de helft van je uitkomst te zien.',
+        freeTitle: 'Gratis',
+        freeBody:
+          'De volledige scan op je eigen bestand, in je eigen browser. Het hele rapport, alle bevindingen, niets afgeschermd.',
+        paidTitle: 'Met account',
+        paidBody:
+          'Rapporten bewaren, historie opbouwen, twee scans naast elkaar leggen, delen met je team, en grotere bestanden serverzijdig laten draaien.',
+        todo: 'TODO — bedragen en de exacte bestandsgrens moeten nog vastgesteld worden.',
+      },
+      about: {
+        title: 'Over deze scan',
+        intro:
+          'De scan meet of jouw productdata de vragen beantwoordt die een koper in jouw categorie stelt, getoetst aan OpenAI ACP en Google UCP.',
+        deterministic:
+          'De uitkomst is volledig deterministisch. Vragen worden beantwoord uit gestructureerde attributen en niet uit lopende tekst, en er komt geen taalmodel aan te pas. Hetzelfde bestand geeft altijd hetzelfde rapport, en een scan kost niets.',
+        privacy:
+          'De gratis scan draait in je browser. Je feed en je catalogus verlaten je apparaat niet en worden nergens opgeslagen.',
+        promise:
+          'Wat de scan niet doet: voorspellen hoe een agent rangschikt. Dat is een uitspraak over andermans systeem. Wat hier staat gaat over je eigen data en is daarmee meetbaar en weerlegbaar.',
+        todo: 'TODO — wie hierachter zit en hoe je contact opneemt.',
+      },
+      dashboard: {
+        title: 'Overzicht',
+        intro: 'Je laatste scans, wat er veranderde, en wat er nog openstaat.',
+        emptyTitle: 'Nog geen bewaarde scans',
+        emptyBody:
+          'Zodra je scans bewaart, zie je hier hoe je catalogus zich ontwikkelt en wat er sinds de vorige keer is opgelost.',
+        scansTitle: 'Scans',
+        scansIntro: 'Alle bewaarde scans, met de mogelijkheid om er twee naast elkaar te leggen.',
+        settingsTitle: 'Instellingen',
+        settingsIntro: 'Je account, je teamleden en wat er met je data gebeurt.',
+        soon: 'Nog niet beschikbaar',
+        soonBody:
+          'Accounts komen later. Tot die tijd draait elke scan in je browser en wordt er niets bewaard.',
+      },
+    },
+
     steps: { upload: 'Data aanleveren', questions: 'Vragensets valideren', report: 'Rapport' },
 
     upload: {
@@ -239,6 +328,95 @@ export const STRINGS = {
     appName: 'Agentic Commerce Discovery Readiness Scan',
     tagline: 'Is your product data good enough for an AI agent to find you?',
     language: 'Language',
+
+    shell: {
+      nav: {
+        home: 'Home',
+        scan: 'Start a scan',
+        demo: 'Example report',
+        methode: 'What we check',
+        prijzen: 'Pricing',
+        over: 'About',
+        dashboard: 'Dashboard',
+      } as Record<string, string>,
+      primaryAction: 'See an example report',
+      skipToContent: 'Skip to content',
+      menu: 'Menu',
+      footerNote:
+        'The free scan runs entirely in your browser. Your file is not uploaded and never leaves your device.',
+      footerRights: 'All rights reserved.',
+      appNav: {
+        overview: 'Overview',
+        scans: 'Scans',
+        settings: 'Settings',
+      } as Record<string, string>,
+      account: 'Account',
+      accountPlaceholder: 'No account yet',
+      backToSite: 'Back to the site',
+    },
+
+    pages: {
+      home: {
+        title: 'See what an AI agent understands about your products',
+        intro:
+          'A buyer asks an AI agent for a product. That agent reads your feed and has to work out whether your product matches what was asked. This scan shows which of those questions your data can answer, and which it cannot.',
+        secondary: 'No account needed. The scan runs on your own device.',
+        todo: 'TODO — step 7 fills this page with the three-step explanation, the privacy block, the FAQ and a real piece of report.',
+      },
+      demo: {
+        title: 'Example report',
+        intro:
+          'A full report on invented sample data, so you can see what you get before choosing your own file.',
+        badge: 'Sample data',
+        todo: 'TODO — the report on the sample feed goes here, visible immediately and without an upload.',
+      },
+      report: {
+        title: 'Report',
+        intro: 'The result of a scan, at its own address so you can share it.',
+        notFound: 'This report does not exist or has expired',
+        notFoundBody:
+          'Reports are not stored yet: a scan lives as long as you keep it open. Run the scan again on your file to get a fresh report.',
+        runScan: 'Start a new scan',
+      },
+      pricing: {
+        title: 'Pricing',
+        intro:
+          'The scan itself is free and stays that way. You pay to keep, compare and share results — not to see the other half of your outcome.',
+        freeTitle: 'Free',
+        freeBody:
+          'The full scan on your own file, in your own browser. The whole report, every finding, nothing held back.',
+        paidTitle: 'With an account',
+        paidBody:
+          'Keep reports, build up history, put two scans side by side, share with your team, and run larger files server-side.',
+        todo: 'TODO — amounts and the exact file-size threshold still need to be decided.',
+      },
+      about: {
+        title: 'About this scan',
+        intro:
+          'The scan measures whether your product data answers the questions a buyer in your category asks, against OpenAI ACP and Google UCP.',
+        deterministic:
+          'The outcome is fully deterministic. Questions are answered from structured attributes rather than prose, and no language model is involved. The same file always gives the same report, and a scan costs nothing.',
+        privacy:
+          'The free scan runs in your browser. Your feed and your catalogue never leave your device and are not stored anywhere.',
+        promise:
+          'What the scan does not do: predict how an agent ranks. That would be a claim about somebody else\'s system. What stands here is about your own data, and is therefore measurable and contestable.',
+        todo: 'TODO — who is behind this and how to get in touch.',
+      },
+      dashboard: {
+        title: 'Overview',
+        intro: 'Your latest scans, what changed, and what is still open.',
+        emptyTitle: 'No saved scans yet',
+        emptyBody:
+          'Once you save scans, this is where you see how your catalogue develops and what has been resolved since last time.',
+        scansTitle: 'Scans',
+        scansIntro: 'Every saved scan, with the option to put two side by side.',
+        settingsTitle: 'Settings',
+        settingsIntro: 'Your account, your team members and what happens to your data.',
+        soon: 'Not available yet',
+        soonBody:
+          'Accounts come later. Until then every scan runs in your browser and nothing is stored.',
+      },
+    },
 
     steps: { upload: 'Supply data', questions: 'Validate question sets', report: 'Report' },
 
