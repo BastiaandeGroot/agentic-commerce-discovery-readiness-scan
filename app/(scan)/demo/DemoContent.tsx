@@ -42,6 +42,7 @@ export function DemoContent() {
           report={report}
           onRestart={() => router.push('/scan')}
           restartLabel={s.pages.demo.ownFile}
+          canSave={false}
         />
       )}
     </div>

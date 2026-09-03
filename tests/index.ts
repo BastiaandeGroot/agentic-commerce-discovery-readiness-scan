@@ -3,3 +3,4 @@ import './parse.test';
 import './engine.test';
 import './purity.test';
 import './determinism.test';
+import './compare.test';

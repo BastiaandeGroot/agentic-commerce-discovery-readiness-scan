@@ -76,6 +76,14 @@ duwen. Is er geen worker beschikbaar, dan valt `ScanClient` terug op de
 hoofddraad en zegt de UI dat erbij — stil falen is hier het slechtste van twee
 werelden.
 
+## Opslag
+
+Bewaarde scans gaan via `SnapshotStore` in `src/storage/`, nooit rechtstreeks via
+`localStorage` vanuit een component. Er wordt een **snapshot** bewaard en geen
+rapport: tellingen, categorienamen en veldnamen, geen productdata en geen
+bronbestand. Dat houdt de belofte overeind dat de catalogus het apparaat niet
+verlaat, ook zodra er serverzijdig bewaard wordt.
+
 ## Merchant-data
 
 Elke tabel die merchant-data raakt krijgt een `account_id`, ook nu er nog geen

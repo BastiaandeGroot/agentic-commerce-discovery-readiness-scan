@@ -7,6 +7,8 @@
 // dat is een belofte over andermans black box en niet aan ons (S2).
 
 import { useMemo, useState } from 'react';
+import { toSnapshot } from '../src/engine/snapshot';
+import { LOCAL_ACCOUNT, snapshotStore } from '../src/storage/snapshots';
 import type { Locale, Protocol, ScanReport } from '../src/domain/types';
 import { SPEC_SOURCES } from '../src/spec/snapshot';
 import { UCP_TRUST_NOTE } from '../src/engine/checklists';
@@ -464,14 +466,31 @@ function GapTable({ s, report, locale }: { s: Strings; report: ScanReport; local
   );
 }
 
-export function ReportView({ s, locale, report, onRestart, restartLabel }: {
+export function ReportView({ s, locale, report, onRestart, restartLabel, canSave = true }: {
   s: Strings;
   locale: Locale;
   report: ScanReport;
   onRestart: () => void;
   /** Op /demo is de weg terug niet "nieuwe scan" maar "doe dit zelf". */
   restartLabel?: string;
+  /** Een voorbeeldrapport hoort niet tussen je eigen scans te belanden. */
+  canSave?: boolean;
 }) {
+  const [saved, setSaved] = useState(false);
+
+  async function save() {
+    // Alleen de uitkomst gaat de opslag in, niet de producten of het bronbestand.
+    await snapshotStore.save(
+      toSnapshot(report, {
+        id: `${report.stamp.scannedAt}-${report.sources.feed.filename}`,
+        accountId: LOCAL_ACCOUNT,
+        savedAt: new Date().toISOString(),
+        label: report.sources.feed.filename,
+      }),
+    );
+    setSaved(true);
+  }
+
   return (
     <div className="space-y-4">
       <Card>
@@ -562,7 +581,12 @@ export function ReportView({ s, locale, report, onRestart, restartLabel }: {
           knop verdwijnt in de afdruk, want daar kun je niet op klikken. */}
       <Card>
         <p className="text-sm leading-relaxed text-muted">{s.report.shareNote}</p>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {canSave ? (
+            <Button variant="secondary" onClick={() => void save()} disabled={saved}>
+              {saved ? s.report.savedScan : s.report.saveScan}
+            </Button>
+          ) : null}
           <Button variant="secondary" onClick={() => window.print()}>{s.report.printReport}</Button>
           <Button variant="quiet" onClick={onRestart}>{restartLabel ?? s.report.startOver}</Button>
         </div>
