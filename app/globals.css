@@ -38,6 +38,44 @@
   }
 }
 
+/* Schalen. Bewust kort: wie kan kiezen uit twintig tekstgroottes kiest er
+   uiteindelijk vijfentwintig. Wat hier niet staat, gebruik je niet. */
+@theme {
+  /* Twee families. De mono is er niet voor de sier maar voor waarden die je
+     onder elkaar moet kunnen vergelijken: veldnamen, product-id's, patronen. */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* 4px-grid. Alles wat ruimte inneemt is een veelvoud hiervan. */
+  --spacing: 0.25rem;
+
+  /* Zes stappen, meer niet. De regelhoogtes lopen op met de leesbaarheid:
+     lopende tekst ruimer dan getallen in een tabel. */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.375rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.625rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.875rem;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.125rem;
+
+  /* Drie radii. Zacht genoeg om toegankelijk te ogen, niet zo rond dat alles
+     een pil wordt. */
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  /* Twee schaduwniveaus. Diepte is hier zeldzaam: het rapport leunt op randen
+     en vlakken, niet op zweven. Alleen wat echt boven de pagina hangt. */
+  --shadow-raised: 0 1px 2px rgb(28 26 23 / 0.06), 0 1px 3px rgb(28 26 23 / 0.04);
+  --shadow-overlay: 0 8px 24px rgb(28 26 23 / 0.12);
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -58,9 +96,22 @@
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans);
   font-feature-settings: "cv05", "ss01";
 }
 
 /* Getallen in de trechter en tabellen uitlijnen op cijferbreedte. */
 .tnum { font-variant-numeric: tabular-nums; }
+
+/* Animatie is feedback, geen show. Wie beweging heeft uitgezet, krijgt hem niet
+   alsnog via een transitie die net onder de grens blijft. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
