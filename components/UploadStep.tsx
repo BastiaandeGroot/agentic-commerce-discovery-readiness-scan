@@ -146,7 +146,17 @@ export function UploadStep({ s, locale, onReady }: Props) {
   const clientRef = useRef<ScanClient>(undefined);
   if (!clientRef.current) clientRef.current = new ScanClient();
   const client = clientRef.current;
-  useEffect(() => () => client.dispose(), [client]);
+  // Bewust géén dispose in een effect-cleanup: React draait effecten in
+  // ontwikkelmodus dubbel (aankoppelen, opruimen, aankoppelen), en dan is de
+  // worker beëindigd voordat hij ooit iets gedaan heeft. De scan valt dan
+  // stilletjes terug op de hoofddraad. Een worker sterft met de pagina; hier
+  // opruimen levert niets op en kost de hele winst. Bij "nieuwe scan" wordt hij
+  // wél expliciet opgeruimd.
+
+  // Of er een worker is, weet alleen de browser. Meteen renderen zou de server
+  // "geen worker" laten zeggen en de client "wel", en dat is een hydratiefout.
+  const [offMainThread, setOffMainThread] = useState<boolean>();
+  useEffect(() => setOffMainThread(client.offMainThread), [client]);
 
   const [sources, setSources] = useState<Partial<Record<DatasetRole, Source>>>({});
   const [datasets, setDatasets] = useState<{ feed?: Dataset; catalog?: Dataset }>({});
@@ -346,7 +356,8 @@ export function UploadStep({ s, locale, onReady }: Props) {
       ) : null}
 
       <p className="mt-3 text-xs leading-relaxed text-muted">
-        {s.upload.privacy} {client.offMainThread ? s.upload.workerOn : s.upload.workerOff}
+        {s.upload.privacy}{' '}
+        {offMainThread === undefined ? null : offMainThread ? s.upload.workerOn : s.upload.workerOff}
       </p>
     </Card>
   );

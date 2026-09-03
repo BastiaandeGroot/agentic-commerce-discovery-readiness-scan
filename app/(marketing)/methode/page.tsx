@@ -28,7 +28,7 @@ export default function MethodePage() {
   return (
     <div className="mx-auto max-w-3xl">
       <header className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">{m.title}</h1>
+        <h1 className="font-display text-2xl font-semibold tracking-tight">{m.title}</h1>
         <Link href="/scan" className="mt-2 inline-block text-sm text-accent underline underline-offset-2">
           {m.backToScan}
         </Link>

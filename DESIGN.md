@@ -54,10 +54,20 @@ niet "klik hier". Zouden ze samenvallen, dan leest elke knop als een goedkeuring
 
 ### Contrast
 
-Alle tekst-op-achtergrond combinaties voldoen aan WCAG AA (≥ 4.5:1), in beide
-standen. Nagerekend, laagste waarden: `warn` op `warn-soft` 4.81 licht,
-`accent` op `accent-soft` 5.17 licht, `muted` op `surface-2` 5.22 licht en 5.84
-donker. Voeg je een kleurpaar toe, reken het na voordat je het gebruikt.
+Alle 32 tekst-op-achtergrond combinaties voldoen aan WCAG AA (≥ 4.5:1), in beide
+standen. Nagerekend na het warmer maken van het palet; laagste waarde is `ok` op
+`ok-soft` met 4.79 in de lichte stand. Voeg je een kleurpaar toe, reken het na
+voordat je het gebruikt.
+
+### Wat we hier bewust niet deden
+
+Een terracotta accentkleur zou het geheel warmer maken en zou meteen oplossen dat
+`accent` en `ok` allebei groen zijn. Het botst alleen met `warn`: in de
+tweelaagsbalk bij de onbeantwoorde vragen liggen "uit je feed" en "verrijkbaar
+uit je PIM" naast elkaar, en terracotta naast amber is daar niet uit elkaar te
+houden. Een leesbare grafiek weegt zwaarder dan een warmere knop. `accent` en
+`ok` verschillen daarom in tint (blauwgroen tegen grasgroen) en niet in
+lichtheid; ze staan zelden naast elkaar.
 
 **Kleur draagt nooit alleen de betekenis.** Ernst en status zijn altijd ook af te
 lezen aan vorm of tekst — een badge met een woord erin, een stoplicht met drie
@@ -65,15 +75,23 @@ posities, een label naast een balk.
 
 ## Typografie
 
-Twee families, allebei uit `globals.css`:
+Twee echte letters, geladen via `next/font` en dus zelf gehost:
 
-- `font-sans` — alles.
-- `font-mono` — waarden die je onder elkaar moet kunnen vergelijken: product-id's,
-  veldnamen, zoekpatronen. Niet voor sier.
+- `font-sans` — **Figtree**, overal. Humanistisch, grote x-hoogte, zachte
+  uiteinden: leesbaar in een dichte tabel maar vriendelijker dan de
+  systeemletter, die op een Mac neutraal-technisch oogt.
+- `font-display` — **Fraunces**, alléén boven koppen op de instapkant en in de
+  merknaam. Een schreefletter maakt daar meteen dat het door mensen geschreven
+  lijkt in plaats van door een dashboard uitgespuugd. **Niet in het rapport**:
+  daar telt vergelijkbaarheid, niet karakter.
+- `font-mono` — de systeem-monostack voor waarden die je onder elkaar moet
+  kunnen vergelijken: product-id's, veldnamen, zoekpatronen. Geen derde
+  webletter; hiervoor is de systeemstack goed genoeg.
 
 Zes tekstgroottes, en daar wijk je niet van af: `text-xs`, `text-sm`, `text-base`,
 `text-lg`, `text-xl`, `text-2xl`. De regelhoogtes lopen mee: lopende tekst ruimer
-dan getallen in een tabel.
+dan getallen in een tabel. Er is één zevende stap, `text-3xl`, uitsluitend voor
+de hero op de landingspagina.
 
 Getallen die je vergelijkt krijgen `.tnum` (tabellarische cijfers), zodat kolommen
 niet gaan dansen als een waarde verandert.

@@ -3,38 +3,38 @@
 /* Ontwerptokens. Licht als basis, donker als variant — de kleuren dragen
    betekenis (tier, gap-oorzaak) en moeten in beide standen leesbaar blijven. */
 :root {
-  --bg: #fbfaf8;
-  --surface: #ffffff;
-  --surface-2: #f4f2ee;
-  --border: #e3ded6;
-  --text: #1c1a17;
-  --muted: #6b645a;
-  --accent: #1f6f5c;
-  --accent-soft: #e6f0ec;
+  --bg: #faf7f1;
+  --surface: #fffdfa;
+  --surface-2: #f3efe6;
+  --border: #e6ded1;
+  --text: #211c15;
+  --muted: #6f6558;
+  --accent: #22684f;
+  --accent-soft: #e4efe9;
   --warn: #9a5b12;
   --warn-soft: #fbf0e0;
   --danger: #8f2f2a;
   --danger-soft: #f9e8e6;
-  --ok: #2f6b3a;
-  --ok-soft: #e8f1e8;
+  --ok: #3a7637;
+  --ok-soft: #eaf2e5;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #14130f;
-    --surface: #1c1a17;
-    --surface-2: #24211d;
-    --border: #35312b;
-    --text: #f0ece5;
-    --muted: #a49b8e;
-    --accent: #5cbfa3;
-    --accent-soft: #17302a;
+    --bg: #17150f;
+    --surface: #201d16;
+    --surface-2: #2a251d;
+    --border: #3b352b;
+    --text: #f3eee4;
+    --muted: #aca090;
+    --accent: #63c4a4;
+    --accent-soft: #18302a;
     --warn: #d69a4e;
-    --warn-soft: #2f2418;
+    --warn-soft: #322618;
     --danger: #e08b84;
-    --danger-soft: #2f1c1a;
-    --ok: #7cc088;
-    --ok-soft: #1a2b1d;
+    --danger-soft: #311d1a;
+    --ok: #93cf82;
+    --ok-soft: #1d2c1a;
   }
 }
 
@@ -43,7 +43,9 @@
 @theme {
   /* Twee families. De mono is er niet voor de sier maar voor waarden die je
      onder elkaar moet kunnen vergelijken: veldnamen, product-id's, patronen. */
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Alleen boven koppen op de instapkant; het rapport blijft schreefloos. */
+  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
   /* 4px-grid. Alles wat ruimte inneemt is een veelvoud hiervan. */
@@ -63,6 +65,10 @@
   --text-xl--line-height: 1.875rem;
   --text-2xl: 1.75rem;
   --text-2xl--line-height: 2.125rem;
+  /* Zevende stap, met opzet beperkt: alleen de hero op de instapkant. In het
+     rapport heeft niets deze maat nodig. */
+  --text-3xl: 2.375rem;
+  --text-3xl--line-height: 2.75rem;
 
   /* Drie radii. Zacht genoeg om toegankelijk te ogen, niet zo rond dat alles
      een pil wordt. */

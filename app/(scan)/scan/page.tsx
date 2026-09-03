@@ -65,7 +65,7 @@ export default function Home() {
   return (
     <div className="mx-auto max-w-5xl">
       <header className="mb-8">
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{steps.find((x) => x.id === step)?.label}</h1>
+        <h1 className="font-display text-2xl font-semibold tracking-tight">{steps.find((x) => x.id === step)?.label}</h1>
         <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">{s.tagline}</p>
 
         <ol className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
