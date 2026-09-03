@@ -24,6 +24,8 @@ interface Props {
   state: QuestionSetState;
   onChange: (next: QuestionSetState) => void;
   onRun: () => void;
+  /** De scan draait; de knop blijft staan met zijn eigen tekst. */
+  running?: boolean;
 }
 
 /** Leesbare omschrijving van wat een vraag nodig heeft. */
@@ -95,7 +97,7 @@ function columnPattern(column: string): string {
   return `attr:^${column.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`;
 }
 
-export function QuestionSetStep({ s, locale, feed, state, onChange, onRun }: Props) {
+export function QuestionSetStep({ s, locale, feed, state, onChange, onRun, running }: Props) {
   const [openSet, setOpenSet] = useState<string | undefined>(state.sets[0]?.id);
   const [newLabel, setNewLabel] = useState('');
   const [newField, setNewField] = useState('');
@@ -229,7 +231,7 @@ export function QuestionSetStep({ s, locale, feed, state, onChange, onRun }: Pro
       </Card>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={onRun} disabled={!ready}>{s.questions.runScan}</Button>
+        <Button onClick={onRun} disabled={!ready} loading={running}>{s.questions.runScan}</Button>
         <span className="text-sm text-muted">
           {ready ? s.questions.allValidated : s.questions.validateFirst}
         </span>

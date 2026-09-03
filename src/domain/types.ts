@@ -78,6 +78,10 @@ export interface Dataset {
   /** Herkend formaat, bv. "CSV (puntkomma-gescheiden)". */
   format: string;
   products: ProductRecord[];
+  /** Alle bronkolommen in de volgorde waarin ze in het bestand staan. */
+  columns: string[];
+  /** De eerste regels ruw, zodat de merchant ziet wat wij zien. */
+  preview: Record<string, string>[];
   /** Bronkolom -> canonieke sleutel. Voor transparantie in de UI. */
   mapping: Record<string, string>;
   /** Bronkolommen die nergens op matchten. */

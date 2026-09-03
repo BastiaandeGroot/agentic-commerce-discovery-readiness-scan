@@ -91,7 +91,10 @@ helft), de teksten, en of de labels de meting noemen of een oordeel.
 **Papa Parse** — het bouwplan schrijft streamend parsen voor. De eigen parser
 haalt de randgevallen (BOM, puntkomma, quotes met scheidingstekens en newlines,
 CRLF, rafelige regels) en staat onder test, maar leest het hele bestand in het
-geheugen. Pas relevant bij de Web Worker en de bestandsgrens uit stap 5.
+geheugen. Gemeten in de browser: 27 MB met 160.000 producten gaat goed in de
+worker, zonder dat de hoofddraad ook maar één tik mist. De grens ligt nu op
+20 MB met een uitweg ("toch proberen"); streamend lezen wordt pas een echte
+vraag als die grens knelt of als het serverzijdig moet.
 
 **Echte kwaliteitscontroles** — nu alleen een woordentelling op titel en
 omschrijving. Kandidaten: schijn-volledigheid (veld overal dezelfde waarde),

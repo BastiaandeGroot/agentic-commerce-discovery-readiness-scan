@@ -100,3 +100,46 @@ test('getallen worden niet geïnterpreteerd, dus komma of punt maakt niet uit', 
   const rows = parseDelimited('id,prijs\n1,"1.234,50"\n');
   assert.equal(rows[0].prijs, '1.234,50');
 });
+
+test('een correctie van de merchant gaat voor op onze herkenning', () => {
+  // Een huisgemaakte kolomnaam die op geen enkele alias lijkt.
+  const text = 'artikelcode,vrij_veld_7\n1,Een stevige meubelstof\n';
+  const zonder = ingest('f.csv', text, 'feed');
+  const met = ingest('f.csv', text, 'feed', { vrij_veld_7: 'description' });
+
+  assert.equal(zonder.mapping.vrij_veld_7, undefined, 'zonder correctie blijft hij ongeplaatst');
+  assert.equal(met.mapping.vrij_veld_7, 'description');
+  assert.equal(met.products[0].values.description, 'Een stevige meubelstof');
+});
+
+test('een kolom bewust niet mappen is iets anders dan geen mening', () => {
+  const text = 'title,prijs\nStof,10\n';
+  const met = ingest('f.csv', text, 'feed', { title: null });
+  assert.equal(met.mapping.title, undefined);
+  assert.ok(met.unmappedColumns.includes('title'));
+  assert.equal(met.products[0].values.title, undefined);
+  assert.equal(met.products[0].unmapped.title, 'Stof');
+});
+
+test('een correctie kan niet verdrongen worden door een automatische treffer', () => {
+  // Beide kolommen willen 'title'; de merchant wijst er één aan.
+  const text = 'title,productnaam\nA,B\n';
+  const met = ingest('f.csv', text, 'feed', { productnaam: 'title' });
+  assert.equal(met.mapping.productnaam, 'title');
+  assert.notEqual(met.mapping.title, 'title');
+});
+
+test('de dataset draagt de kolomvolgorde en de eerste regels ruw', () => {
+  const text = 'id,titel\n1,Stof\n2,Linnen\n';
+  const data = ingest('f.csv', text, 'feed');
+  assert.deepEqual(data.columns, ['id', 'titel']);
+  assert.equal(data.preview.length, 2);
+  assert.equal(data.preview[1].titel, 'Linnen');
+});
+
+test('de voorbeeldweergave blijft bij tien regels, ook bij een grote feed', () => {
+  const rijen = Array.from({ length: 50 }, (_, i) => `${i},Stof ${i}`).join('\n');
+  const data = ingest('f.csv', `id,titel\n${rijen}\n`, 'feed');
+  assert.equal(data.products.length, 50);
+  assert.equal(data.preview.length, 10);
+});
