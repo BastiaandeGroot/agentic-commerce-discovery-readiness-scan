@@ -76,15 +76,35 @@ export interface ColumnMapping {
   unmapped: string[];
 }
 
-/** Bouw de mapping voor een set bronkolommen. */
-export function buildMapping(columns: string[]): ColumnMapping {
+/**
+ * Bouw de mapping voor een set bronkolommen.
+ *
+ * `overrides` is het oordeel van de merchant en gaat voor op onze herkenning:
+ * hij weet wat er in zijn kolom staat en wij raden ernaar. Een expliciete `null`
+ * betekent "laat deze kolom met rust" — dat is iets anders dan geen mening.
+ */
+export function buildMapping(
+  columns: string[],
+  overrides: Record<string, string | null> = {},
+): ColumnMapping {
   const mapping: Record<string, string> = {};
   const unmapped: string[] = [];
   const claimed = new Set<string>();
 
+  // Eerst de correcties, zodat een claim van de merchant niet verdrongen kan
+  // worden door een automatische treffer op dezelfde sleutel.
+  for (const column of columns) {
+    const chosen = overrides[column];
+    if (chosen === undefined) continue;
+    if (chosen === null) continue; // bewust niet mappen; komt bij unmapped terecht
+    mapping[column] = chosen;
+    claimed.add(chosen);
+  }
+
   // Twee rondes: exacte treffers claimen hun sleutel eerst, zodat een vage
   // deelmatch een exacte niet kan verdringen.
   for (const column of columns) {
+    if (mapping[column] || overrides[column] === null) continue;
     const norm = normalizeColumnName(column);
     const exact = ALIAS_INDEX.get(norm);
     if (exact && !claimed.has(exact)) {
@@ -94,6 +114,7 @@ export function buildMapping(columns: string[]): ColumnMapping {
   }
   for (const column of columns) {
     if (mapping[column]) continue;
+    if (overrides[column] === null) { unmapped.push(column); continue; }
     const key = matchColumn(column);
     if (key && !claimed.has(key)) {
       mapping[column] = key;

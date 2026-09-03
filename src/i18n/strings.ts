@@ -106,6 +106,34 @@ export const STRINGS = {
       heading: 'Lever je productdata aan',
       intro:
         'De feed is wat de agent daadwerkelijk ziet en is daarom de analysebron. De catalogus-export uit je PIM is optioneel, maar zonder die tweede bron kunnen we niet zien of een ontbrekend veld een mappingfout is of een echt gat.',
+      drop: 'Sleep je bestand hierheen of klik om te kiezen',
+      previewHeading: 'Zo lezen wij je bestand',
+      previewIntro:
+        'De eerste regels zoals wij ze zien. Staat hier iets scheef, dan klopt het scheidingsteken of de kopregel niet en heeft corrigeren verderop weinig zin.',
+      previewMore: 'en nog',
+      previewRows: 'regels',
+      mappingHeading: 'Kolommen koppelen',
+      mappingIntro:
+        'Wij raden welke kolom welk veld draagt. Zit er iets fout, corrigeer het hier — jij weet wat er in je kolommen staat en wij leiden het af uit de naam.',
+      mappingColumn: 'Jouw kolom',
+      mappingField: 'Wij lezen dit als',
+      mappingSample: 'Eerste waarde',
+      mappingNone: '— niet koppelen —',
+      mappingGuessed: 'geraden',
+      mappingCorrected: 'door jou gezet',
+      mappingShow: 'Kolommen koppelen',
+      mappingHide: 'Koppeling verbergen',
+      mappingUnmappedNote:
+        'Kolommen die we niet plaatsen gaan niet verloren: juist daar zit de categoriespecifieke informatie waar de vragensets op afgaan.',
+      tooLarge: 'Dit bestand is groot',
+      tooLargeBody:
+        'Boven de {limit} MB wordt een scan in de browser traag en kan een tabblad omvallen. Je kunt het proberen, maar serverzijdig draaien is hiervoor gemaakt — dat komt met een account.',
+      tryAnyway: 'Toch in de browser proberen',
+      workerOn: 'De scan draait naast de pagina, dus je scherm blijft reageren.',
+      workerOff:
+        'Je browser staat geen achtergrondverwerking toe. De scan draait daarom op de pagina zelf en die kan even stilstaan.',
+      progressReading: 'Bezig met lezen',
+      progressScanning: 'Bezig met beoordelen',
       feedLabel: 'Productfeed',
       feedHint: 'Verplicht. Bijvoorbeeld je Channable- of Google Shopping-feed.',
       catalogLabel: 'Catalogus uit PIM',
@@ -320,6 +348,13 @@ export const STRINGS = {
     },
 
     errors: {
+      noColumns: 'We herkennen geen enkele kolom in dit bestand',
+      noColumnsNext:
+        'Controleer of de eerste regel de kolomnamen bevat en niet bijvoorbeeld een titel of een lege regel. Een export uit Excel zet daar soms een regel boven.',
+      didYouMean: 'Bedoelde je deze kolom?',
+      linkIt: 'Koppel hem',
+      wrongType: 'Dit bestandstype kunnen we niet lezen',
+      wrongTypeNext: 'We lezen CSV, TSV, puntkomma-CSV, JSON, NDJSON en XML. Een xlsx exporteer je eerst als CSV.',
       feedRequired: 'Lever eerst een productfeed aan.',
       readFailed: 'Kon dit bestand niet inlezen',
     },
@@ -425,6 +460,34 @@ export const STRINGS = {
       heading: 'Supply your product data',
       intro:
         'The feed is what the agent actually sees, so that is the analysis source. The catalogue export from your PIM is optional, but without that second source we cannot tell whether a missing field is a mapping error or a real gap.',
+      drop: 'Drop your file here, or click to choose one',
+      previewHeading: 'How we read your file',
+      previewIntro:
+        'The first rows as we see them. If something looks skewed here, the delimiter or the header row is wrong, and correcting fields below will not help.',
+      previewMore: 'and another',
+      previewRows: 'rows',
+      mappingHeading: 'Link your columns',
+      mappingIntro:
+        'We guess which column carries which field. If we got one wrong, correct it here — you know what is in your columns, we infer it from the name.',
+      mappingColumn: 'Your column',
+      mappingField: 'We read this as',
+      mappingSample: 'First value',
+      mappingNone: '— do not link —',
+      mappingGuessed: 'guessed',
+      mappingCorrected: 'set by you',
+      mappingShow: 'Link your columns',
+      mappingHide: 'Hide linking',
+      mappingUnmappedNote:
+        'Columns we do not place are not lost: that is exactly where the category-specific information lives that the question sets rely on.',
+      tooLarge: 'This is a large file',
+      tooLargeBody:
+        'Above {limit} MB a scan in the browser gets slow and a tab can fall over. You can try, but running server-side is built for this — that comes with an account.',
+      tryAnyway: 'Try in the browser anyway',
+      workerOn: 'The scan runs alongside the page, so your screen stays responsive.',
+      workerOff:
+        'Your browser does not allow background processing. The scan therefore runs on the page itself, which may briefly freeze.',
+      progressReading: 'Reading',
+      progressScanning: 'Assessing',
       feedLabel: 'Product feed',
       feedHint: 'Required. For example your Channable or Google Shopping feed.',
       catalogLabel: 'Catalogue from PIM',
@@ -639,6 +702,13 @@ export const STRINGS = {
     },
 
     errors: {
+      noColumns: 'We do not recognise a single column in this file',
+      noColumnsNext:
+        'Check that the first row holds the column names and not, say, a title or a blank line. An export from Excel sometimes puts a row above it.',
+      didYouMean: 'Did you mean this column?',
+      linkIt: 'Link it',
+      wrongType: 'We cannot read this file type',
+      wrongTypeNext: 'We read CSV, TSV, semicolon CSV, JSON, NDJSON and XML. Export an xlsx as CSV first.',
       feedRequired: 'Supply a product feed first.',
       readFailed: 'Could not read this file',
     },

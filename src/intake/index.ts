@@ -17,7 +17,15 @@ function recordKey(values: Record<string, string>, index: number): string {
   return str(values.item_id) ?? str(values.gtin) ?? str(values.mpn) ?? `#${index + 1}`;
 }
 
-export function ingest(filename: string, text: string, role: DatasetRole): Dataset {
+export const PREVIEW_ROWS = 10;
+
+export function ingest(
+  filename: string,
+  text: string,
+  role: DatasetRole,
+  /** Correcties van de merchant op onze kolomherkenning. */
+  overrides: Record<string, string | null> = {},
+): Dataset {
   if (text.trim() === '') {
     throw new IntakeError(`${filename} is leeg.`);
   }
@@ -35,8 +43,9 @@ export function ingest(filename: string, text: string, role: DatasetRole): Datas
   for (const row of rows.slice(0, 500)) {
     for (const key of Object.keys(row)) columns.add(key);
   }
+  const columnList = [...columns];
 
-  const { mapping, unmapped } = buildMapping([...columns]);
+  const { mapping, unmapped } = buildMapping(columnList, overrides);
 
   const products: ProductRecord[] = rows.map((row, index) => {
     const values: Record<string, string> = {};
@@ -63,6 +72,8 @@ export function ingest(filename: string, text: string, role: DatasetRole): Datas
     role,
     filename,
     format,
+    columns: columnList,
+    preview: rows.slice(0, PREVIEW_ROWS),
     products,
     mapping,
     unmappedColumns: unmapped,

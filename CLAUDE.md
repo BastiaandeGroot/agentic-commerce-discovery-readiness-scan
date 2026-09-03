@@ -67,6 +67,15 @@ in de browser en straks serverzijdig.
   verschoven definitie op vooruitgang.
 - Elk resultaat draagt scanversie, spec-snapshot én vragenset-versie.
 
+## Zwaar werk
+
+De intake en de scan draaien in een Web Worker (`src/worker/`). De worker houdt
+de datasets vast; ze gaan één keer naar de pagina. Terugsturen om te kunnen
+scannen zou dezelfde duizenden producten nog een keer door de structured clone
+duwen. Is er geen worker beschikbaar, dan valt `ScanClient` terug op de
+hoofddraad en zegt de UI dat erbij — stil falen is hier het slechtste van twee
+werelden.
+
 ## Merchant-data
 
 Elke tabel die merchant-data raakt krijgt een `account_id`, ook nu er nog geen

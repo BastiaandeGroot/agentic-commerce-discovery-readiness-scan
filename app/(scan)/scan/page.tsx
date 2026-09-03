@@ -7,7 +7,7 @@
 import { useState } from 'react';
 import type { Dataset, QuestionSetState, ScanReport } from '../../../src/domain/types';
 import { generateQuestionSets } from '../../../src/questions/generate';
-import { runScan } from '../../../src/engine/report';
+import type { ScanClient } from '../../../src/worker/client';
 import { STRINGS } from '../../../src/i18n/strings';
 import { useLocale } from '../../../src/i18n/useLocale';
 import { UploadStep } from '../../../components/UploadStep';
@@ -23,6 +23,10 @@ export default function Home() {
   const [catalog, setCatalog] = useState<Dataset>();
   const [questionState, setQuestionState] = useState<QuestionSetState>();
   const [report, setReport] = useState<ScanReport>();
+  // De client houdt de worker vast; de datasets blijven daar zodat ze niet voor
+  // elke scan opnieuw door de structured clone hoeven.
+  const [client, setClient] = useState<ScanClient>();
+  const [scanning, setScanning] = useState(false);
 
   const s = STRINGS[locale];
   const steps: { id: Step; label: string }[] = [
@@ -31,22 +35,30 @@ export default function Home() {
     { id: 'report', label: s.steps.report },
   ];
 
-  function handleReady(nextFeed: Dataset, nextCatalog?: Dataset) {
+  function handleReady(nextClient: ScanClient, nextFeed: Dataset, nextCatalog?: Dataset) {
+    setClient(nextClient);
     setFeed(nextFeed);
     setCatalog(nextCatalog);
     setQuestionState(generateQuestionSets(nextFeed, nextCatalog));
     setStep('questions');
   }
 
-  function handleRun() {
-    if (!feed || !questionState) return;
-    setReport(runScan(feed, catalog, questionState, { scannedAt: new Date().toISOString() }));
-    setStep('report');
+  async function handleRun() {
+    if (!client || !questionState) return;
+    setScanning(true);
+    try {
+      // De klok komt van hier: de motor heeft er zelf geen.
+      setReport(await client.scan(questionState, new Date().toISOString()));
+      setStep('report');
+    } finally {
+      setScanning(false);
+    }
   }
 
   function restart() {
     setFeed(undefined); setCatalog(undefined);
     setQuestionState(undefined); setReport(undefined);
+    client?.dispose(); setClient(undefined);
     setStep('upload');
   }
 
@@ -79,7 +91,7 @@ export default function Home() {
       </header>
 
       <main>
-        {step === 'upload' ? <UploadStep s={s} onReady={handleReady} /> : null}
+        {step === 'upload' ? <UploadStep s={s} locale={locale} onReady={handleReady} /> : null}
 
         {step === 'questions' && feed && questionState ? (
           <QuestionSetStep
@@ -88,7 +100,8 @@ export default function Home() {
             feed={feed}
             state={questionState}
             onChange={setQuestionState}
-            onRun={handleRun}
+            onRun={() => void handleRun()}
+            running={scanning}
           />
         ) : null}
 
