@@ -1,7 +1,7 @@
 # Werknotities
 
 Sessiestand: wat er staat, wat er besloten is, wat er open is.
-Laatst bijgewerkt: 2026-09-02.
+Laatst bijgewerkt: 2026-09-03.
 
 Structurele regels die altijd gelden staan **niet** hier maar in `CLAUDE.md`.
 
@@ -34,6 +34,26 @@ uitlegpagina op `/methode` in merchant-taal.
 
 ---
 
+## Waar we staan
+
+Er is een bouwplan van negen stappen gevolgd. De stand:
+
+| Stap | Wat | Stand |
+|---|---|---|
+| 1 | Design system vastleggen | af — `DESIGN.md` + tokens |
+| 2 | `CLAUDE.md` schrijven | af |
+| 3 | Routestructuur en shell | af — drie route groups, twee layouts |
+| 4 | Scan-core | af — `SCAN_VERSION`, geen klok, 40 tests |
+| 5 | Upload, kolommapping, Web Worker | af |
+| 6 | Rapportpagina | af — "waar begin je", printbaar |
+| 7 | Publieke pagina's | af — landing, `/demo`, FAQ, privacyblok |
+| 8 | Accounts, dashboard, serverzijdig | **half** — bewaren en vergelijken lokaal; accounts wachten op sleutels |
+| 9 | Live zetten | af via Render, niet via Vercel |
+
+Het plan zelf staat niet in deze repo; het is een extern document. De stappen 4,
+5 en 8 zijn bewust anders uitgevoerd dan het plan voorschreef. Waarom staat per
+geval in de commitboodschap van die stap — `git log` is daarvoor de bron.
+
 ## Genomen beslissingen
 
 Deze zijn met de opdrachtgever doorgesproken. Niet terugdraaien zonder overleg.
@@ -62,6 +82,16 @@ uitzondering is het stoplicht, en daar is groen exact gelijk aan vindbaar
 **Bevestigen van een vragenset is terugdraaibaar** en verhoogt de versie niet;
 het is een oordeel over de set, geen wijziging eraan.
 
+**Render, niet Vercel.** Het bouwplan schrijft Vercel voor. `render.yaml` staat in
+de repo met `autoDeploy: true` en werkt; verhuizen zou een verbouwing zijn zonder
+winst. Niet opnieuw voorstellen.
+
+**Accounts blijven voorlopig uit.** Bewaren, historie en vergelijken draaien
+lokaal in de browser van de merchant. Accounts komen pas als merchants er echt om
+vragen — dat adviseert het bouwplan zelf ook. De database ligt klaar in
+`supabase/migrations/0001_snapshots.sql`; aansluiten vereist een Supabase-project
+met sleutels van de opdrachtgever.
+
 **Elke scan draagt twee versienummers**: spec-snapshot en vragenset-versie.
 Zonder allebei is vergelijken over tijd betekenisloos.
 
@@ -79,6 +109,17 @@ Niet opnieuw voorstellen zonder dat er iets veranderd is.
 ---
 
 ## Open
+
+**De gratis/betaald-grens klopt mogelijk niet meer.** Lokaal bewaren levert nu al
+drie van de vier dingen die het bouwplan als betaald aanmerkt: bewaren, historie
+en vergelijken. Wat een account daar bovenop echt toevoegt is delen, meerdere
+apparaten, teamleden en grote bestanden. Dat is een smallere propositie dan het
+plan aanneemt. Voorgelegd aan de opdrachtgever, nog geen besluit.
+
+**Volgorde van het resterende werk**, van meest naar minst waardevol: (1) echte
+kwaliteitscontroles, want die maken het rapport aantoonbaar eerlijker en vragen
+geen besluit; (2) mechanisme per veld, de grootste maar vereist review van 51
+velden door de opdrachtgever; (3) de rood/oranje-grens van het stoplicht.
 
 **Prijzen** — de bedragen en de exacte bestandsgrens staan nog niet vast. De
 prijzenpagina draagt daar een zichtbare TODO in plaats van een verzonnen bedrag.
