@@ -85,6 +85,104 @@ function FunnelCard({ s, report, protocol }: { s: Strings; report: ScanReport; p
   );
 }
 
+/**
+ * Waar begin je?
+ *
+ * De trechter is binair en zegt bij de meeste merchants nul. Dat leest als een
+ * dichte deur terwijl er al veel staat. Dit blok laat de afstand zien en wat de
+ * eerstvolgende stap oplevert — zonder de lat te verlagen, want vindbaar blijft
+ * alle vragen beantwoord. Het is een richting, geen zachter cijfer.
+ */
+function NextStep({ s, report, protocol, locale }: {
+  s: Strings; report: ScanReport; protocol: Protocol; locale: Locale;
+}) {
+  const { funnel, distance, questionCoverage } = report.protocols[protocol];
+
+  // De dichtstbijzijnde stand die nog niet vindbaar is.
+  const nearest = distance.find((bucket) => bucket.open > 0);
+
+  // Welke vragen houden de meeste producten tegen? Tel over alle sets heen, want
+  // dezelfde vraag komt in meerdere categorieën terug.
+  const blockers = new Map<string, { label: string; open: number; enrichable: number; ids: Set<string> }>();
+  for (const row of questionCoverage) {
+    const open = row.applicable - row.answered;
+    if (open === 0) continue;
+    const key = row.label[locale];
+    const entry = blockers.get(key) ?? { label: key, open: 0, enrichable: 0, ids: new Set<string>() };
+    entry.open += open;
+    entry.enrichable += row.enrichable;
+    entry.ids.add(row.questionId);
+    blockers.set(key, entry);
+  }
+  const top = [...blockers.values()].sort((a, b) => b.open - a.open).slice(0, 2);
+
+  // Wat levert het op als juist die vragen beantwoord worden? Een product wordt
+  // vindbaar als er daarna niets meer openstaat.
+  const topIds = new Set(top.flatMap((entry) => [...entry.ids]));
+  const wouldBecome = report.products.filter((product) => {
+    if (product.unmatched) return false;
+    const open = product.perProtocol[protocol].questions.filter((q) => !q.answered);
+    return open.length > 0 && open.every((q) => topIds.has(q.questionId));
+  }).length;
+
+  if (top.length === 0) return null;
+
+  return (
+    <Card>
+      <CardTitle sub={s.report.startIntro}>
+        {s.report.startHeading} — {s.report.protocolNames[protocol]}
+      </CardTitle>
+
+      <p className="text-sm leading-relaxed">
+        {funnel.findable === 0 ? (
+          s.report.startNoneFindable
+        ) : (
+          <><span className="tnum font-semibold">{n(funnel.findable)}</span> {s.report.startSomeFindable}</>
+        )}
+        {nearest ? (
+          <>
+            {' '}{s.report.startNearest}{' '}
+            <span className="tnum font-semibold">{n(nearest.products)}</span>{' '}
+            {s.report.startNearestProducts}{' '}
+            <span className="tnum font-semibold">{nearest.open}</span>{' '}
+            {s.report.startNearestQuestions}
+          </>
+        ) : null}
+      </p>
+
+      <div className="mt-4">
+        <h3 className="text-xs font-medium text-muted">{s.report.startBlockersHeading}</h3>
+        <ul className="mt-1.5 space-y-1.5">
+          {top.map((entry) => (
+            <li key={entry.label} className="text-sm">
+              <span className="font-medium">{entry.label}</span>
+              <span className="tnum ml-2 text-xs text-muted">
+                {n(entry.open)} {s.report.startBlockerOpen}
+                {entry.enrichable > 0
+                  ? <>, <span className="text-warn">{n(entry.enrichable)}</span> {s.report.startBlockerPim}</>
+                  : <>, {s.report.startBlockerNowhere}</>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="mt-4 rounded-md bg-surface-2 px-3 py-2.5">
+        <h3 className="text-xs font-medium text-muted">{s.report.startWinHeading}</h3>
+        {wouldBecome > 0 ? (
+          <p className="mt-1 text-sm leading-relaxed">
+            {s.report.startWinBody}{' '}
+            <span className="tnum font-semibold text-accent">{n(wouldBecome)}</span>{' '}
+            {s.report.startWinProducts}
+          </p>
+        ) : (
+          <p className="mt-1 text-sm leading-relaxed text-muted">{s.report.startWinNone}</p>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 function QuestionCoverage({ s, report, protocol, locale }: {
   s: Strings; report: ScanReport; protocol: Protocol; locale: Locale;
 }) {
@@ -394,6 +492,12 @@ export function ReportView({ s, locale, report, onRestart }: {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {PROTOCOLS.map((protocol) => (
+          <NextStep key={protocol} s={s} report={report} protocol={protocol} locale={locale} />
+        ))}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {PROTOCOLS.map((protocol) => (
           <QuestionCoverage key={protocol} s={s} report={report} protocol={protocol} locale={locale} />
         ))}
       </div>
@@ -449,7 +553,15 @@ export function ReportView({ s, locale, report, onRestart }: {
         <p className="text-xs leading-relaxed text-muted">{s.report.disclaimer}</p>
       </Card>
 
-      <Button variant="secondary" onClick={onRestart}>{s.report.startOver}</Button>
+      {/* Delen zonder dat er data weggaat: afdrukken doet de browser zelf. De
+          knop verdwijnt in de afdruk, want daar kun je niet op klikken. */}
+      <Card>
+        <p className="text-sm leading-relaxed text-muted">{s.report.shareNote}</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => window.print()}>{s.report.printReport}</Button>
+          <Button variant="quiet" onClick={onRestart}>{s.report.startOver}</Button>
+        </div>
+      </Card>
     </div>
   );
 }

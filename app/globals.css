@@ -121,3 +121,51 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Printen.
+ *
+ * Een rapport wordt doorgestuurd, en zolang er geen accounts zijn is een pdf de
+ * enige manier waarop dat kan zonder dat de data ergens heen gaat. Weg met alles
+ * wat je niet kunt aanklikken op papier; kaarten mogen niet halverwege breken. */
+@media print {
+  :root {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f4f2ee;
+    --border: #c9c2b6;
+    --text: #000000;
+    --muted: #3d3830;
+  }
+
+  header,
+  footer,
+  nav,
+  button {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  /* Een kaart die over twee pagina's valt is niet meer te lezen als geheel. */
+  section {
+    break-inside: avoid;
+    box-shadow: none !important;
+  }
+
+  table {
+    break-inside: auto;
+  }
+
+  tr {
+    break-inside: avoid;
+  }
+
+  /* Een link is op papier niets waard zonder zijn adres. */
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.75em;
+    color: #3d3830;
+  }
+}

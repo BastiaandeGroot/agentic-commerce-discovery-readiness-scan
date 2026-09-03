@@ -57,7 +57,7 @@ export const STRINGS = {
         intro: 'Het resultaat van een scan, op een eigen adres zodat je het kunt delen.',
         notFound: 'Dit rapport bestaat niet of is verlopen',
         notFoundBody:
-          'Rapporten worden nu nog niet bewaard: een scan leeft zolang je hem open hebt staan. Draai de scan opnieuw op je bestand om een vers rapport te krijgen.',
+          'Rapporten worden nog nergens bewaard, en dus ook niet op een adres dat je kunt doorsturen. Dat is een bewuste volgorde: opslaan betekent dat je productdata ons systeem in gaat, en daar hoort eerst een account met een bewaartermijn bij. Tot die tijd druk je een rapport af of sla je het op als pdf — dat gebeurt op je eigen apparaat. Draai de scan opnieuw om een vers rapport te krijgen.',
         runScan: 'Nieuwe scan starten',
       },
       pricing: {
@@ -198,6 +198,23 @@ export const STRINGS = {
     report: {
       heading: 'Rapport',
       funnelHeading: 'De trechter',
+      startHeading: 'Waar begin je?',
+      startIntro:
+        'De trechter is streng: vindbaar betekent dat élke vraag beantwoord is. Dat zegt niet hoe ver je bent, en dat staat hier wel.',
+      startNoneFindable: 'Nog geen enkel product is vindbaar.',
+      startSomeFindable: 'producten zijn al vindbaar.',
+      startNearest: 'Het dichtst in de buurt:',
+      startNearestProducts: 'producten missen nog',
+      startNearestQuestions: 'antwoorden.',
+      startBlockersHeading: 'Wat de meeste producten tegenhoudt',
+      startBlockerOpen: 'producten hebben deze vraag open',
+      startBlockerPim: 'waarvan uit je PIM te halen',
+      startBlockerNowhere: 'staat nergens vastgelegd',
+      startWinHeading: 'Wat de eerste stap oplevert',
+      startWinBody: 'Beantwoord je deze vragen voor je hele catalogus, dan zijn',
+      startWinProducts: 'producten meteen vindbaar.',
+      startWinNone:
+        'Deze vragen alleen zijn niet genoeg: er blijven bij elk product nog andere vragen open. Dat is geen reden om ze te laten liggen — ze zijn wel de grootste stap.',
       total: 'producten in de feed',
       findable: 'vindbaar',
       competitive: 'concurrerend',
@@ -303,6 +320,9 @@ export const STRINGS = {
       scannedAt: 'Gescand op',
       disclaimer:
         'Deze scan meet of jouw data de vragen beantwoordt die een koper in jouw categorie stelt. Dat is een uitspraak over je eigen data, niet een voorspelling van hoe een agent rangschikt. Een agent put ook uit je website, reviews van derden, marktplaatsvermeldingen en zijn eigen trainingsdata; de catalogus is één van meerdere bronnen.',
+      printReport: 'Afdrukken of opslaan als pdf',
+      shareNote:
+        'Rapporten worden nergens bewaard: dit rapport leeft zolang je dit tabblad open hebt. Wil je het delen of bewaren, druk het dan af of sla het op als pdf — dat gebeurt op je eigen apparaat, net als de scan zelf.',
       startOver: 'Nieuwe scan',
       protocolNames: { acp: 'OpenAI ACP', ucp: 'Google UCP' } as Record<string, string>,
     },
@@ -355,6 +375,8 @@ export const STRINGS = {
       linkIt: 'Koppel hem',
       wrongType: 'Dit bestandstype kunnen we niet lezen',
       wrongTypeNext: 'We lezen CSV, TSV, puntkomma-CSV, JSON, NDJSON en XML. Een xlsx exporteer je eerst als CSV.',
+      scanFailed: 'De scan kon niet worden uitgevoerd',
+      scanFailedNext: 'Ga terug naar de eerste stap en lever je bestand opnieuw aan. Blijft het misgaan, dan helpt het om de pagina te herladen — de scan draait in je browser en verliest zijn geheugen als een tabblad lang open staat.',
       feedRequired: 'Lever eerst een productfeed aan.',
       readFailed: 'Kon dit bestand niet inlezen',
     },
@@ -411,7 +433,7 @@ export const STRINGS = {
         intro: 'The result of a scan, at its own address so you can share it.',
         notFound: 'This report does not exist or has expired',
         notFoundBody:
-          'Reports are not stored yet: a scan lives as long as you keep it open. Run the scan again on your file to get a fresh report.',
+          'Reports are not stored anywhere yet, and therefore not at an address you can forward either. That order is deliberate: storing means your product data enters our systems, and that needs an account with a retention period first. Until then, print a report or save it as a PDF — that happens on your own device. Run the scan again to get a fresh report.',
         runScan: 'Start a new scan',
       },
       pricing: {
@@ -552,6 +574,23 @@ export const STRINGS = {
     report: {
       heading: 'Report',
       funnelHeading: 'The funnel',
+      startHeading: 'Where do you start?',
+      startIntro:
+        'The funnel is strict: findable means every question is answered. That does not tell you how far along you are, and this does.',
+      startNoneFindable: 'No product is findable yet.',
+      startSomeFindable: 'products are already findable.',
+      startNearest: 'Closest to the line:',
+      startNearestProducts: 'products are still missing',
+      startNearestQuestions: 'answers.',
+      startBlockersHeading: 'What holds back the most products',
+      startBlockerOpen: 'products have this question open',
+      startBlockerPim: 'of which available from your PIM',
+      startBlockerNowhere: 'is recorded nowhere',
+      startWinHeading: 'What the first step buys you',
+      startWinBody: 'Answer these questions across your catalogue and',
+      startWinProducts: 'products become findable straight away.',
+      startWinNone:
+        'These questions alone are not enough: every product still has others open. That is no reason to leave them — they are still the biggest single step.',
       total: 'products in the feed',
       findable: 'findable',
       competitive: 'competitive',
@@ -657,6 +696,9 @@ export const STRINGS = {
       scannedAt: 'Scanned at',
       disclaimer:
         'This scan measures whether your data answers the questions a buyer in your category asks. That is a statement about your own data, not a prediction of how an agent ranks. An agent also draws on your website, third-party reviews, marketplace listings and its own training data; the catalogue is one input of several.',
+      printReport: 'Print or save as PDF',
+      shareNote:
+        'Reports are not stored anywhere: this one lives as long as you keep this tab open. To share or keep it, print it or save it as a PDF — that happens on your own device, just like the scan itself.',
       startOver: 'New scan',
       protocolNames: { acp: 'OpenAI ACP', ucp: 'Google UCP' } as Record<string, string>,
     },
@@ -709,6 +751,8 @@ export const STRINGS = {
       linkIt: 'Link it',
       wrongType: 'We cannot read this file type',
       wrongTypeNext: 'We read CSV, TSV, semicolon CSV, JSON, NDJSON and XML. Export an xlsx as CSV first.',
+      scanFailed: 'The scan could not be run',
+      scanFailedNext: 'Go back to the first step and supply your file again. If it keeps failing, reloading the page helps — the scan runs in your browser and loses its memory when a tab stays open for a long time.',
       feedRequired: 'Supply a product feed first.',
       readFailed: 'Could not read this file',
     },

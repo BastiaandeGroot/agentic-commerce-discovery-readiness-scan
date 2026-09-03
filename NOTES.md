@@ -107,7 +107,10 @@ verschil hieronder onnodig lang onverklaarbaar; `Dataset.filename` ligt al klaar
 in `report.sources`, het staat alleen niet in het stempelblok van `ReportView`.
 
 **Snapshot-opslag** — rapporten worden nergens bewaard. De rapportvorm is er wel
-op voorbereid, dus dat kan later zonder migratie.
+op voorbereid, dus dat kan later zonder migratie. Daarmee bestaat `/rapport/[id]`
+nog niet echt: een deelbaar adres vereist opslag, en opslag betekent dat
+productdata ons systeem in gaat. Dat hoort na de accounts, niet ervoor. Tot die
+tijd is afdrukken naar pdf de deelweg, en die verlaat het apparaat niet.
 
 ---
 

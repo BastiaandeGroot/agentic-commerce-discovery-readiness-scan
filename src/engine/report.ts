@@ -132,8 +132,18 @@ function buildProtocolReport(
     note: check.note,
   }));
 
+  // Afstand tot vindbaar: hoeveel producten hebben er nog n vragen open?
+  const distance = new Map<number, number>();
+  for (const result of scored) {
+    const open = result.perProtocol[protocol].questions.filter((q) => !q.answered).length;
+    distance.set(open, (distance.get(open) ?? 0) + 1);
+  }
+
   return {
     protocol,
+    distance: [...distance.entries()]
+      .map(([open, products]) => ({ open, products }))
+      .sort((a, b) => a.open - b.open),
     funnel: {
       total: results.length,
       findable: scored.filter((r) => r.perProtocol[protocol].findable).length,

@@ -15,7 +15,7 @@ import {
   addQuestion, allValidated, editQuestion, toggleQuestion, toggleValidated,
 } from '../src/questions/mutate';
 import type { Strings } from '../src/i18n/strings';
-import { Badge, Button, Card, CardTitle } from './ui';
+import { Badge, Button, Card, CardTitle, ErrorState } from './ui';
 
 interface Props {
   s: Strings;
@@ -26,6 +26,8 @@ interface Props {
   onRun: () => void;
   /** De scan draait; de knop blijft staan met zijn eigen tekst. */
   running?: boolean;
+  /** De scan viel om. Zeggen wat er gebeurde, niet stil blijven. */
+  error?: string;
 }
 
 /** Leesbare omschrijving van wat een vraag nodig heeft. */
@@ -97,7 +99,7 @@ function columnPattern(column: string): string {
   return `attr:^${column.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`;
 }
 
-export function QuestionSetStep({ s, locale, feed, state, onChange, onRun, running }: Props) {
+export function QuestionSetStep({ s, locale, feed, state, onChange, onRun, running, error }: Props) {
   const [openSet, setOpenSet] = useState<string | undefined>(state.sets[0]?.id);
   const [newLabel, setNewLabel] = useState('');
   const [newField, setNewField] = useState('');
@@ -232,6 +234,11 @@ export function QuestionSetStep({ s, locale, feed, state, onChange, onRun, runni
 
       <div className="flex flex-wrap items-center gap-3">
         <Button onClick={onRun} disabled={!ready} loading={running}>{s.questions.runScan}</Button>
+        {error ? (
+          <div className="mt-3 w-full">
+            <ErrorState title={s.errors.scanFailed} body={error} next={s.errors.scanFailedNext} />
+          </div>
+        ) : null}
         <span className="text-sm text-muted">
           {ready ? s.questions.allValidated : s.questions.validateFirst}
         </span>

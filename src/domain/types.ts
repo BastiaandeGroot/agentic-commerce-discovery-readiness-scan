@@ -216,9 +216,25 @@ export interface CategoryReport {
   topGaps: { field: string; label: Bilingual; cause: GapCause; affected: number }[];
 }
 
+/**
+ * Hoe ver is een product nog van vindbaar af?
+ *
+ * De trechter is binair en zegt bij de meeste merchants nul. Dat leest als een
+ * dichte deur terwijl er in werkelijkheid al veel staat. Deze verdeling laat de
+ * afstand zien zonder de lat te verlagen: nul open vragen is nog steeds het
+ * enige dat vindbaar heet.
+ */
+export interface DistanceBucket {
+  /** Aantal vragen dat nog openstaat. */
+  open: number;
+  products: number;
+}
+
 export interface ProtocolReport {
   protocol: Protocol;
   funnel: Funnel;
+  /** Oplopend op aantal openstaande vragen; alleen de standen die voorkomen. */
+  distance: DistanceBucket[];
   /** Per vraag: hoeveel producten hem beantwoorden. */
   questionCoverage: {
     setId: string;
