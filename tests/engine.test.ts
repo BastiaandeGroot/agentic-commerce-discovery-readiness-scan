@@ -82,3 +82,19 @@ test('de trechter telt alleen gescoorde producten, de out-checks alle', () => {
     assert.equal(warning.affected, report.productCount, 'geen enkel product is afrekenbaar');
   }
 });
+
+test('de afstand tot vindbaar telt alle gescoorde producten', () => {
+  const report = scan(FEED);
+  const distance = report.protocols.acp.distance;
+  const totaal = distance.reduce((n, bucket) => n + bucket.products, 0);
+  assert.equal(totaal, report.productCount - report.unmatchedCount);
+  // Oplopend, en geen lege standen.
+  assert.deepEqual(distance.map((b) => b.open), [...distance.map((b) => b.open)].sort((a, b) => a - b));
+  for (const bucket of distance) assert.ok(bucket.products > 0);
+});
+
+test('nul openstaande vragen betekent precies vindbaar', () => {
+  const report = scan(FEED);
+  const nul = report.protocols.acp.distance.find((b) => b.open === 0)?.products ?? 0;
+  assert.equal(nul, report.protocols.acp.funnel.findable);
+});

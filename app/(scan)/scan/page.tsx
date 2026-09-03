@@ -27,6 +27,9 @@ export default function Home() {
   // elke scan opnieuw door de structured clone hoeven.
   const [client, setClient] = useState<ScanClient>();
   const [scanning, setScanning] = useState(false);
+  // Een knop die stil faalt is erger dan een knop die een fout toont: dan denkt
+  // een merchant dat hij verkeerd geklikt heeft.
+  const [scanError, setScanError] = useState<string>();
 
   const s = STRINGS[locale];
   const steps: { id: Step; label: string }[] = [
@@ -46,10 +49,13 @@ export default function Home() {
   async function handleRun() {
     if (!client || !questionState) return;
     setScanning(true);
+    setScanError(undefined);
     try {
       // De klok komt van hier: de motor heeft er zelf geen.
       setReport(await client.scan(questionState, new Date().toISOString()));
       setStep('report');
+    } catch (caught) {
+      setScanError((caught as Error).message);
     } finally {
       setScanning(false);
     }
@@ -102,6 +108,7 @@ export default function Home() {
             onChange={setQuestionState}
             onRun={() => void handleRun()}
             running={scanning}
+            error={scanError}
           />
         ) : null}
 
