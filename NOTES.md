@@ -78,6 +78,10 @@ Niet opnieuw voorstellen zonder dat er iets veranderd is.
 
 ## Open
 
+**Prijzen** — de bedragen en de exacte bestandsgrens staan nog niet vast. De
+prijzenpagina draagt daar een zichtbare TODO in plaats van een verzonnen bedrag.
+Hetzelfde geldt voor wie er achter de scan zit op de over-pagina.
+
 **Mechanisme per veld** — de grootste. Leg per veld vast of het om *filtering*,
 *vergelijking* of *begrip* gaat. Alleen bij de eerste twee is er een mechanisme
 dat aan een klant uit te leggen is; begrip is een aanname en hoort buiten de
