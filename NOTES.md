@@ -28,7 +28,9 @@ uitlegpagina op `/methode` in merchant-taal.
 | `src/questions/` | archetypenbibliotheek, generator, mutaties met changelog |
 | `src/engine/` | join, evaluatie, checklists, rapportaggregatie |
 | `src/i18n/` | alle teksten, NL en EN naast elkaar |
-| `components/` | UI: upload, validatie, rapport, verkenner |
+| `src/storage/` | bewaarde scans achter een interface; nu de browser, later de server |
+| `src/worker/` | de zware kant van de scan, weg van de hoofddraad |
+| `components/` | UI: upload, validatie, rapport, verkenner, dashboard |
 
 ---
 
@@ -110,11 +112,24 @@ vragensetversie, maar niet de bestanden waarop het draaide. Dat maakte het
 verschil hieronder onnodig lang onverklaarbaar; `Dataset.filename` ligt al klaar
 in `report.sources`, het staat alleen niet in het stempelblok van `ReportView`.
 
-**Snapshot-opslag** — rapporten worden nergens bewaard. De rapportvorm is er wel
-op voorbereid, dus dat kan later zonder migratie. Daarmee bestaat `/rapport/[id]`
-nog niet echt: een deelbaar adres vereist opslag, en opslag betekent dat
-productdata ons systeem in gaat. Dat hoort na de accounts, niet ervoor. Tot die
-tijd is afdrukken naar pdf de deelweg, en die verlaat het apparaat niet.
+**Accounts aansluiten** — alles eromheen staat, alleen de dienst niet. Wat er ligt:
+`ScanSnapshot` als opslagbare vorm, `compareSnapshots()` met de
+meetlat-waarschuwing, `SnapshotStore` als interface met een browser-implementatie,
+de drie dashboardschermen, en `supabase/migrations/0001_snapshots.sql` met
+`account_id` en row level security. Wat ontbreekt is een Supabase- of
+Clerk-project: dat vraagt een account en sleutels van de opdrachtgever. Zodra die
+er zijn is het een tweede implementatie van drie methodes, geen verbouwing van
+de schermen.
+
+**Serverzijdige scan** — voor bestanden boven de 20 MB. Vereist objectopslag met
+een signed URL en een achtergrondtaak; dezelfde motor, andere aanroeper. Wacht op
+hetzelfde account als hierboven.
+
+**Delen van een rapport** — `/rapport/[id]` bestaat nog niet echt: een deelbaar
+adres vereist opslag, en opslag betekent dat productdata ons systeem in gaat.
+Snapshots lossen dat deels op — daar zit geen productdata in — maar een gedeeld
+adres vereist nog steeds authenticatie. Tot die tijd is afdrukken naar pdf de
+deelweg, en die verlaat het apparaat niet.
 
 ---
 
