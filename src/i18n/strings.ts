@@ -43,14 +43,70 @@ export const STRINGS = {
         intro:
           'Een koper vraagt een AI-agent om een product. Die agent leest jouw feed en moet daaruit opmaken of jouw product past bij wat er gevraagd is. Deze scan laat zien welke van die vragen jouw data kan beantwoorden, en welke niet.',
         secondary: 'Geen account nodig. De scan draait op je eigen apparaat.',
-        todo: 'TODO — stap 7 vult deze pagina met de uitleg in drie stappen, het privacyblok, de FAQ en een echt stuk rapport.',
+        sampleHeading: 'Zo ziet een uitkomst eruit',
+        sampleIntro:
+          'Hieronder draait de scan live op een voorbeeldwinkel. Geen schermafbeelding: dit is dezelfde motor die straks over jouw feed gaat.',
+        sampleFull: 'Bekijk het hele voorbeeldrapport',
+        stepsHeading: 'Hoe het werkt',
+        steps: [
+          {
+            title: 'Je kiest je bestand',
+            body: 'Je productfeed, zoals je die naar Google of een kanaal stuurt. Lever je er ook een export uit je PIM bij, dan kunnen we zien of een ontbrekend veld een instelling is of echt ontbreekt.',
+          },
+          {
+            title: 'De scan draait op je eigen apparaat',
+            body: 'Je bestand wordt niet geüpload. Het rekenwerk gebeurt in je browser, naast de pagina, zodat je scherm blijft reageren ook bij duizenden producten.',
+          },
+          {
+            title: 'Je rapport staat er',
+            body: 'Per categorie de vragen die een koper stelt, welke jouw data beantwoordt, en waar de ontbrekende antwoorden vandaan moeten komen. Compleet, niets afgeschermd.',
+          },
+        ],
+        privacyHeading: 'Wat er met je bestand gebeurt',
+        privacyLead:
+          'Kort gezegd: niets. De gratis scan verlaat je apparaat niet, en dat is geen belofte maar een eigenschap van hoe hij gebouwd is.',
+        privacyPoints: [
+          'Je feed en je PIM-export worden in je browser gelezen en verwerkt. Er gaat geen bestand naar een server, ook niet tijdelijk.',
+          'Er wordt niets bewaard. Sluit je het tabblad, dan is het rapport weg. Wil je het houden, druk het dan af of sla het op als pdf.',
+          'Er komt geen taalmodel aan te pas. De scan leest gestructureerde velden, niet je teksten, en kost daarom niets per keer.',
+          'Zodra er accounts komen verandert dat, want bewaren betekent opslaan. Dan staat er ook bij hoe lang en hoe je het weggooit.',
+        ],
+        faqHeading: 'Vragen die we vaker krijgen',
+        faq: [
+          {
+            q: 'Vertelt dit me of ik hoger in ChatGPT kom?',
+            a: 'Nee, en dat zou niemand eerlijk kunnen. Hoe een agent rangschikt is andermans systeem, en die put ook uit je website, reviews en zijn eigen kennis. Wat we wél meten is of jouw data de vragen kan beantwoorden die in jouw categorie spelen. Dat gaat over je eigen bestand, en dat is te controleren en tegen te spreken.',
+          },
+          {
+            q: 'Welke bestanden kan ik aanleveren?',
+            a: 'CSV, TSV, puntkomma-CSV, JSON, NDJSON en XML. Dus ook gewoon de feed die je al naar Channable of Google Shopping stuurt. Een xlsx exporteer je eerst als CSV.',
+          },
+          {
+            q: 'Mijn kolommen heten anders dan bij anderen. Werkt het dan?',
+            a: 'Meestal wel — we herkennen een paar honderd gangbare namen, met of zonder prefix. Zit er iets fout, dan zie je dat meteen in de voorbeeldweergave en kun je het per kolom zelf rechtzetten.',
+          },
+          {
+            q: 'Waarom vragen jullie ook mijn PIM-export?',
+            a: 'Omdat "ontbreekt" geen werkopdracht is. Ligt het antwoord al in je PIM en haalt het alleen je feed niet, dan is dat een middag werk. Staat het nergens, dan is het maandenwerk. Zonder die tweede bron kunnen we die twee niet uit elkaar houden.',
+          },
+          {
+            q: 'Hoe groot mag mijn bestand zijn?',
+            a: 'Tot ongeveer 20 MB gaat prima in de browser; daarboven waarschuwen we, want dan kan een tabblad omvallen. Grotere catalogi horen serverzijdig te draaien, en dat komt met een account.',
+          },
+          {
+            q: 'Wat kost het?',
+            a: 'De scan zelf is gratis en blijft dat, inclusief het volledige rapport. Je betaalt pas als je resultaten wilt bewaren, vergelijken en delen.',
+          },
+        ],
+        closingHeading: 'Kijk wat er in jouw feed staat',
+        closingBody: 'Een scan kost een paar seconden, geen account en geen gegevens.',
       },
       demo: {
         title: 'Voorbeeldrapport',
         intro:
           'Een volledig rapport op verzonnen voorbeelddata, zodat je ziet wat je krijgt voordat je je eigen bestand kiest.',
         badge: 'Voorbeelddata',
-        todo: 'TODO — hier komt het rapport op de voorbeeldfeed, meteen zichtbaar en zonder upload.',
+        ownFile: 'Doe dit met je eigen bestand',
       },
       report: {
         title: 'Rapport',
@@ -419,14 +475,70 @@ export const STRINGS = {
         intro:
           'A buyer asks an AI agent for a product. That agent reads your feed and has to work out whether your product matches what was asked. This scan shows which of those questions your data can answer, and which it cannot.',
         secondary: 'No account needed. The scan runs on your own device.',
-        todo: 'TODO — step 7 fills this page with the three-step explanation, the privacy block, the FAQ and a real piece of report.',
+        sampleHeading: 'This is what an outcome looks like',
+        sampleIntro:
+          'Below, the scan runs live on a sample shop. Not a screenshot: this is the same engine that will read your feed.',
+        sampleFull: 'See the full example report',
+        stepsHeading: 'How it works',
+        steps: [
+          {
+            title: 'You choose your file',
+            body: 'Your product feed, the one you already send to Google or a channel. Add an export from your PIM and we can tell whether a missing field is a setting or genuinely absent.',
+          },
+          {
+            title: 'The scan runs on your own device',
+            body: 'Your file is not uploaded. The work happens in your browser, alongside the page, so your screen keeps responding even with thousands of products.',
+          },
+          {
+            title: 'Your report is there',
+            body: 'Per category the questions a buyer asks, which ones your data answers, and where the missing answers have to come from. Complete, nothing held back.',
+          },
+        ],
+        privacyHeading: 'What happens to your file',
+        privacyLead:
+          'In short: nothing. The free scan never leaves your device, and that is not a promise but a property of how it is built.',
+        privacyPoints: [
+          'Your feed and your PIM export are read and processed in your browser. No file goes to a server, not even briefly.',
+          'Nothing is stored. Close the tab and the report is gone. To keep it, print it or save it as a PDF.',
+          'No language model is involved. The scan reads structured fields, not your prose, which is why it costs nothing per run.',
+          'That changes once accounts arrive, because keeping means storing. It will then say for how long and how you delete it.',
+        ],
+        faqHeading: 'Questions we get a lot',
+        faq: [
+          {
+            q: 'Does this tell me whether I will rank higher in ChatGPT?',
+            a: 'No, and nobody could say that honestly. How an agent ranks is somebody else\'s system, and it also draws on your website, reviews and its own knowledge. What we do measure is whether your data can answer the questions that matter in your category. That is about your own file, and it can be checked and contested.',
+          },
+          {
+            q: 'What files can I supply?',
+            a: 'CSV, TSV, semicolon CSV, JSON, NDJSON and XML. So the feed you already send to Channable or Google Shopping works. Export an xlsx as CSV first.',
+          },
+          {
+            q: 'My columns are named differently. Will it still work?',
+            a: 'Usually — we recognise a few hundred common names, with or without a prefix. If we get one wrong you see it straight away in the preview and can correct it per column.',
+          },
+          {
+            q: 'Why do you also ask for my PIM export?',
+            a: 'Because "missing" is not a work order. If the answer already sits in your PIM and only fails to reach your feed, that is an afternoon of work. If it is nowhere, it is months. Without that second source we cannot tell those apart.',
+          },
+          {
+            q: 'How large can my file be?',
+            a: 'Up to about 20 MB is fine in the browser; above that we warn you, because a tab can fall over. Larger catalogues belong server-side, and that comes with an account.',
+          },
+          {
+            q: 'What does it cost?',
+            a: 'The scan itself is free and stays that way, including the full report. You pay only to keep, compare and share results.',
+          },
+        ],
+        closingHeading: 'See what is in your feed',
+        closingBody: 'A scan takes a few seconds, no account and no details.',
       },
       demo: {
         title: 'Example report',
         intro:
           'A full report on invented sample data, so you can see what you get before choosing your own file.',
         badge: 'Sample data',
-        todo: 'TODO — the report on the sample feed goes here, visible immediately and without an upload.',
+        ownFile: 'Do this with your own file',
       },
       report: {
         title: 'Report',

@@ -464,8 +464,13 @@ function GapTable({ s, report, locale }: { s: Strings; report: ScanReport; local
   );
 }
 
-export function ReportView({ s, locale, report, onRestart }: {
-  s: Strings; locale: Locale; report: ScanReport; onRestart: () => void;
+export function ReportView({ s, locale, report, onRestart, restartLabel }: {
+  s: Strings;
+  locale: Locale;
+  report: ScanReport;
+  onRestart: () => void;
+  /** Op /demo is de weg terug niet "nieuwe scan" maar "doe dit zelf". */
+  restartLabel?: string;
 }) {
   return (
     <div className="space-y-4">
@@ -559,7 +564,7 @@ export function ReportView({ s, locale, report, onRestart }: {
         <p className="text-sm leading-relaxed text-muted">{s.report.shareNote}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button variant="secondary" onClick={() => window.print()}>{s.report.printReport}</Button>
-          <Button variant="quiet" onClick={onRestart}>{s.report.startOver}</Button>
+          <Button variant="quiet" onClick={onRestart}>{restartLabel ?? s.report.startOver}</Button>
         </div>
       </Card>
     </div>
