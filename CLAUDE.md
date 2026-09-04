@@ -7,28 +7,36 @@ genomen beslissingen en wat er open is.
 
 ## Wat deze app is
 
-De scan is **volledig deterministisch**. Klantvragen worden beantwoord uit
+De scan meet **beantwoordbaarheid van consumentenvragen, geen
+attribuutcompleetheid**. Een gat bestaat alleen als er een vraag door
+onbeantwoord blijft; een leeg veld waar geen vraag op leunt komt niet in de
+lijst, en een gevuld veld dat de vraag niet beantwoordt komt er wél in.
+
+De **catalogus is de enige bron**: één export uit het PIM of MDM, of anders uit
+Magento of Shopify. Geen kanaalfeed — dat is een afgeleide met een afgevlakte
+categorieboom. Er wordt niet tegen ACP of UCP gemeten; die zijn feedspecificaties
+en hebben zonder feed geen anker.
+
+De scan is **volledig deterministisch**. Vragen worden beantwoord uit
 gestructureerde attributen, niet uit lopende tekst, en er komt geen model aan te
-pas. Dezelfde feed geeft altijd hetzelfde rapport en een scan kost niets.
+pas. Dezelfde catalogus geeft altijd hetzelfde rapport en een scan kost niets.
 
 De analyse draait **client-side**; er zijn geen serverroutes en productdata
 verlaat de browser niet.
-
-Volgorde van de analyse: eerst de feed (dat is wat de agent leest), dan pas de
-catalogus om te bepalen of een gat een mappingfout is of een echt gat.
 
 ## Mapstructuur
 
 | Map | Wat er hoort |
 |---|---|
 | `src/intake/` | formaatdetectie en kolomherkenning |
-| `src/spec/` | veldenregister ACP + UCP, met tier en eigenaar per veld |
-| `src/questions/` | archetypen, generator, mutaties met changelog |
+| `src/spec/` | veldenregister: kolomaliassen en eigenaar per veld |
+| `src/questions/` | vragenbanken, composer, generator, import en aanvraag |
 | `src/engine/` | join, evaluatie, checklists, rapportaggregatie |
 | `src/i18n/` | alle teksten, NL en EN naast elkaar |
 | `components/` | UI; `ui.tsx` draagt de gedeelde bouwstenen |
 | `app/` | routes |
 | `scripts/` | headless testharnas, geen productiecode |
+| `kennis/_methode/` | de methode en de promptreeks; documentatie, geen code |
 
 ## Design
 
@@ -49,6 +57,35 @@ houdt zich daaraan.
 - Iconen via `lucide-react`, nooit een emoji als icoon.
 - Alle tekst komt uit `src/i18n/`, in beide talen. Nooit een string in een
   component.
+
+## Vragenbanken
+
+De vragen komen uit een **vragenbank** (`src/questions/bank.ts`), opgebouwd
+volgens `kennis/_methode/`. Vier regels die altijd gelden:
+
+- **Een bank hoort bij een vertical, niet bij een merchant.** Nooit een bank
+  genereren uit de site of de catalogus van één winkel: dan meet je zijn blinde
+  vlekken mee en zijn twee merchants in dezelfde markt niet meer vergelijkbaar.
+  Zijn site is één van de vijf à acht panelsites.
+- **Een bankaanvraag draagt geen productdata.** Categorienamen met aantallen en
+  een URL, verder niets — ook geen kolomnamen. Dat is fase 3 van de methode
+  (blinderen) én de privacybelofte. Het type kan het niet dragen; houd het zo.
+- **Herkomst staat bij elk getal.** Een gepubliceerde drempel noemt zijn site,
+  een beredeneerde zijn onderbouwing, en `dekking: 0` (niemand behandelt dit)
+  is iets anders dan niet-onderzochte dekking (`null`). Verzin nooit een
+  drempel, een certificering of een normnummer.
+- **Een overlay herweegt, maar herschrijft niet.** Zou een categorie de tekst
+  van een basisvraag mogen veranderen, dan meten twee categorieën verschillende
+  dingen onder hetzelfde id.
+
+`belang` weegt mee in de trechter via een eigen trede: **basisgeschikt** is elke
+kritieke vraag beantwoord, **volledig** blijft élke gescoorde vraag. Geen gewogen
+percentagedrempel — zie de afgevallen richtingen in `NOTES.md`.
+
+Een gat draagt zijn oorzaak, en die volgt uit één bron: `unfilled` (de kolom
+bestaat, staat leeg — invulwerk), `unmodelled` (geen kolom — modelwerk) of
+`no-source` (komt uit een systeem dat een catalogus niet draagt). Elk gat draagt
+ook de vragen die het blokkeert.
 
 ## Scanlogica
 

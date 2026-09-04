@@ -3,7 +3,7 @@ import { DemoContent } from './DemoContent';
 
 const titel = 'Voorbeeldrapport';
 const omschrijving =
-  'Een volledig readiness-rapport op voorbeelddata. Zie wat de scan oplevert voordat je je eigen feed aanlevert.';
+  'Een volledig readiness-rapport op voorbeelddata. Zie wat de scan oplevert voordat je je eigen catalogus aanlevert.';
 
 export const metadata: Metadata = {
   title: titel,

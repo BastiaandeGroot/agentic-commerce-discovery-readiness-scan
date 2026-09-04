@@ -1,16 +1,20 @@
 // Generatie van vragensets — de stap die pas kan lopen nadat de merchant zijn
 // data heeft aangeleverd.
 //
-// De sets moeten over de EIGEN categorieen van de merchant gaan, anders meten we
-// onze indeling in plaats van de zijne. Daarom:
+// De sets gaan over de EIGEN categorieen van de merchant, anders meten we onze
+// indeling in plaats van de zijne. De vragen komen daarentegen nooit uit zijn
+// data: die komen uit een vragenbank die op vertical-niveau is opgebouwd (zie
+// `bank.ts`). Dat onderscheid is dragend. Zou de bank uit zijn kolommen volgen,
+// dan meten we of zijn feed zijn eigen velden draagt — en dat is per definitie
+// waar.
 //
-//   1. haal de echte categorieen uit de feed;
-//   2. koppel per categorie een archetype (of het vangnet);
-//   3. vul aan met vragen die uit de data zelf komen — kolommen die in deze
-//      categorie steeds terugkomen zijn een sterke aanwijzing voor wat er speelt;
+// Dus:
+//   1. haal de echte categorieen uit de feed of de catalogus;
+//   2. kies per categorie de bank die op die markt slaat;
+//   3. leg de categorie-overlay op de basislaag;
 //   4. leg het voor aan de merchant, die mag bewerken, uitzetten en aanvullen.
 //
-// Stap 4 is geen formaliteit. Een gegenereerde set is een hypothese; zonder
+// Stap 4 is geen formaliteit. Een samengestelde set is een hypothese; zonder
 // validatielus is de eerste aanwijzing dat een set fout was een klacht (S6).
 //
 // De generator is deterministisch en blijft dat. De vragen worden beantwoord uit
@@ -18,12 +22,15 @@
 // te pas — de uitkomst is daarmee reproduceerbaar en kost niets per scan.
 
 import type { Dataset, Question, QuestionSet, QuestionSetState } from '../domain/types';
-import { ARCHETYPES } from './archetypes';
+import type { QuestionBank } from './bank';
+import { bankFor, resolveBanks } from './banks';
+import { composeSet } from './compose';
 import { str } from '../intake/normalize';
-import { indexCatalog, lookupCatalog, mainCategory } from '../engine/join';
+import { mainCategory } from '../engine/join';
 
 /** Hoeveel categorieen een eigen set krijgen; de staart wordt samengevoegd. */
 const MAX_SETS = 30;
+
 export interface CategoryStat {
   name: string;
   count: number;
@@ -32,15 +39,15 @@ export interface CategoryStat {
 /**
  * Tel de categorieen, aflopend op aantal producten.
  *
- * Is er een catalogus, dan is die leidend: daar staat de boom zoals de merchant
- * hem onderhoudt. De feed geeft een afgevlakte versie waarin subcategorieen als
- * losse thema's ogen en een hoofdcategorie zomaar kan ontbreken.
+ * De boom komt uit de catalogus, zoals de merchant hem onderhoudt. Dat is precies
+ * waarom de catalogus de bron is en niet een kanaalfeed: die vlakt de boom af.
+ * Bij de testmerchant werd "Outdoorstoffen > Gestreept" onderweg tot los
+ * "Gestreept" en verdween een hele hoofdcategorie.
  */
-export function deriveCategories(feed: Dataset, catalog?: Dataset): CategoryStat[] {
-  const index = indexCatalog(catalog);
+export function deriveCategories(catalog: Dataset): CategoryStat[] {
   const counts = new Map<string, number>();
-  for (const product of feed.products) {
-    const category = mainCategory(product, lookupCatalog(index, product));
+  for (const product of catalog.products) {
+    const category = mainCategory(product);
     if (!category) continue;
     counts.set(category, (counts.get(category) ?? 0) + 1);
   }
@@ -60,14 +67,14 @@ export function deriveCategories(feed: Dataset, catalog?: Dataset): CategoryStat
  * veld overal, dan is dat geen gat maar de standaardwaarde. Pas als er ergens
  * iets anders dan nieuw in staat, wordt het een echte keuze voor de koper.
  */
-function sellsNonNew(feed: Dataset): boolean {
-  return feed.products.some((product) => {
+function sellsNonNew(catalog: Dataset): boolean {
+  return catalog.products.some((product) => {
     const value = str(product.values.condition)?.toLowerCase();
     return value !== undefined && value !== 'new' && value !== 'nieuw';
   });
 }
 
-function slug(value: string): string {
+export function slug(value: string): string {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -75,67 +82,70 @@ function slug(value: string): string {
     .slice(0, 40) || 'categorie';
 }
 
-/** Kies het archetype dat bij deze categorienaam past. */
-function archetypeFor(category: string) {
-  for (const archetype of ARCHETYPES) {
-    if (!archetype.match) continue;
-    if (new RegExp(archetype.match, 'i').test(category)) return archetype;
-  }
-  return ARCHETYPES.find((a) => !a.match) ?? ARCHETYPES[0];
-}
-
 /**
  * Bouw de vragensets voor deze merchant. Levert versie 1 met een lege changelog;
  * elke bewerking daarna verhoogt de versie en schrijft een regel bij (S8).
+ *
+ * `imported` zijn de banken die uit de methode terugkwamen. Staat er een die op
+ * de categorie matcht, dan wint die van de meegeleverde terugval.
  */
-export function generateQuestionSets(feed: Dataset, catalog?: Dataset): QuestionSetState {
-  const categories = deriveCategories(feed, catalog);
+export function generateQuestionSets(
+  catalog: Dataset,
+  imported: QuestionBank[] = [],
+): QuestionSetState {
+  const banks = resolveBanks(imported);
+  const categories = deriveCategories(catalog);
   // Vragen die in deze catalogus niets te vragen hebben, laten we weg in plaats
   // van ze als permanent gat te laten staan.
-  const askCondition = sellsNonNew(feed);
+  const askCondition = sellsNonNew(catalog);
   const applicable = (question: Question) =>
     askCondition || !question.requires.includes('condition');
+
   const named = categories.slice(0, MAX_SETS);
   const tail = categories.slice(MAX_SETS);
+  const used = new Map<string, QuestionBank>();
 
   const sets: QuestionSet[] = named.map((category) => {
-    const archetype = archetypeFor(category.name);
-    const questions: Question[] = archetype.questions
-      .filter(applicable)
-      .map((q) => ({ ...q, origin: 'archetype' as const }));
-
-    return {
-      id: slug(category.name),
-      label: { nl: category.name, en: category.name },
-      // Anker de match op de exacte categorienaam van de merchant.
-      match: `^${category.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
-      category: category.name,
-      productCount: category.count,
-      archetypeId: archetype.id,
-      questions,
-      validated: false,
-    };
+    const bank = bankFor(category.name, banks);
+    used.set(bank.meta.vertical, bank);
+    const set = composeSet(bank, { id: slug(category.name), name: category.name, count: category.count });
+    return { ...set, questions: set.questions.filter(applicable) };
   });
 
   // De staart van kleine categorieen deelt een vangnet-set, zodat die producten
   // wel gescoord worden maar de lijst hanteerbaar blijft.
   if (tail.length > 0) {
-    const fallback = ARCHETYPES.find((a) => !a.match) ?? ARCHETYPES[0];
-    sets.push({
+    const fallback = banks.find((bank) => !bank.meta.match) ?? banks[banks.length - 1];
+    used.set(fallback.meta.vertical, fallback);
+    const set = composeSet(fallback, {
       id: 'overige-categorieen',
+      name: 'Overige categorieën',
+      count: tail.reduce((sum, c) => sum + c.count, 0),
+    });
+    sets.push({
+      ...set,
       label: {
         nl: `Overige categorieën (${tail.length})`,
         en: `Remaining categories (${tail.length})`,
       },
+      // Geen match: dit is de set waar alles in valt wat nergens anders op uitkomt.
+      match: undefined,
       category: undefined,
-      productCount: tail.reduce((sum, c) => sum + c.count, 0),
-      archetypeId: fallback.id,
-      questions: fallback.questions
-        .filter(applicable)
-        .map((q) => ({ ...q, origin: 'archetype' as const })),
-      validated: false,
+      questions: set.questions.filter(applicable),
     });
   }
 
-  return { version: 1, sets, changeLog: [] };
+  return {
+    version: 1,
+    sets,
+    changeLog: [],
+    // De herkomst reist mee tot op het rapport: een cijfer dat beweegt omdat de
+    // bank onder de merchant vernieuwd is, mag niet op vooruitgang lijken.
+    banks: [...used.values()].map((bank) => ({
+      id: bank.meta.vertical,
+      label: bank.meta.label,
+      version: bank.meta.version,
+      status: bank.meta.status,
+    })),
+  };
 }

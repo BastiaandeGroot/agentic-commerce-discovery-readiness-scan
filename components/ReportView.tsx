@@ -2,46 +2,51 @@
 
 // Stap 3: het rapport.
 //
-// De kop is een trechter, geen cijfer. Er staat met opzet nergens een
-// gecombineerd Core/Selection-getal, en nergens een uitspraak over ranking —
-// dat is een belofte over andermans black box en niet aan ons (S2).
+// De kop is een trechter en geen cijfer, en er staat nergens een uitspraak over
+// ranking — dat is een belofte over andermans black box en niet aan ons. Wat
+// hier gemeten wordt is één ding: kan de catalogus de vragen beantwoorden die
+// een koper in deze markt stelt.
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { toSnapshot } from '../src/engine/snapshot';
 import { LOCAL_ACCOUNT, snapshotStore } from '../src/storage/snapshots';
-import type { Locale, Protocol, ScanReport } from '../src/domain/types';
-import { SPEC_SOURCES } from '../src/spec/snapshot';
-import { UCP_TRUST_NOTE } from '../src/engine/checklists';
+import type { Locale, ScanReport } from '../src/domain/types';
 import type { Strings } from '../src/i18n/strings';
 import { Badge, Bar, Button, Card, CardTitle, InfoButton, InfoPanel, Select, TrafficLight, statusOf } from './ui';
 import { Explorer } from './Explorer';
-
-const PROTOCOLS: Protocol[] = ['acp', 'ucp'];
 
 function n(value: number): string {
   return value.toLocaleString('nl-NL');
 }
 
-function FunnelCard({ s, report, protocol }: { s: Strings; report: ScanReport; protocol: Protocol }) {
-  const { funnel } = report.protocols[protocol];
+function FunnelCard({ s, report }: { s: Strings; report: ScanReport }) {
+  const { funnel } = report;
   const status = statusOf(funnel.avgAnswered, funnel.avgApplicable);
   // Eén uitleg tegelijk open: twee tegelijk maakt de kaart onleesbaar.
   const [openInfo, setOpenInfo] = useState<string>();
+  // Kent deze catalogus geen enkele kritieke vraag, dan is de eerste trede leeg
+  // en zegt hij niets. Dat gebeurt bij een voorlopige bank: welke fout in deze
+  // markt onomkeerbaar is, volgt uit onderzoek. Hem dan stilzwijgend op "iedereen
+  // geslaagd" zetten zou een poort suggereren die er niet is.
+  const hasCritical = report.questionCoverage
+    .some((row) => row.scored && row.importance === 'critical');
+
   const rows = [
     { label: s.report.total, value: funnel.total, tone: 'neutral' as const, explain: undefined, info: undefined },
     {
-      label: s.report.findable, value: funnel.findable, tone: 'accent' as const,
-      explain: s.report.findableExplain, info: s.report.findableInfo,
+      label: s.report.qualified, value: funnel.qualified, tone: 'warn' as const,
+      explain: hasCritical ? s.report.qualifiedExplain : s.report.qualifiedNoCritical,
+      info: s.report.qualifiedInfo,
     },
     {
-      label: s.report.competitive, value: funnel.competitive, tone: 'ok' as const,
-      explain: s.report.competitiveExplain, info: s.report.competitiveInfo,
+      label: s.report.findable, value: funnel.findable, tone: 'ok' as const,
+      explain: s.report.findableExplain, info: s.report.findableInfo,
     },
   ];
 
   return (
     <Card>
-      <CardTitle>{s.report.protocolNames[protocol]}</CardTitle>
+      <CardTitle>{s.report.funnelHeading}</CardTitle>
       <div className="space-y-3">
         {rows.map((row) => (
           <div key={row.label}>
@@ -77,6 +82,13 @@ function FunnelCard({ s, report, protocol }: { s: Strings; report: ScanReport; p
               {funnel.avgAnswered.toFixed(1)} {s.report.statusScale}{' '}
               {funnel.avgApplicable.toFixed(0)} {s.report.statusAnswered}
             </p>
+            {/* Twee schalen naast elkaar. Het aantal vragen is meteen te
+                bevatten; de punten zeggen wat het waard is, want een kritieke
+                vraag weegt vijf keer een lage. */}
+            <p className="tnum text-xs text-muted">
+              {s.report.avgPointsLine} {funnel.avgEarned.toFixed(1)} {s.report.statusScale}{' '}
+              {funnel.avgWeight.toFixed(0)} {s.report.points}
+            </p>
           </div>
         </div>
         <p className="mt-2.5 text-sm leading-relaxed text-muted">
@@ -95,24 +107,27 @@ function FunnelCard({ s, report, protocol }: { s: Strings; report: ScanReport; p
  * eerstvolgende stap oplevert — zonder de lat te verlagen, want vindbaar blijft
  * alle vragen beantwoord. Het is een richting, geen zachter cijfer.
  */
-function NextStep({ s, report, protocol, locale }: {
-  s: Strings; report: ScanReport; protocol: Protocol; locale: Locale;
+function NextStep({ s, report, locale }: {
+  s: Strings; report: ScanReport; locale: Locale;
 }) {
-  const { funnel, distance, questionCoverage } = report.protocols[protocol];
+  const { funnel, distance, questionCoverage } = report;
 
   // De dichtstbijzijnde stand die nog niet vindbaar is.
   const nearest = distance.find((bucket) => bucket.open > 0);
 
   // Welke vragen houden de meeste producten tegen? Tel over alle sets heen, want
   // dezelfde vraag komt in meerdere categorieën terug.
-  const blockers = new Map<string, { label: string; open: number; enrichable: number; ids: Set<string> }>();
+  const blockers = new Map<string, { label: string; open: number; empty: number; ids: Set<string> }>();
   for (const row of questionCoverage) {
+    if (!row.scored) continue;
     const open = row.applicable - row.answered;
     if (open === 0) continue;
     const key = row.label[locale];
-    const entry = blockers.get(key) ?? { label: key, open: 0, enrichable: 0, ids: new Set<string>() };
+    const entry = blockers.get(key) ?? { label: key, open: 0, empty: 0, ids: new Set<string>() };
     entry.open += open;
-    entry.enrichable += row.enrichable;
+    // Waar het veld al bestaat is dit invulwerk, en dat is de goedkoopste winst
+    // die er is. Dat onderscheid hoort in de eerste zin die een merchant leest.
+    entry.empty += row.empty;
     entry.ids.add(row.questionId);
     blockers.set(key, entry);
   }
@@ -123,7 +138,7 @@ function NextStep({ s, report, protocol, locale }: {
   const topIds = new Set(top.flatMap((entry) => [...entry.ids]));
   const wouldBecome = report.products.filter((product) => {
     if (product.unmatched) return false;
-    const open = product.perProtocol[protocol].questions.filter((q) => !q.answered);
+    const open = product.questions.filter((q) => q.scored && !q.answered);
     return open.length > 0 && open.every((q) => topIds.has(q.questionId));
   }).length;
 
@@ -131,9 +146,7 @@ function NextStep({ s, report, protocol, locale }: {
 
   return (
     <Card>
-      <CardTitle sub={s.report.startIntro}>
-        {s.report.startHeading} — {s.report.protocolNames[protocol]}
-      </CardTitle>
+      <CardTitle sub={s.report.startIntro}>{s.report.startHeading}</CardTitle>
 
       <p className="text-sm leading-relaxed">
         {funnel.findable === 0 ? (
@@ -160,8 +173,8 @@ function NextStep({ s, report, protocol, locale }: {
               <span className="font-medium">{entry.label}</span>
               <span className="tnum ml-2 text-xs text-muted">
                 {n(entry.open)} {s.report.startBlockerOpen}
-                {entry.enrichable > 0
-                  ? <>, <span className="text-warn">{n(entry.enrichable)}</span> {s.report.startBlockerPim}</>
+                {entry.empty > 0
+                  ? <>, <span className="text-warn">{n(entry.empty)}</span> {s.report.startBlockerPim}</>
                   : <>, {s.report.startBlockerNowhere}</>}
               </span>
             </li>
@@ -185,12 +198,11 @@ function NextStep({ s, report, protocol, locale }: {
   );
 }
 
-function QuestionCoverage({ s, report, protocol, locale }: {
-  s: Strings; report: ScanReport; protocol: Protocol; locale: Locale;
+function QuestionCoverageCard({ s, report, locale }: {
+  s: Strings; report: ScanReport; locale: Locale;
 }) {
   const [setId, setSetId] = useState('all');
-  const hasCatalog = report.sources.catalog !== undefined;
-  const categories = report.protocols[protocol].categories;
+  const categories = report.categories;
 
   // Toon de categorienaam van de merchant, niet onze interne set-id.
   const categoryName = new Map(categories.map((c) => [c.setId, c.category]));
@@ -198,7 +210,8 @@ function QuestionCoverage({ s, report, protocol, locale }: {
   // Beste eerst. Een merchant leest dan van boven naar beneden af waar hij al
   // ver is en waar het werk begint, in plaats van meteen tegen het slechtste
   // nieuws aan te kijken.
-  const rows = report.protocols[protocol].questionCoverage
+  const rows = report.questionCoverage
+    .filter((q) => q.scored)
     .filter((q) => q.answered < q.applicable)
     .filter((q) => setId === 'all' || q.setId === setId)
     .sort(
@@ -209,13 +222,11 @@ function QuestionCoverage({ s, report, protocol, locale }: {
   // een gekozen categorie hoort hij compleet te zijn.
   const shown = setId === 'all' ? rows.slice(0, 14) : rows;
 
-  if (report.protocols[protocol].questionCoverage.length === 0) return null;
+  if (report.questionCoverage.length === 0) return null;
 
   return (
     <Card>
-      <CardTitle sub={s.report.questionsIntro}>
-        {s.report.questionsHeading} — {s.report.protocolNames[protocol]}
-      </CardTitle>
+      <CardTitle sub={s.report.questionsIntro}>{s.report.questionsHeading}</CardTitle>
 
       {categories.length > 1 ? (
         <div className="mb-3">
@@ -238,13 +249,22 @@ function QuestionCoverage({ s, report, protocol, locale }: {
           {shown.map((row) => (
             <li key={`${row.setId}-${row.questionId}`}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-sm">{row.label[locale]}</span>
+                <span className="flex min-w-0 items-center gap-2 text-sm">
+                  {/* Het gewicht staat vóór de vraag: het bepaalt of dit de
+                      eerste trede van de trechter blokkeert of alleen de laatste. */}
+                  {row.importance === 'critical' ? (
+                    <Badge tone="danger">{s.questions.importance.critical}</Badge>
+                  ) : null}
+                  <span className="min-w-0">{row.label[locale]}</span>
+                </span>
                 <span className="tnum text-xs text-muted">
                   {n(row.answered)}/{n(row.applicable)} {s.report.ofProducts}
                 </span>
               </div>
-              {/* Twee lagen: wat de feed beantwoordt, en wat het PIM alsnog kan
-                  aanvullen. Dat verschil bepaalt of dit doorzetwerk of invulwerk is. */}
+              {/* Vier lagen: beantwoord, verborgen in het PIM, gevuld maar te
+                  mager, en deels aanwezig. Elke laag wijst naar ander werk —
+                  mappen, herschrijven of aanvullen — en op één hoop gooien levert
+                  een lijst op waar niemand mee verder kan. */}
               <div className="mt-1 flex h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
                 <div
                   className="h-full bg-accent"
@@ -252,7 +272,11 @@ function QuestionCoverage({ s, report, protocol, locale }: {
                 />
                 <div
                   className="h-full bg-warn"
-                  style={{ width: `${(row.enrichable / Math.max(row.applicable, 1)) * 100}%` }}
+                  style={{ width: `${(row.empty / Math.max(row.applicable, 1)) * 100}%` }}
+                />
+                <div
+                  className="h-full bg-warn/50"
+                  style={{ width: `${((row.unusable + row.incomplete) / Math.max(row.applicable, 1)) * 100}%` }}
                 />
               </div>
               <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted">
@@ -260,13 +284,23 @@ function QuestionCoverage({ s, report, protocol, locale }: {
                 <span className="tnum">
                   <span className="text-accent">{n(row.answered)}</span> {s.report.fromFeed}
                 </span>
-                {hasCatalog && row.enrichable > 0 ? (
-                  <span className="tnum">
-                    <span className="text-warn">{n(row.enrichable)}</span> {s.report.enrichable}
+                {row.empty > 0 ? (
+                  <span className="tnum" title={s.report.statesExplain.empty}>
+                    <span className="text-warn">{n(row.empty)}</span> {s.report.enrichable}
                   </span>
                 ) : null}
-                <span className="tnum">
-                  {n(row.applicable - row.answered - row.enrichable)} {s.report.neither}
+                {row.unusable > 0 ? (
+                  <span className="tnum" title={s.report.statesExplain.unusable}>
+                    {n(row.unusable)} {s.report.states.unusable.toLowerCase()}
+                  </span>
+                ) : null}
+                {row.incomplete > 0 ? (
+                  <span className="tnum" title={s.report.statesExplain.incomplete}>
+                    {n(row.incomplete)} {s.report.states.incomplete.toLowerCase()}
+                  </span>
+                ) : null}
+                <span className="tnum" title={s.report.statesExplain.absent}>
+                  {n(row.absent)} {s.report.neither}
                 </span>
               </p>
             </li>
@@ -277,108 +311,16 @@ function QuestionCoverage({ s, report, protocol, locale }: {
   );
 }
 
-function SelectionCard({ s, report, protocol, locale }: {
-  s: Strings; report: ScanReport; protocol: Protocol; locale: Locale;
-}) {
-  const [setId, setSetId] = useState('all');
-  const categories = report.protocols[protocol].categories;
-
-  // Per categorie tellen we opnieuw uit de producten zelf. De checklist is voor
-  // elk product dezelfde, maar hoe vaak hij gehaald wordt verschilt per
-  // categorie — en daar kiest een merchant waar hij begint.
-  const rows = useMemo(() => {
-    const members = report.products.filter(
-      (product) => !product.unmatched && (setId === 'all' || product.setId === setId),
-    );
-    const base = report.protocols[protocol].selectionCoverage;
-    if (setId === 'all') return base;
-    return base.map((item) => ({
-      ...item,
-      present: members.filter(
-        (product) => product.perProtocol[protocol].selection.find((x) => x.id === item.id)?.present,
-      ).length,
-      total: members.length,
-    }));
-  }, [report, protocol, setId]);
-
-  return (
-    <Card>
-      <CardTitle>{s.report.selectionHeading} — {s.report.protocolNames[protocol]}</CardTitle>
-
-      {categories.length > 1 ? (
-        <div className="mb-3">
-          <Select
-            label={s.report.filterCategory}
-            value={setId}
-            onChange={setSetId}
-            options={[
-              { value: 'all', label: s.report.allCategories },
-              ...categories.map((c) => ({ value: c.setId, label: `${c.category} (${n(c.total)})` })),
-            ]}
-          />
-        </div>
-      ) : null}
-
-      <ul className="space-y-2.5">
-        {rows.map((row) => (
-          <li key={row.id}>
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="text-sm">{row.label[locale]}</span>
-              <span className="tnum text-xs text-muted">{n(row.present)}/{n(row.total)}</span>
-            </div>
-            <div className="mt-1"><Bar value={row.present} total={row.total} tone="ok" /></div>
-          </li>
-        ))}
-      </ul>
-      {protocol === 'ucp' ? (
-        <p className="mt-3 rounded-md bg-surface-2 px-3 py-2 text-xs leading-relaxed text-muted">
-          {UCP_TRUST_NOTE[locale]}
-        </p>
-      ) : null}
-    </Card>
-  );
-}
-
-function OutWarnings({ s, report, locale }: { s: Strings; report: ScanReport; locale: Locale }) {
-  const rows = PROTOCOLS.flatMap((protocol) =>
-    report.protocols[protocol].outWarnings
-      .filter((w) => w.affected > 0)
-      .map((w) => ({ ...w, protocol })),
-  );
-  if (rows.length === 0) return null;
-
-  return (
-    <Card className="border-warn/40">
-      <CardTitle sub={s.report.outIntro}>{s.report.outHeading}</CardTitle>
-      <ul className="space-y-3">
-        {rows.map((row) => (
-          <li key={`${row.protocol}-${row.id}`} className="rounded-lg bg-warn-soft p-3">
-            <div className="flex flex-wrap items-baseline gap-2">
-              <Badge tone="warn">{s.report.protocolNames[row.protocol]}</Badge>
-              <span className="tnum font-semibold">{n(row.affected)}</span>
-              <span className="text-sm">{s.report.notEligible} — {row.label[locale]}</span>
-            </div>
-            {row.note ? (
-              <p className="mt-1.5 text-xs leading-relaxed text-muted">{row.note[locale]}</p>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
-}
-
 function GapTable({ s, report, locale }: { s: Strings; report: ScanReport; locale: Locale }) {
   // Eén kolomuitleg tegelijk; twee open panelen boven een tabel is onleesbaar.
   const [openInfo, setOpenInfo] = useState<string>();
 
-  // Voeg de gaps van beide protocollen samen op veld + oorzaak.
   const merged = new Map<string, {
     field: string; label: { nl: string; en: string };
-    tier: string; cause: string; owner: string; affected: number;
+    cause: string; owner: string; affected: number; questions: string[];
   }>();
-  for (const protocol of PROTOCOLS) {
-    for (const gap of report.protocols[protocol].gaps) {
+  {
+    for (const gap of report.gaps) {
       const id = `${gap.field}|${gap.cause}`;
       const existing = merged.get(id);
       if (!existing || gap.affected > existing.affected) {
@@ -389,11 +331,11 @@ function GapTable({ s, report, locale }: { s: Strings; report: ScanReport; local
   const rows = [...merged.values()].sort((a, b) => b.affected - a.affected).slice(0, 25);
   if (rows.length === 0) return null;
 
-  const causeTone = { mapping: 'accent', enrichment: 'warn', 'no-source': 'danger' } as const;
+  const causeTone = { unfilled: 'accent', unmodelled: 'warn', 'no-source': 'danger' } as const;
 
   const columns: { id: string; label: string; align?: string }[] = [
     { id: 'field', label: s.report.gapField },
-    { id: 'tier', label: s.report.gapTier },
+    { id: 'questions', label: s.report.gapQuestions },
     { id: 'cause', label: s.report.gapCause },
     { id: 'affected', label: s.report.gapAffected, align: 'text-right' },
   ];
@@ -407,12 +349,6 @@ function GapTable({ s, report, locale }: { s: Strings; report: ScanReport; local
       <p className="rounded-md bg-surface-2 px-3 py-2 text-sm leading-relaxed text-muted">
         {s.report.gapsWhy}
       </p>
-
-      {!report.sources.catalog ? (
-        <p className="mt-3 rounded-md bg-warn-soft px-3 py-2 text-sm leading-relaxed text-warn">
-          {s.report.noCatalogWarning}
-        </p>
-      ) : null}
 
       {/* De uitleg staat boven de tabel en niet in de cel: een paneel binnen een
           scrollende tabel verdwijnt half achter de rand. */}
@@ -441,12 +377,9 @@ function GapTable({ s, report, locale }: { s: Strings; report: ScanReport; local
               <tr key={`${row.field}-${row.cause}`} className="border-b border-line/60">
                 <td className="py-2 pr-3">{row.label[locale]}</td>
                 <td className="py-2 pr-3">
-                  <Badge tone={row.tier === 'core' ? 'accent' : 'neutral'}>
-                    {s.report.tiers[row.tier]}
-                  </Badge>
-                  <span className="mt-0.5 block text-xs text-muted">
-                    {s.report.tierMeaning[row.tier]}
-                  </span>
+                  {/* Welke vragen hierdoor blijven liggen. Een gat zonder vraag
+                      bestaat niet: dat is het verschil met een lege-veldenlijst. */}
+                  <span className="text-xs text-muted">{row.questions.length}</span>
                 </td>
                 <td className="py-2 pr-3">
                   <Badge tone={causeTone[row.cause as keyof typeof causeTone]}>
@@ -462,6 +395,45 @@ function GapTable({ s, report, locale }: { s: Strings; report: ScanReport; local
           </tbody>
         </table>
       </div>
+    </Card>
+  );
+}
+
+/**
+ * Buiten de score.
+ *
+ * Dit zijn vragen die een koper wel stelt maar die geen enkel productattribuut
+ * kan beantwoorden: kan ik een staal krijgen, welke kleuren bestaan er nog in
+ * deze kwaliteit. Ze meetellen zou elke merchant op hetzelfde punt laten zakken
+ * en daarmee de meting vertekenen. Ze weglaten zou het waardevolste advies uit
+ * het rapport halen — juist hier ligt het antwoord bij de website of de
+ * klantenservice, en niet bij de catalogus.
+ */
+function Advisory({ s, report, locale }: { s: Strings; report: ScanReport; locale: Locale }) {
+  // Ontdubbeld op vraag, met de categorieën erachter: dezelfde procesvraag komt
+  // in meerdere categorieën terug en hoeft maar één keer als advies te staan.
+  const seen = new Map<string, { label: string; importance: string; categories: Set<string> }>();
+  const categories = new Map(report.categories.map((c) => [c.setId, c.category]));
+  for (const row of report.advisory) {
+    const entry = seen.get(row.questionId)
+      ?? { label: row.label[locale], importance: row.importance, categories: new Set<string>() };
+    entry.categories.add(categories.get(row.setId) ?? row.setId);
+    seen.set(row.questionId, entry);
+  }
+  if (seen.size === 0) return null;
+
+  return (
+    <Card>
+      <CardTitle sub={s.report.advisoryIntro}>{s.report.advisoryHeading}</CardTitle>
+      <ul className="space-y-2">
+        {[...seen.entries()].map(([id, entry]) => (
+          <li key={id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line pt-2">
+            <Badge tone="neutral">{s.questions.importance[entry.importance]}</Badge>
+            <span className="min-w-0 flex-1 text-sm">{entry.label}</span>
+            <span className="text-xs text-muted">{[...entry.categories].join(', ')}</span>
+          </li>
+        ))}
+      </ul>
     </Card>
   );
 }
@@ -482,63 +454,55 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
     // Alleen de uitkomst gaat de opslag in, niet de producten of het bronbestand.
     await snapshotStore.save(
       toSnapshot(report, {
-        id: `${report.stamp.scannedAt}-${report.sources.feed.filename}`,
+        id: `${report.stamp.scannedAt}-${report.sources.catalog.filename}`,
         accountId: LOCAL_ACCOUNT,
         savedAt: new Date().toISOString(),
-        label: report.sources.feed.filename,
+        label: report.sources.catalog.filename,
       }),
     );
     setSaved(true);
   }
 
+  const provisional = report.stamp.banks.filter((bank) => bank.status !== 'frozen');
+
   return (
     <div className="space-y-4">
-      <Card>
-        <CardTitle sub={s.report.perProtocol}>{s.report.funnelHeading}</CardTitle>
-        <div className="grid gap-4 md:grid-cols-2">
-          {PROTOCOLS.map((protocol) => (
-            <FunnelCard key={protocol} s={s} report={report} protocol={protocol} />
-          ))}
+      {/* Bovenaan en niet in het stempel onderaan: wie een cijfer leest hoort
+          meteen te weten dat de lat beredeneerd is en niet onderzocht. */}
+      {provisional.length > 0 ? (
+        <div className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3">
+          <p className="font-medium text-warn">
+            {s.report.bankHeading}: {provisional.map((bank) => bank.label[locale]).join(', ')}
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-ink">{s.report.bankProvisional}</p>
         </div>
-        <p className="mt-4 rounded-md bg-surface-2 px-3 py-2 text-xs leading-relaxed text-muted">
-          {s.report.noBlend}
-        </p>
-        {report.unmatchedCount > 0 ? (
-          <div className="mt-3 rounded-md bg-warn-soft px-3 py-2">
-            <p className="text-sm">
-              <span className="tnum font-semibold">{n(report.unmatchedCount)}</span>{' '}
-              {s.report.unmatched}
-            </p>
-            <p className="mt-0.5 text-xs leading-relaxed text-muted">{s.report.unmatchedExplain}</p>
-          </div>
-        ) : null}
-      </Card>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {PROTOCOLS.map((protocol) => (
-          <NextStep key={protocol} s={s} report={report} protocol={protocol} locale={locale} />
-        ))}
+        <FunnelCard s={s} report={report} />
+        <NextStep s={s} report={report} locale={locale} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {PROTOCOLS.map((protocol) => (
-          <QuestionCoverage key={protocol} s={s} report={report} protocol={protocol} locale={locale} />
-        ))}
-      </div>
+      {report.unmatchedCount > 0 ? (
+        <div className="rounded-md bg-warn-soft px-3 py-2">
+          <p className="text-sm">
+            <span className="tnum font-semibold">{n(report.unmatchedCount)}</span>{' '}
+            {s.report.unmatched}
+          </p>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted">{s.report.unmatchedExplain}</p>
+        </div>
+      ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {PROTOCOLS.map((protocol) => (
-          <SelectionCard key={protocol} s={s} report={report} protocol={protocol} locale={locale} />
-        ))}
-      </div>
+      <QuestionCoverageCard s={s} report={report} locale={locale} />
 
       <GapTable s={s} report={report} locale={locale} />
 
       <Explorer s={s} locale={locale} report={report} />
 
-      {/* Checkout komt bewust na alle datasecties: eerst of de productdata de
-          vragen van een koper beantwoordt, dan pas of er afgerekend kan worden. */}
-      <OutWarnings s={s} report={report} locale={locale} />
+      {/* Vragen die geen enkel attribuut kan dragen. Ze staan ná de meting: het
+          is advies over je website en je dienstverlening, geen bevinding over je
+          catalogus. */}
+      <Advisory s={s} report={report} locale={locale} />
 
       <Card>
         <CardTitle sub={s.report.stampExplain}>{s.report.stampHeading}</CardTitle>
@@ -549,7 +513,20 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
           </div>
           <div>
             <dt className="text-xs text-muted">{s.report.specSnapshot}</dt>
-            <dd className="tnum font-medium">{report.stamp.specSnapshot}</dd>
+            <dd className="tnum font-medium">{report.stamp.fieldRegister}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted">{s.report.bankVersion}</dt>
+            <dd className="font-medium">
+              {report.stamp.banks.length === 0 ? '—' : report.stamp.banks.map((bank) => (
+                <span key={bank.id} className="mr-2 inline-flex items-center gap-1.5">
+                  <span className="tnum">{bank.label[locale]} {bank.version}</span>
+                  {bank.status !== 'frozen' ? (
+                    <Badge tone="warn">{s.bank.status[bank.status]}</Badge>
+                  ) : null}
+                </span>
+              ))}
+            </dd>
           </div>
           <div>
             <dt className="text-xs text-muted">{s.report.questionVersion}</dt>
@@ -562,15 +539,6 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
             </dd>
           </div>
         </dl>
-        <ul className="mt-4 space-y-1 text-xs text-muted">
-          {SPEC_SOURCES.map((source) => (
-            <li key={source.url}>
-              <a href={source.url} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-ink">
-                {source.label}
-              </a>
-            </li>
-          ))}
-        </ul>
       </Card>
 
       <Card>

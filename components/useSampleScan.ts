@@ -1,6 +1,6 @@
 'use client';
 
-// De scan op de voorbeeldfeed, voor de landingspagina en /demo.
+// De scan op de voorbeeldcatalogus, voor de landingspagina en /demo.
 //
 // Geen nagemaakte schermafbeelding en geen vastgezette cijfers: dit is dezelfde
 // motor op dezelfde weg als bij een echte merchant. Zo kan wat een bezoeker ziet
@@ -25,17 +25,11 @@ export function useSampleScan(): { report?: ScanReport; error?: string } {
 
     (async () => {
       try {
-        const [feedText, catalogText] = await Promise.all([
-          fetch('/sample-feed.csv').then((r) => r.text()),
-          fetch('/sample-catalog.json').then((r) => r.text()),
-        ]);
-        const { feed, catalog } = await client.ingestAll([
-          { role: 'feed', name: 'sample-feed.csv', text: feedText },
-          { role: 'catalog', name: 'sample-catalog.json', text: catalogText },
-        ]);
+        const text = await fetch('/sample-catalog.csv').then((r) => r.text());
+        const catalog = await client.ingestCatalog({ name: 'sample-catalog.csv', text });
         // De sets worden meteen als bevestigd doorgegeven: op een voorbeeld is er
         // geen merchant om ze na te kijken, en de validatiestap hoort bij hem.
-        const questions = generateQuestionSets(feed, catalog);
+        const questions = generateQuestionSets(catalog);
         const validated = {
           ...questions,
           sets: questions.sets.map((set) => ({ ...set, validated: true })),

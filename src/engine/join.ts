@@ -1,57 +1,12 @@
-// Koppeling tussen feed en catalogus, en de vraag welke categorie leidend is.
+// Welke categorie is leidend voor een product?
 //
-// Beide dingen staan hier omdat ze op dezelfde plek fout gaan: als de koppeling
-// mislukt, valt ook de categorie terug op de feed zonder dat iemand het merkt.
+// De categorie bepaalt welke vragenset erop wordt losgelaten, en daarmee waar de
+// merchant op afgerekend wordt. Een product dat op "simple" of op "2669" uitkomt
+// krijgt een vragenset die niet over zijn markt gaat, en dat is erger dan geen
+// vragenset — vandaar de uitsluitingen hieronder.
 
-import type { Dataset, ProductRecord } from '../domain/types';
-import { normalizeColumnName } from '../intake/fieldmap';
+import type { ProductRecord } from '../domain/types';
 import { str } from '../intake/normalize';
-
-/**
- * Kolommen die als join-sleutel kunnen dienen.
- *
- * Feed en catalogus koppelen op één veld is fragiel: een Channable-feed zet vaak
- * de SKU in g:id terwijl het PIM daarnaast een eigen intern id voert. Koppelen we
- * alleen op dat id, dan matcht niets en lijkt élk gat een echt gat — precies de
- * verkeerde conclusie. Daarom indexeren we op alle bruikbare sleutels.
- */
-const JOIN_COLUMNS = /^(sku|ean|upc|gtin|mpn|barcode|artikelnummer|artikelcode|productcode)$/;
-
-function joinValues(product: ProductRecord): string[] {
-  const values: string[] = [];
-  for (const key of ['item_id', 'mpn', 'gtin'] as const) {
-    const value = product.values[key];
-    if (value) values.push(value.trim());
-  }
-  for (const [column, value] of Object.entries(product.unmapped)) {
-    if (value && JOIN_COLUMNS.test(normalizeColumnName(column))) values.push(value.trim());
-  }
-  return values;
-}
-
-export function indexCatalog(catalog: Dataset | undefined): Map<string, ProductRecord> | undefined {
-  if (!catalog) return undefined;
-  const index = new Map<string, ProductRecord>();
-  for (const product of catalog.products) {
-    for (const value of joinValues(product)) {
-      // Eerste voorkomen wint; dubbele sleutels zijn zelf een bevinding.
-      if (!index.has(value)) index.set(value, product);
-    }
-  }
-  return index;
-}
-
-export function lookupCatalog(
-  index: Map<string, ProductRecord> | undefined,
-  product: ProductRecord,
-): ProductRecord | undefined {
-  if (!index) return undefined;
-  for (const value of joinValues(product)) {
-    const hit = index.get(value);
-    if (hit) return hit;
-  }
-  return undefined;
-}
 
 // --- Categorie -------------------------------------------------------------
 
@@ -100,16 +55,12 @@ export function categoryPath(record: ProductRecord): string | undefined {
 /**
  * De hoofdcategorie van een product: het eerste segment van het categoriepad.
  *
- * De catalogus gaat vóór de feed. Het PIM is waar de merchant zijn taxonomie
- * daadwerkelijk onderhoudt; de feed is een afgeleide die onderweg wordt afgevlakt
- * — bij de testdata verdween daar een hele hoofdcategorie in, en bleef van
- * "Outdoorstoffen > Gestreept" alleen "Gestreept" over, wat als los thema oogt.
+ * Het eerste segment en niet het hele pad, want daar zit de markt in. "Meubel-
+ * stoffen > Gestreept > Blauw" is één markt met twee filters erachter; per volledig
+ * pad een vragenset maken zou tientallen sets van drie producten opleveren.
  */
-export function mainCategory(
-  feedProduct: ProductRecord,
-  catalogProduct?: ProductRecord,
-): string | undefined {
-  const raw = (catalogProduct ? categoryPath(catalogProduct) : undefined) ?? categoryPath(feedProduct);
+export function mainCategory(product: ProductRecord): string | undefined {
+  const raw = categoryPath(product);
   if (!raw) return undefined;
   const first = raw.split(/\s*[>/|]\s*/)[0].replace(/\s+/g, ' ').trim();
   if (first === '' || /^\d+$/.test(first)) return undefined;

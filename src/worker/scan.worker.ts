@@ -7,8 +7,8 @@
 // scrollen, geen knop die reageert, geen voortgang. Hier kan de pagina intussen
 // gewoon tekenen.
 //
-// De worker houdt de datasets zelf vast. Ze gaan één keer naar de pagina voor de
-// vragensets en het rapport; ze terugsturen om te kunnen scannen zou dezelfde
+// De worker houdt de catalogus zelf vast. Hij gaat één keer naar de pagina voor
+// de vragensets en het rapport; hem terugsturen om te kunnen scannen zou dezelfde
 // paar duizend producten nog een keer door de structured clone duwen.
 
 import { ingest } from '../intake/index';
@@ -18,7 +18,6 @@ import type { WorkerRequest, WorkerResponse } from './protocol';
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 
-let feed: Dataset | undefined;
 let catalog: Dataset | undefined;
 
 function post(message: WorkerResponse) {
@@ -29,27 +28,21 @@ scope.onmessage = (event: MessageEvent<WorkerRequest>) => {
   const request = event.data;
   try {
     if (request.type === 'ingest') {
-      feed = undefined;
       catalog = undefined;
-      const total = request.files.length;
-      request.files.forEach((file, index) => {
-        post({ id: request.id, type: 'progress', step: file.name, done: index, total });
-        const dataset = ingest(file.name, file.text, file.role, file.overrides ?? {});
-        if (file.role === 'feed') feed = dataset;
-        else catalog = dataset;
-      });
-      if (!feed) throw new Error('Geen feed aangeleverd.');
-      post({ id: request.id, type: 'ingested', feed, catalog });
+      post({ id: request.id, type: 'progress', step: request.file.name, done: 0, total: 1 });
+      catalog = ingest(request.file.name, request.file.text, request.file.overrides ?? {});
+      post({ id: request.id, type: 'ingested', catalog });
       return;
     }
 
     if (request.type === 'scan') {
-      if (!feed) throw new Error('Er is nog geen feed ingelezen.');
+      if (!catalog) throw new Error('Er is nog geen catalogus ingelezen.');
       post({ id: request.id, type: 'progress', step: 'scan', done: 0, total: 1 });
-      const report = runScan(feed, catalog, request.questionState, {
-        scannedAt: request.scannedAt,
+      post({
+        id: request.id,
+        type: 'scanned',
+        report: runScan(catalog, request.questionState, { scannedAt: request.scannedAt }),
       });
-      post({ id: request.id, type: 'scanned', report });
     }
   } catch (error) {
     post({ id: request.id, type: 'failed', message: (error as Error).message });
