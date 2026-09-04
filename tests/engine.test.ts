@@ -1,31 +1,30 @@
-// De motor op zijn beloftes: vindbaar is alles-of-niets, een gat uit de
-// catalogus heet verrijkbaar en niet ontbrekend, en aanwezigheid is niet
-// hetzelfde als bruikbaarheid.
+// De motor op zijn beloftes: volledig is alles-of-niets, een gat kent zijn
+// oorzaak, en een veld vullen is nog geen vraag beantwoorden.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ingest } from '../src/intake/index';
 import { generateQuestionSets } from '../src/questions/generate';
 import { runScan } from '../src/engine/report';
-import { satisfies, MIN_WORDS } from '../src/engine/evaluate';
+import { catalogKnows, satisfies, MIN_WORDS } from '../src/engine/evaluate';
 
-const FEED = [
-  'g:id,title,g:brand,g:product_type,description,g:image_link,g:price,g:availability,g:gtin,g:color,materiaal',
-  '1,Meubelstof Anker gestreept blauw,DeGroot,Meubelstoffen,Een stevige meubelstof met een gestreept dessin in blauw,https://x/1.jpg,10 EUR,in stock,0614141000012,blauw,katoen',
-  '2,Meubelstof Effen groen,DeGroot,Meubelstoffen,Kort,https://x/2.jpg,12 EUR,in stock,0614141000029,groen,',
+/**
+ * Een catalogusexport zoals een PIM hem levert. Let op de kolom `baanbreedte`:
+ * die bestaat wél, maar staat bij het tweede product leeg. Dat is precies het
+ * verschil tussen invulwerk en modelwerk dat deze motor moet kunnen zien.
+ */
+const CATALOG = [
+  'sku,name,brand,category,description,image,color,material,baanbreedte',
+  '1,Meubelstof Anker gestreept blauw,DeGroot,Meubelstoffen,Een stevige meubelstof met een gestreept dessin in blauw,https://x/1.jpg,blauw,katoen,140 cm',
+  '2,Meubelstof Effen groen,DeGroot,Meubelstoffen,Kort,https://x/2.jpg,groen,,',
 ].join('\n');
 
 /** Een vast tijdstip: de tests gaan over de uitkomst, niet over de klok. */
 const VAST_TIJDSTIP = '2026-01-01T00:00:00.000Z';
 
-const CATALOG = JSON.stringify([
-  { item_id: '2', material: 'linnen' },
-]);
-
-function scan(feedText: string, catalogText?: string) {
-  const feed = ingest('feed.csv', feedText, 'feed');
-  const catalog = catalogText ? ingest('cat.json', catalogText, 'catalog') : undefined;
-  return runScan(feed, catalog, generateQuestionSets(feed, catalog), { scannedAt: VAST_TIJDSTIP });
+function scan(text: string) {
+  const catalog = ingest('catalogus.csv', text);
+  return runScan(catalog, generateQuestionSets(catalog), { scannedAt: VAST_TIJDSTIP });
 }
 
 test('een te korte omschrijving vult het veld maar beantwoordt de vraag niet', () => {
@@ -37,64 +36,79 @@ test('een te korte omschrijving vult het veld maar beantwoordt de vraag niet', (
 });
 
 test('een attr:-eis kijkt in de kolommen die we niet konden plaatsen', () => {
-  const record = { key: 'x', values: {}, unmapped: { materiaal: 'katoen' } };
-  assert.equal(satisfies(record, 'attr:materiaal|stof'), true);
-  assert.equal(satisfies(record, 'attr:breedte|width'), false);
+  const record = { key: 'x', values: {}, unmapped: { baanbreedte: '140 cm' } };
+  assert.equal(satisfies(record, 'attr:breedte|width'), true);
+  assert.equal(satisfies(record, 'attr:martindale|schuurtoer'), false);
 });
 
-test('vindbaar is alles-of-niets, niet een percentage', () => {
-  const report = scan(FEED);
+test('volledig is alles-of-niets, niet een percentage', () => {
+  const report = scan(CATALOG);
   for (const product of report.products) {
-    const result = product.perProtocol.acp;
-    const alles = result.questions.length > 0 && result.questions.every((q) => q.answered);
-    assert.equal(result.findable, alles);
+    // Over de gescoorde vragen: een procesvraag hoort in het advies en mag geen
+    // enkele merchant permanent van volledig afhouden.
+    const gescoord = product.questions.filter((q) => q.scored);
+    const alles = gescoord.length > 0 && gescoord.every((q) => q.answered);
+    assert.equal(product.findable, alles);
   }
-  // Deze feed mist te veel; niemand haalt het.
-  assert.equal(report.protocols.acp.funnel.findable, 0);
+  // Deze catalogus mist te veel; niemand haalt het.
+  assert.equal(report.funnel.findable, 0);
 });
 
-test('wat de feed mist maar de catalogus heeft, heet verrijkbaar', () => {
-  const zonder = scan(FEED);
-  const met = scan(FEED, CATALOG);
+test('een leeg veld is iets anders dan een veld dat niet bestaat', () => {
+  const catalog = ingest('catalogus.csv', CATALOG);
+  // De kolom staat in de export, dus de catalogus kent hem — ook al is hij bij
+  // het tweede product leeg.
+  assert.equal(catalogKnows(catalog, 'attr:breedte|width|baanbreedte|rolbreedte'), true);
+  assert.equal(catalogKnows(catalog, 'material'), true);
+  // Dit kenmerk komt in geen enkele kolom voor: modelwerk, geen invulwerk.
+  assert.equal(catalogKnows(catalog, 'attr:martindale|schuurtoer|slijtage'), false);
 
-  const vraagZonder = zonder.protocols.acp.questionCoverage.find((q) => q.enrichable > 0);
-  assert.equal(vraagZonder, undefined, 'zonder catalogus kan niets verrijkbaar zijn');
+  const report = scan(CATALOG);
+  const tweede = report.products.find((p) => p.key === '2');
+  // Samenstelling: de kolom bestaat, deze rij is leeg.
+  assert.equal(tweede?.questions.find((q) => q.questionId === 'h3')?.state, 'empty');
+  // Schuurweerstand: nergens een kolom voor.
+  assert.equal(tweede?.questions.find((q) => q.questionId === 'h14')?.state, 'absent');
+});
 
-  const totaalVerrijkbaar = met.protocols.acp.questionCoverage.reduce((n, q) => n + q.enrichable, 0);
-  assert.ok(totaalVerrijkbaar > 0, 'met catalogus moet er iets verrijkbaar zijn');
+test('een gat draagt zijn oorzaak, en dus wat voor werk het is', () => {
+  const report = scan(CATALOG);
+  const causes = new Map(report.gaps.map((g) => [g.field, g.cause]));
+  assert.equal(causes.get('material'), 'unfilled', 'de kolom bestaat, hij is niet gevuld');
+  assert.equal(causes.get('attr:schuurtoer|martindale|slijtage'), 'unmodelled', 'geen kolom, dus modelwerk');
+});
+
+test('een gat bestaat alleen als er een vraag door onbeantwoord blijft', () => {
+  const report = scan(CATALOG);
+  for (const gap of report.gaps) {
+    assert.ok(gap.questions.length > 0, `${gap.field} hangt aan geen enkele vraag`);
+  }
+  // Andersom: een veld dat in geen enkele vraag voorkomt is geen gat, ook niet
+  // als het leeg is. Dat is het verschil met een compleetheidscontrole.
+  assert.equal(report.gaps.some((g) => g.field === 'gtin'), false);
 });
 
 test('een product zonder categorie wordt geteld maar niet gescoord', () => {
-  const feed = FEED + '\n3,Los product,DeGroot,,Geen categorie hier maar wel een nette omschrijving,https://x/3.jpg,9 EUR,in stock,0614141000036,rood,';
-  const report = scan(feed);
+  const report = scan(CATALOG + '\n3,Los product,DeGroot,,Geen categorie hier maar wel een nette omschrijving,https://x/3.jpg,rood,,');
   assert.equal(report.unmatchedCount, 1);
   const los = report.products.find((p) => p.key === '3');
   assert.equal(los?.unmatched, true);
-  assert.equal(los?.perProtocol.acp.questions.length, 0);
-  assert.equal(los?.perProtocol.acp.findable, false);
+  assert.equal(los?.questions.length, 0);
+  assert.equal(los?.findable, false);
 });
 
-test('de trechter telt alleen gescoorde producten, de out-checks alle', () => {
-  const report = scan(FEED);
-  const funnel = report.protocols.acp.funnel;
-  assert.equal(funnel.total, report.productCount);
-  for (const warning of report.protocols.acp.outWarnings) {
-    assert.equal(warning.affected, report.productCount, 'geen enkel product is afrekenbaar');
-  }
-});
-
-test('de afstand tot vindbaar telt alle gescoorde producten', () => {
-  const report = scan(FEED);
-  const distance = report.protocols.acp.distance;
-  const totaal = distance.reduce((n, bucket) => n + bucket.products, 0);
+test('de trechter telt alle producten, de score alleen de gescoorde', () => {
+  const report = scan(CATALOG);
+  assert.equal(report.funnel.total, report.productCount);
+  const totaal = report.distance.reduce((n, bucket) => n + bucket.products, 0);
   assert.equal(totaal, report.productCount - report.unmatchedCount);
   // Oplopend, en geen lege standen.
-  assert.deepEqual(distance.map((b) => b.open), [...distance.map((b) => b.open)].sort((a, b) => a - b));
-  for (const bucket of distance) assert.ok(bucket.products > 0);
+  assert.deepEqual(report.distance.map((b) => b.open), [...report.distance.map((b) => b.open)].sort((a, b) => a - b));
+  for (const bucket of report.distance) assert.ok(bucket.products > 0);
 });
 
-test('nul openstaande vragen betekent precies vindbaar', () => {
-  const report = scan(FEED);
-  const nul = report.protocols.acp.distance.find((b) => b.open === 0)?.products ?? 0;
-  assert.equal(nul, report.protocols.acp.funnel.findable);
+test('nul openstaande vragen betekent precies volledig', () => {
+  const report = scan(CATALOG);
+  const nul = report.distance.find((b) => b.open === 0)?.products ?? 0;
+  assert.equal(nul, report.funnel.findable);
 });

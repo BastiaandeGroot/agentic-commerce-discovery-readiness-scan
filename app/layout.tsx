@@ -27,7 +27,7 @@ import { ToastProvider } from '../components/ui';
 export const metadata: Metadata = {
   title: 'Agentic Commerce Discovery Readiness Scan',
   description:
-    'Meet of productdata de vragen beantwoordt die een koper in een categorie stelt — voor OpenAI ACP en Google UCP.',
+    'Meet of een productcatalogus de vragen beantwoordt die een koper in zijn markt stelt.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

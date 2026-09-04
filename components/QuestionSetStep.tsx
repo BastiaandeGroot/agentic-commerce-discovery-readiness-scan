@@ -10,6 +10,7 @@
 
 import { useMemo, useState } from 'react';
 import type { Dataset, Locale, Question, QuestionSetState } from '../src/domain/types';
+import { isScored } from '../src/questions/compose';
 import { FIELDS, FIELD_BY_KEY } from '../src/spec/fields';
 import {
   addQuestion, allValidated, editQuestion, toggleQuestion, toggleValidated,
@@ -20,7 +21,7 @@ import { Badge, Button, Card, CardTitle, ErrorState } from './ui';
 interface Props {
   s: Strings;
   locale: Locale;
-  feed: Dataset;
+  catalog: Dataset;
   state: QuestionSetState;
   onChange: (next: QuestionSetState) => void;
   onRun: () => void;
@@ -38,6 +39,18 @@ function requirementLabel(requirement: string, locale: Locale): string {
   return FIELD_BY_KEY[requirement]?.label[locale] ?? requirement;
 }
 
+/**
+ * Het gewicht van een vraag, in woord en in vorm.
+ *
+ * Kritiek krijgt de danger-toon en niet omdat er iets mis is: het is de vraag
+ * die de fout voorkomt die de koper niet kan terugdraaien, en die moet uit de
+ * rij springen. Er staat altijd een woord in de badge, want kleur mag de
+ * betekenis nooit alleen dragen.
+ */
+const IMPORTANCE_TONE = {
+  critical: 'danger', high: 'accent', medium: 'neutral', low: 'neutral',
+} as const;
+
 function QuestionRow({
   s, locale, setId, question, onChange, state,
 }: {
@@ -46,6 +59,9 @@ function QuestionRow({
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(question.label[locale]);
+  const [why, setWhy] = useState(false);
+  const importance = question.importance ?? 'medium';
+  const scored = isScored(question);
 
   function save() {
     const label = { ...question.label, [locale]: draft } as { nl: string; en: string };
@@ -73,14 +89,56 @@ function QuestionRow({
           <>
             <p className="text-sm">{question.label[locale]}</p>
             <p className="mt-0.5 text-xs text-muted">
-              {s.questions.needs}: {question.requires.map((r) => requirementLabel(r, locale)).join(' · ')}
+              {/* Het bewijs per attribuut, niet als één platte lijst velden: een
+                  vraag die twee dingen tegelijk vraagt is iets anders dan een
+                  vraag die tevreden is met één van de twee. */}
+              {s.questions.needs}:{' '}
+              {question.evidence && question.evidence.length > 0
+                ? question.evidence
+                  .map((group) => group.label[locale])
+                  .join(question.mode === 'all' ? ' + ' : ' / ')
+                : question.requires.map((r) => requirementLabel(r, locale)).join(' · ')}
             </p>
+            <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted">
+              {question.intent ? <span>{s.questions.intents[question.intent]}</span> : null}
+              <span>
+                {s.questions.coverage}:{' '}
+                {question.coverage === null || question.coverage === undefined
+                  ? s.questions.coverageNone
+                  : <span className="tnum">{question.coverage}</span>}
+              </span>
+              {question.weightNote ? (
+                <button
+                  type="button"
+                  onClick={() => setWhy(!why)}
+                  aria-expanded={why}
+                  className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                >
+                  {s.questions.weightNote}
+                </button>
+              ) : null}
+            </div>
+            {why && question.weightNote ? (
+              <p className="mt-1.5 rounded-md bg-surface-2 p-2 text-xs leading-relaxed text-muted">
+                {question.weightNote[locale]}
+              </p>
+            ) : null}
+            {!scored ? (
+              <p className="mt-1.5 rounded-md bg-surface-2 p-2 text-xs leading-relaxed text-muted">
+                {s.questions.notScoredExplain}
+              </p>
+            ) : null}
           </>
         )}
       </div>
 
       {!editing ? (
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+          {scored ? (
+            <Badge tone={IMPORTANCE_TONE[importance]}>{s.questions.importance[importance]}</Badge>
+          ) : (
+            <Badge tone="neutral">{s.questions.notScored}</Badge>
+          )}
           <Badge tone={question.origin === 'custom' ? 'accent' : 'neutral'}>
             {question.origin === 'custom' ? s.questions.fromData : s.questions.fromArchetype}
           </Badge>
@@ -99,7 +157,7 @@ function columnPattern(column: string): string {
   return `attr:^${column.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`;
 }
 
-export function QuestionSetStep({ s, locale, feed, state, onChange, onRun, running, error }: Props) {
+export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, running, error }: Props) {
   const [openSet, setOpenSet] = useState<string | undefined>(state.sets[0]?.id);
   const [newLabel, setNewLabel] = useState('');
   const [newField, setNewField] = useState('');
@@ -107,9 +165,9 @@ export function QuestionSetStep({ s, locale, feed, state, onChange, onRun, runni
   // Keuzelijst: de canonieke velden plus de eigen kolommen die we niet plaatsten.
   const fieldOptions = useMemo(() => {
     const canonical = FIELDS.map((f) => ({ value: f.key, label: f.label[locale] }));
-    const own = feed.unmappedColumns.map((c) => ({ value: columnPattern(c), label: c }));
+    const own = catalog.unmappedColumns.map((c) => ({ value: columnPattern(c), label: c }));
     return [...canonical, ...own];
-  }, [feed.unmappedColumns, locale]);
+  }, [catalog.unmappedColumns, locale]);
 
   const ready = allValidated(state);
 
@@ -124,6 +182,7 @@ export function QuestionSetStep({ s, locale, feed, state, onChange, onRun, runni
           <Badge>{s.questions.version} {state.version}</Badge>
           <span className="text-muted">{s.questions.generatedNote}</span>
         </div>
+        <p className="mt-2 text-xs leading-relaxed text-muted">{s.questions.importanceExplain}</p>
       </Card>
 
       {state.sets.map((set) => {
@@ -143,13 +202,20 @@ export function QuestionSetStep({ s, locale, feed, state, onChange, onRun, runni
                   <span className="text-xs text-muted">
                     <span className="tnum">{set.productCount ?? 0}</span> {s.questions.productsInCategory} ·{' '}
                     <span className="tnum">{active}</span> {locale === 'nl' ? 'vragen' : 'questions'} ·{' '}
-                    {s.questions.basedOn}: {set.archetypeId}
+                    {s.questions.basedOn}: {set.bankId}
+                    {set.bankVersion ? ` ${set.bankVersion}` : ''}
                   </span>
                 </span>
               </button>
               {/* Terugdraaibaar: wie halverwege bedenkt dat een set toch niet
                   klopt, moet dat kunnen terugnemen zonder opnieuw te beginnen. */}
               <div className="flex shrink-0 items-center gap-2">
+                {/* Een voorlopige bank hoort de merchant te zien, niet te raden:
+                    zijn cijfer klopt met de gestelde vragen, maar of dít de
+                    vragen zijn is beredeneerd en niet onderzocht. */}
+                {set.bankStatus && set.bankStatus !== 'frozen' ? (
+                  <Badge tone="warn">{s.bank.status[set.bankStatus]}</Badge>
+                ) : null}
                 {set.validated ? <Badge tone="ok">✓ {s.questions.validated}</Badge> : null}
                 <Button
                   variant={set.validated ? 'quiet' : 'secondary'}

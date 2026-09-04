@@ -1,25 +1,21 @@
 // Aggregatie tot het scanrapport.
 //
-// De kop is een trechter, geen cijfer (§5): totaal -> vindbaar -> concurrerend,
-// per protocol apart uitgerekend omdat de beschikbare velden verschillen.
-// Er bestaat met opzet geen gecombineerd Core/Selection-getal: dat middelt
-// ongelijke dingen en vernietigt precies de routering waar het product om draait.
+// De kop is een trechter en geen cijfer: totaal → basisgeschikt → volledig. Geen
+// percentage met een grens, want zo'n grens is verzonnen en het eerste waar een
+// merchant terecht over gaat discussiëren. Wel een benoemde lijst vragen die hij
+// kan nakijken.
 //
-// Naast de feed-brede cijfers levert dit bestand twee fijnere niveaus: per
-// categorie en per product. Een feed-breed getal vertelt een merchant dat er werk
-// is; pas de categorie zegt wáár, en pas het product zegt wat.
+// Naast het catalogusbrede cijfer levert dit bestand twee fijnere niveaus: per
+// categorie en per product. Een catalogusbreed getal vertelt een merchant dat er
+// werk is; pas de categorie zegt wáár, en pas het product zegt wat.
 
 import type {
-  CategoryReport, Dataset, Gap, ProductRecord, ProductResult, Protocol,
-  ProtocolReport, QuestionSetState, ScanReport,
+  CategoryReport, Dataset, Gap, ProductResult, QuestionCoverage,
+  QuestionSetState, ScanReport,
 } from '../domain/types';
-import { OUT_CHECKS, SELECTION_CHECKLIST } from './checklists';
 import { evaluateProduct } from './evaluate';
-import { indexCatalog, lookupCatalog } from './join';
-import { SPEC_SNAPSHOT_ID } from '../spec/snapshot';
+import { FIELD_REGISTER_ID } from '../spec/snapshot';
 import { SCAN_VERSION } from './version';
-
-const PROTOCOLS: Protocol[] = ['acp', 'ucp'];
 
 /** Tel gaps samen over een verzameling producten, op veld en oorzaak. */
 function aggregateGaps(results: ProductResult[]): Gap[] {
@@ -28,31 +24,53 @@ function aggregateGaps(results: ProductResult[]): Gap[] {
     for (const gap of result.gaps) {
       const id = `${gap.field}|${gap.cause}`;
       const existing = totals.get(id);
-      if (existing) existing.affected += 1;
-      else totals.set(id, { ...gap });
+      if (existing) {
+        existing.affected += 1;
+        for (const question of gap.questions) {
+          if (!existing.questions.includes(question)) existing.questions.push(question);
+        }
+      } else {
+        totals.set(id, { ...gap, questions: [...gap.questions] });
+      }
     }
   }
   return [...totals.values()].sort((a, b) => b.affected - a.affected);
 }
 
-function answeredStats(results: ProductResult[], protocol: Protocol) {
-  if (results.length === 0) return { avgAnswered: 0, avgApplicable: 0 };
+/**
+ * Het gemiddelde op twee schalen: in vragen én in gewichtspunten.
+ *
+ * Allebei, en niet één van de twee. "5,4 van de 12" is meteen te bevatten maar
+ * doet alsof elke vraag even zwaar weegt; "34 van de 48" weegt de vraag die de
+ * onomkeerbare fout voorkomt zwaarder dan een kleurveld, maar zegt op zichzelf
+ * niet hoeveel vragen er nog open staan. Het rapport toont ze naast elkaar.
+ *
+ * Alleen gescoorde vragen tellen mee. Procesvragen staan in het adviesblok.
+ */
+function answeredStats(results: ProductResult[]) {
+  const empty = { avgAnswered: 0, avgApplicable: 0, avgEarned: 0, avgWeight: 0 };
+  if (results.length === 0) return empty;
   let answered = 0;
   let applicable = 0;
+  let earned = 0;
+  let weight = 0;
   for (const result of results) {
-    const questions = result.perProtocol[protocol].questions;
+    const questions = result.questions.filter((q) => q.scored);
     answered += questions.filter((q) => q.answered).length;
     applicable += questions.length;
+    earned += result.earned;
+    weight += result.weight;
   }
   return {
     avgAnswered: answered / results.length,
     avgApplicable: applicable / results.length,
+    avgEarned: earned / results.length,
+    avgWeight: weight / results.length,
   };
 }
 
 function buildCategoryReports(
   results: ProductResult[],
-  protocol: Protocol,
   questionState: QuestionSetState,
 ): CategoryReport[] {
   const grouped = new Map<string, ProductResult[]>();
@@ -66,14 +84,13 @@ function buildCategoryReports(
   return [...grouped.entries()]
     .map(([setId, members]) => {
       const set = questionState.sets.find((s) => s.id === setId);
-      const stats = answeredStats(members, protocol);
       return {
         setId,
         category: set?.category ?? set?.label.nl ?? setId,
         total: members.length,
-        findable: members.filter((m) => m.perProtocol[protocol].findable).length,
-        competitive: members.filter((m) => m.perProtocol[protocol].competitive).length,
-        ...stats,
+        qualified: members.filter((m) => m.qualified).length,
+        findable: members.filter((m) => m.findable).length,
+        ...answeredStats(members),
         topGaps: aggregateGaps(members)
           .slice(0, 4)
           .map((g) => ({ field: g.field, label: g.label, cause: g.cause, affected: g.affected })),
@@ -82,111 +99,96 @@ function buildCategoryReports(
     .sort((a, b) => b.total - a.total);
 }
 
-function buildProtocolReport(
-  protocol: Protocol,
-  results: ProductResult[],
+export function runScan(
+  catalog: Dataset,
   questionState: QuestionSetState,
-): ProtocolReport {
-  const scored = results.filter((r) => !r.unmatched);
+  /** Het tijdstip komt van de aanroeper: een motor met een eigen klok geeft op
+   *  dezelfde invoer twee keer een ander rapport. */
+  options: { scannedAt: string },
+): ScanReport {
+  const products = catalog.products.map(
+    (product) => evaluateProduct(product, questionState.sets, catalog),
+  );
+  const scored = products.filter((r) => !r.unmatched);
 
   // Per vraag: hoeveel producten die de set gebruiken, beantwoorden hem?
-  const coverage = new Map<string, {
-    setId: string; questionId: string; label: { nl: string; en: string };
-    answered: number; enrichable: number; applicable: number;
-  }>();
+  const coverage = new Map<string, QuestionCoverage>();
+  const advisory = new Map<string, ScanReport['advisory'][number]>();
   for (const result of scored) {
-    for (const question of result.perProtocol[protocol].questions) {
+    for (const question of result.questions) {
       const id = `${result.setId}|${question.questionId}`;
       const entry = coverage.get(id) ?? {
         setId: result.setId ?? '',
         questionId: question.questionId,
         label: question.label,
         answered: 0,
-        enrichable: 0,
+        empty: 0,
+        unusable: 0,
+        incomplete: 0,
+        absent: 0,
         applicable: 0,
+        importance: question.importance,
+        weight: question.weight,
+        scored: question.scored,
       };
       entry.applicable += 1;
-      if (question.answered) entry.answered += 1;
-      else if (question.enrichable) entry.enrichable += 1;
+      // De vijf toestanden wijzen elk naar een andere handeling. Ze op één hoop
+      // gooien levert een lijst op waar niemand mee verder kan.
+      entry[question.state] += 1;
       coverage.set(id, entry);
+
+      if (!question.scored && !advisory.has(id)) {
+        advisory.set(id, {
+          setId: result.setId ?? '',
+          questionId: question.questionId,
+          label: question.label,
+          importance: question.importance,
+        });
+      }
     }
   }
 
-  const selectionCoverage = SELECTION_CHECKLIST[protocol].map((item) => ({
-    id: item.id,
-    label: item.label,
-    present: scored.filter(
-      (r) => r.perProtocol[protocol].selection.find((s) => s.id === item.id)?.present,
-    ).length,
-    total: scored.length,
-  }));
-
-  // Out-tier telt over ALLE producten, ook de niet-gescoorde: een product zonder
-  // categorie kan nog steeds stilzwijgend uit de checkout vallen.
-  const outWarnings = OUT_CHECKS[protocol].map((check) => ({
-    id: check.id,
-    label: check.label,
-    affected: results.filter(
-      (r) => !r.perProtocol[protocol].outWarnings.find((w) => w.id === check.id)?.present,
-    ).length,
-    note: check.note,
-  }));
-
-  // Afstand tot vindbaar: hoeveel producten hebben er nog n vragen open?
+  // Afstand tot volledig: hoeveel producten hebben er nog n vragen open? Alleen
+  // gescoorde vragen, anders staat elk product minstens één stap van volledig af
+  // door een vraag die per definitie niet uit een catalogus te beantwoorden is.
   const distance = new Map<number, number>();
   for (const result of scored) {
-    const open = result.perProtocol[protocol].questions.filter((q) => !q.answered).length;
+    const open = result.questions.filter((q) => q.scored && !q.answered).length;
     distance.set(open, (distance.get(open) ?? 0) + 1);
   }
 
   return {
-    protocol,
-    distance: [...distance.entries()]
-      .map(([open, products]) => ({ open, products }))
-      .sort((a, b) => a.open - b.open),
-    funnel: {
-      total: results.length,
-      findable: scored.filter((r) => r.perProtocol[protocol].findable).length,
-      competitive: scored.filter((r) => r.perProtocol[protocol].competitive).length,
-      ...answeredStats(scored, protocol),
-    },
-    questionCoverage: [...coverage.values()].sort(
-      (a, b) => a.answered / Math.max(a.applicable, 1) - b.answered / Math.max(b.applicable, 1),
-    ),
-    selectionCoverage,
-    outWarnings,
-    gaps: aggregateGaps(scored),
-    categories: buildCategoryReports(results, protocol, questionState),
-  };
-}
-
-export function runScan(
-  feed: Dataset,
-  catalog: Dataset | undefined,
-  questionState: QuestionSetState,
-  /** Het tijdstip komt van de aanroeper: een motor met een eigen klok geeft op
-   *  dezelfde invoer twee keer een ander rapport. */
-  options: { scannedAt: string },
-): ScanReport {
-  const catalogIndex = indexCatalog(catalog);
-  const products = feed.products.map((product) =>
-    evaluateProduct(product, questionState.sets, catalog, lookupCatalog(catalogIndex, product)),
-  );
-
-  return {
     stamp: {
       scanVersion: SCAN_VERSION,
-      specSnapshot: SPEC_SNAPSHOT_ID,
+      fieldRegister: FIELD_REGISTER_ID,
       questionSetVersion: questionState.version,
+      banks: questionState.banks,
       scannedAt: options.scannedAt,
     },
-    sources: { feed, catalog },
+    sources: { catalog },
     productCount: products.length,
     unmatchedCount: products.filter((p) => p.unmatched).length,
-    protocols: {
-      acp: buildProtocolReport('acp', products, questionState),
-      ucp: buildProtocolReport('ucp', products, questionState),
+    funnel: {
+      total: products.length,
+      qualified: scored.filter((r) => r.qualified).length,
+      findable: scored.filter((r) => r.findable).length,
+      ...answeredStats(scored),
     },
+    distance: [...distance.entries()]
+      .map(([open, count]) => ({ open, products: count }))
+      .sort((a, b) => a.open - b.open),
+    // Volgorde: eerst wat het zwaarst weegt, dan wat het slechtst gedekt is.
+    // Alleen op dekking sorteren zet een kleurveld dat nergens ingevuld is boven
+    // de vraag die de onomkeerbare fout voorkomt, en dat is precies de verkeerde
+    // volgorde om aan een merchant voor te leggen.
+    questionCoverage: [...coverage.values()].sort((a, b) => {
+      const gap = (e: QuestionCoverage) => (e.applicable - e.answered) * e.weight;
+      return gap(b) - gap(a)
+        || a.answered / Math.max(a.applicable, 1) - b.answered / Math.max(b.applicable, 1);
+    }),
+    advisory: [...advisory.values()],
+    gaps: aggregateGaps(scored),
+    categories: buildCategoryReports(products, questionState),
     products,
   };
 }

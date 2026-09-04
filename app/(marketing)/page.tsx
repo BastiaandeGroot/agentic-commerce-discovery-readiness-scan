@@ -6,7 +6,7 @@ import { HomeContent } from './HomeContent';
 
 const titel = 'Is je productdata klaar voor AI-agenten?';
 const omschrijving =
-  'Scan je productfeed en zie welke vragen van een koper je data kan beantwoorden, getoetst aan OpenAI ACP en Google UCP. Gratis, geen account, en je bestand verlaat je apparaat niet.';
+  'Scan je productcatalogus en zie welke vragen van een koper je data kan beantwoorden. Gratis, geen account, en je bestand verlaat je apparaat niet.';
 
 export const metadata: Metadata = {
   title: titel,

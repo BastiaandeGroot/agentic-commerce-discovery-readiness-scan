@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 
 const titel = 'Rapport';
 const omschrijving =
-  'Het resultaat van een readiness-scan op je eigen productfeed.';
+  'Het resultaat van een readiness-scan op je eigen productcatalogus.';
 
 export const metadata: Metadata = {
   title: titel,

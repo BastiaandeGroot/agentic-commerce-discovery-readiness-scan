@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 
 const titel = 'Over deze scan';
 const omschrijving =
-  'Een deterministische scan die meet of je productdata de vragen van een koper beantwoordt, getoetst aan OpenAI ACP en Google UCP.';
+  'Een deterministische scan die meet of je productcatalogus de vragen van een koper beantwoordt.';
 
 export const metadata: Metadata = {
   title: titel,
