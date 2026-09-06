@@ -1,26 +1,36 @@
 'use client';
 
-// De app is een reeks van drie stappen: data aanleveren, vragensets valideren,
-// rapport. Die volgorde is niet cosmetisch — de sets kunnen pas bestaan als de
-// data er is, want ze gaan over de eigen categorieen van de merchant (S6).
+// De app is een reeks van vier stappen: data aanleveren, de vragenbank, de
+// vragensets valideren, rapport.
+//
+// Die volgorde is niet cosmetisch. De sets kunnen pas bestaan als de data er is,
+// want ze gaan over de eigen categorieen van de merchant (S6). En de bank komt
+// daar tussen omdat de vragen niet uit die data volgen maar uit onderzoek naar de
+// markt: zou de bank onzichtbaar blijven, dan krijgt een merchant een cijfer
+// zonder te zien waarlangs hij gemeten is, en zonder te weten dat die lat
+// voorlopig kan zijn.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Dataset, QuestionSetState, ScanReport } from '../../../src/domain/types';
-import { generateQuestionSets } from '../../../src/questions/generate';
+import { deriveCategories, generateQuestionSets, type CategoryStat } from '../../../src/questions/generate';
+import { bankStore, LOCAL_ACCOUNT, type StoredBank } from '../../../src/storage/banks';
 import type { ScanClient } from '../../../src/worker/client';
 import { STRINGS } from '../../../src/i18n/strings';
 import { useLocale } from '../../../src/i18n/useLocale';
 import { UploadStep } from '../../../components/UploadStep';
+import { BankStep } from '../../../components/BankStep';
 import { QuestionSetStep } from '../../../components/QuestionSetStep';
 import { ReportView } from '../../../components/ReportView';
 
-type Step = 'upload' | 'questions' | 'report';
+type Step = 'upload' | 'bank' | 'questions' | 'report';
 
 export default function Home() {
   const [locale] = useLocale();
   const [step, setStep] = useState<Step>('upload');
-  const [feed, setFeed] = useState<Dataset>();
   const [catalog, setCatalog] = useState<Dataset>();
+  const [site, setSite] = useState<string>();
+  const [categories, setCategories] = useState<CategoryStat[]>([]);
+  const [banks, setBanks] = useState<StoredBank[]>([]);
   const [questionState, setQuestionState] = useState<QuestionSetState>();
   const [report, setReport] = useState<ScanReport>();
   // De client houdt de worker vast; de datasets blijven daar zodat ze niet voor
@@ -34,16 +44,45 @@ export default function Home() {
   const s = STRINGS[locale];
   const steps: { id: Step; label: string }[] = [
     { id: 'upload', label: s.steps.upload },
+    { id: 'bank', label: s.steps.bank },
     { id: 'questions', label: s.steps.questions },
     { id: 'report', label: s.steps.report },
   ];
 
-  function handleReady(nextClient: ScanClient, nextFeed: Dataset, nextCatalog?: Dataset) {
+  // Eerder ingelezen banken staan op dit apparaat; ze horen er meteen te zijn,
+  // anders draait de eerste scan van een sessie op de terugval terwijl er allang
+  // een onderzochte bank ligt.
+  useEffect(() => {
+    void bankStore.list(LOCAL_ACCOUNT).then(setBanks);
+  }, []);
+
+  /** Stel de sets opnieuw samen; elke bankwijziging verandert immers de vragen. */
+  function compose(nextBanks: StoredBank[], nextCatalog = catalog) {
+    if (!nextCatalog) return;
+    setQuestionState(generateQuestionSets(nextCatalog, nextBanks.map((entry) => entry.bank)));
+  }
+
+  function handleReady(nextClient: ScanClient, nextCatalog: Dataset, nextSite?: string) {
     setClient(nextClient);
-    setFeed(nextFeed);
     setCatalog(nextCatalog);
-    setQuestionState(generateQuestionSets(nextFeed, nextCatalog));
-    setStep('questions');
+    setSite(nextSite);
+    setCategories(deriveCategories(nextCatalog));
+    compose(banks, nextCatalog);
+    setStep('bank');
+  }
+
+  async function handleImport(entry: StoredBank) {
+    await bankStore.save(entry);
+    const next = await bankStore.list(LOCAL_ACCOUNT);
+    setBanks(next);
+    compose(next);
+  }
+
+  async function handleRemoveBank(vertical: string) {
+    await bankStore.remove(LOCAL_ACCOUNT, vertical);
+    const next = await bankStore.list(LOCAL_ACCOUNT);
+    setBanks(next);
+    compose(next);
   }
 
   async function handleRun() {
@@ -62,7 +101,8 @@ export default function Home() {
   }
 
   function restart() {
-    setFeed(undefined); setCatalog(undefined);
+    setCatalog(undefined); setSite(undefined);
+    setCategories([]);
     setQuestionState(undefined); setReport(undefined);
     client?.dispose(); setClient(undefined);
     setStep('upload');
@@ -99,11 +139,25 @@ export default function Home() {
       <main>
         {step === 'upload' ? <UploadStep s={s} locale={locale} onReady={handleReady} /> : null}
 
-        {step === 'questions' && feed && questionState ? (
+        {step === 'bank' && questionState ? (
+          <BankStep
+            s={s}
+            locale={locale}
+            state={questionState}
+            categories={categories}
+            merchantSite={site}
+            stored={banks}
+            onImport={(entry) => void handleImport(entry)}
+            onRemove={(vertical) => void handleRemoveBank(vertical)}
+            onContinue={() => setStep('questions')}
+          />
+        ) : null}
+
+        {step === 'questions' && catalog && questionState ? (
           <QuestionSetStep
             s={s}
             locale={locale}
-            feed={feed}
+            catalog={catalog}
             state={questionState}
             onChange={setQuestionState}
             onRun={() => void handleRun()}

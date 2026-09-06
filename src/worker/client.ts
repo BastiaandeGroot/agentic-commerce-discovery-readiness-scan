@@ -26,8 +26,7 @@ export interface Progress {
 export class ScanClient {
   private worker?: Worker;
   private nextId = 1;
-  /** Terugval: zonder worker houden we de datasets hier vast. */
-  private feed?: Dataset;
+  /** Terugval: zonder worker houden we de catalogus hier vast. */
   private catalog?: Dataset;
 
   /** Draait het werk echt buiten de hoofddraad? De UI mag dat zeggen. */
@@ -72,31 +71,22 @@ export class ScanClient {
     });
   }
 
-  async ingestAll(
-    files: IngestFile[],
+  async ingestCatalog(
+    file: IngestFile,
     onProgress?: (progress: Progress) => void,
-  ): Promise<{ feed: Dataset; catalog?: Dataset }> {
+  ): Promise<Dataset> {
     if (this.worker) {
       const result = await this.send<Extract<WorkerResponse, { type: 'ingested' }>>(
-        { type: 'ingest', files },
+        { type: 'ingest', file },
         onProgress,
       );
-      return { feed: result.feed, catalog: result.catalog };
+      return result.catalog;
     }
 
     // Terugval op de hoofddraad.
-    let feed: Dataset | undefined;
-    let catalog: Dataset | undefined;
-    files.forEach((file, index) => {
-      onProgress?.({ step: file.name, done: index, total: files.length });
-      const dataset = ingest(file.name, file.text, file.role, file.overrides ?? {});
-      if (file.role === 'feed') feed = dataset;
-      else catalog = dataset;
-    });
-    if (!feed) throw new Error('Geen feed aangeleverd.');
-    this.feed = feed;
-    this.catalog = catalog;
-    return { feed, catalog };
+    onProgress?.({ step: file.name, done: 0, total: 1 });
+    this.catalog = ingest(file.name, file.text, file.overrides ?? {});
+    return this.catalog;
   }
 
   async scan(
@@ -111,9 +101,9 @@ export class ScanClient {
       );
       return result.report;
     }
-    if (!this.feed) throw new Error('Er is nog geen feed ingelezen.');
+    if (!this.catalog) throw new Error('Er is nog geen catalogus ingelezen.');
     onProgress?.({ step: 'scan', done: 0, total: 1 });
-    return runScan(this.feed, this.catalog, questionState, { scannedAt });
+    return runScan(this.catalog, questionState, { scannedAt });
   }
 
   dispose() {

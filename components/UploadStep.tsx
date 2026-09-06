@@ -1,18 +1,19 @@
 'use client';
 
-// Stap 1: data aanleveren.
+// Stap 1: je catalogus aanleveren.
 //
-// De feed is verplicht en is de analysebron — dat is wat de agent ziet. De
-// catalogus is optioneel maar bepaalt of gap-attributie mogelijk is; dat zeggen
-// we hier al, zodat de merchant de keuze bewust maakt en niet pas in het rapport
-// hoort dat de helft van het antwoord ontbrak.
+// Eén bron, en met opzet de export uit het systeem waar de merchant zijn
+// productkennis werkelijk onderhoudt: zijn PIM of MDM, of anders Magento of
+// Shopify. Daar staat wat hij wéét van zijn producten, en dat is wat de scan
+// meet. Een kanaalfeed is een afgeleide en zou een dunner beeld geven van
+// dezelfde catalogus.
 //
 // Hier haakt een merchant af of raakt hij overtuigd. Een bestand klopt bijna
 // nooit meteen, dus alles draait om laten zien wat wij lezen en hem laten
 // corrigeren voordat er iets beoordeeld wordt.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Dataset, DatasetRole } from '../src/domain/types';
+import type { Dataset } from '../src/domain/types';
 import { FIELDS } from '../src/spec/fields';
 import type { Locale, Strings } from '../src/i18n/strings';
 import { ScanClient, type Progress } from '../src/worker/client';
@@ -24,7 +25,7 @@ const LARGE_FILE_MB = 20;
 interface Props {
   s: Strings;
   locale: Locale;
-  onReady: (client: ScanClient, feed: Dataset, catalog?: Dataset) => void;
+  onReady: (client: ScanClient, catalog: Dataset, site?: string) => void;
 }
 
 interface Source {
@@ -35,7 +36,7 @@ interface Source {
 }
 
 function bytesToMb(text: string): number {
-  // Ruwe maat: één teken is in de praktijk ongeveer één byte voor deze feeds.
+  // Ruwe maat: één teken is in de praktijk ongeveer één byte voor deze exports.
   return text.length / (1024 * 1024);
 }
 
@@ -86,7 +87,7 @@ function Preview({ s, dataset }: { s: Strings; dataset: Dataset }) {
  * Kolommen koppelen.
  *
  * Alleen de kolommen die wij ergens op hebben gelegd plus die de merchant zelf
- * heeft aangewezen: de volledige lijst is bij een Channable-feed honderd rijen
+ * heeft aangewezen: de volledige lijst is bij een PIM-export honderd rijen
  * lang en dan kijkt niemand er meer naar. De rest blijft bereikbaar, want een
  * niet-geplaatste kolom is hier ook te koppelen.
  */
@@ -158,40 +159,36 @@ export function UploadStep({ s, locale, onReady }: Props) {
   const [offMainThread, setOffMainThread] = useState<boolean>();
   useEffect(() => setOffMainThread(client.offMainThread), [client]);
 
-  const [sources, setSources] = useState<Partial<Record<DatasetRole, Source>>>({});
-  const [datasets, setDatasets] = useState<{ feed?: Dataset; catalog?: Dataset }>({});
+  const [source, setSource] = useState<Source>();
+  const [dataset, setDataset] = useState<Dataset>();
   const [error, setError] = useState<{ title: string; body: string; next?: string }>();
   const [progress, setProgress] = useState<Progress>();
   const [busy, setBusy] = useState(false);
   const [showMapping, setShowMapping] = useState(false);
+  const [site, setSite] = useState('');
   const [acceptedLarge, setAcceptedLarge] = useState(false);
 
-  const feedSource = sources.feed;
-  const largeMb = feedSource ? bytesToMb(feedSource.text) : 0;
+  const largeMb = source ? bytesToMb(source.text) : 0;
   const tooLarge = largeMb > LARGE_FILE_MB && !acceptedLarge;
 
-  /** Lees alles opnieuw in; dat is ook de weg terug na een correctie. */
-  async function reingest(next: Partial<Record<DatasetRole, Source>>) {
-    const feed = next.feed;
-    if (!feed) { setDatasets({}); return; }
+  /** Lees opnieuw in; dat is ook de weg terug na een correctie. */
+  async function reingest(next: Source | undefined) {
+    if (!next) { setDataset(undefined); return; }
 
     setBusy(true);
     setError(undefined);
     try {
-      const files = [
-        { role: 'feed' as const, name: feed.name, text: feed.text, overrides: feed.overrides },
-        ...(next.catalog
-          ? [{ role: 'catalog' as const, name: next.catalog.name, text: next.catalog.text, overrides: next.catalog.overrides }]
-          : []),
-      ];
-      const result = await client.ingestAll(files, setProgress);
-      setDatasets(result);
+      const result = await client.ingestCatalog(
+        { name: next.name, text: next.text, overrides: next.overrides },
+        setProgress,
+      );
+      setDataset(result);
 
-      if (Object.keys(result.feed.mapping).length === 0) {
+      if (Object.keys(result.mapping).length === 0) {
         setError({ title: s.errors.noColumns, body: s.errors.noColumnsNext });
       }
     } catch (caught) {
-      setDatasets({});
+      setDataset(undefined);
       setError({ title: s.errors.readFailed, body: (caught as Error).message });
     } finally {
       setBusy(false);
@@ -199,104 +196,44 @@ export function UploadStep({ s, locale, onReady }: Props) {
     }
   }
 
-  async function handleFile(file: File, role: DatasetRole) {
+  async function handleFile(file: File) {
     if (!/\.(csv|tsv|txt|json|ndjson|xml|rss)$/i.test(file.name)) {
       setError({ title: s.errors.wrongType, body: s.errors.wrongTypeNext });
       return;
     }
-    const text = await file.text();
-    const next = { ...sources, [role]: { name: file.name, text, overrides: {} } };
-    setSources(next);
+    const next = { name: file.name, text: await file.text(), overrides: {} };
+    setSource(next);
     setAcceptedLarge(false);
     await reingest(next);
   }
 
-  function clear(role: DatasetRole) {
-    const next = { ...sources };
-    delete next[role];
-    setSources(next);
-    void reingest(next);
+  function clear() {
+    setSource(undefined);
+    void reingest(undefined);
   }
 
-  function correct(role: DatasetRole, column: string, key: string | null | undefined) {
-    const source = sources[role];
+  function correct(column: string, key: string | null | undefined) {
     if (!source) return;
     const overrides = { ...source.overrides };
     if (key === undefined) delete overrides[column];
     else overrides[column] = key;
-    const next = { ...sources, [role]: { ...source, overrides } };
-    setSources(next);
+    const next = { ...source, overrides };
+    setSource(next);
     void reingest(next);
   }
 
   async function loadSample() {
     setBusy(true);
     try {
-      const [feedText, catalogText] = await Promise.all([
-        fetch('/sample-feed.csv').then((r) => r.text()),
-        fetch('/sample-catalog.json').then((r) => r.text()),
-      ]);
-      const next = {
-        feed: { name: 'sample-feed.csv', text: feedText, overrides: {} },
-        catalog: { name: 'sample-catalog.json', text: catalogText, overrides: {} },
-      };
-      setSources(next);
+      const text = await fetch('/sample-catalog.csv').then((r) => r.text());
+      const next = { name: 'sample-catalog.csv', text, overrides: {} };
+      setSource(next);
       await reingest(next);
     } catch (caught) {
       setError({ title: s.errors.readFailed, body: (caught as Error).message });
     } finally {
       setBusy(false);
     }
-  }
-
-  function Slot({ role, label, hint }: { role: DatasetRole; label: string; hint: string }) {
-    const dataset = datasets[role];
-    const source = sources[role];
-
-    return (
-      <div className="rounded-lg border border-line p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="font-medium">{label}</h3>
-          <span className="text-xs text-muted">{s.upload.formats}</span>
-        </div>
-        <p className="mt-1 text-sm leading-relaxed text-muted">{hint}</p>
-
-        {dataset && source ? (
-          <div className="mt-3 space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="ok">{dataset.filename}</Badge>
-              <span className="tnum text-xs text-muted">
-                {s.upload.recognised} {dataset.format} — {dataset.products.length.toLocaleString('nl-NL')}{' '}
-                {s.upload.products}, {Object.keys(dataset.mapping).length} {s.upload.mappedColumns},{' '}
-                {dataset.unmappedColumns.length} {s.upload.unmappedColumns}
-              </span>
-              <Button variant="quiet" onClick={() => clear(role)}>{s.upload.remove}</Button>
-            </div>
-            <Preview s={s} dataset={dataset} />
-            {showMapping ? (
-              <MappingEditor
-                s={s}
-                locale={locale}
-                dataset={dataset}
-                overrides={source.overrides}
-                onChange={(column, key) => correct(role, column, key)}
-              />
-            ) : null}
-          </div>
-        ) : (
-          <div className="mt-3">
-            <FileDropzone
-              id={`bestand-${role}`}
-              label={s.upload.choose}
-              hint={s.upload.drop}
-              accept=".csv,.tsv,.txt,.json,.ndjson,.xml,.rss"
-              disabled={busy}
-              onFile={(file) => void handleFile(file, role)}
-            />
-          </div>
-        )}
-      </div>
-    );
   }
 
   return (
@@ -323,12 +260,68 @@ export function UploadStep({ s, locale, onReady }: Props) {
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Slot role="feed" label={s.upload.feedLabel} hint={s.upload.feedHint} />
-        <Slot role="catalog" label={s.upload.catalogLabel} hint={s.upload.catalogHint} />
+      <div className="rounded-lg border border-line p-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="font-medium">{s.upload.catalogLabel}</h3>
+          <span className="text-xs text-muted">{s.upload.formats}</span>
+        </div>
+        <p className="mt-1 text-sm leading-relaxed text-muted">{s.upload.catalogHint}</p>
+
+        {dataset && source ? (
+          <div className="mt-3 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="ok">{dataset.filename}</Badge>
+              <span className="tnum text-xs text-muted">
+                {s.upload.recognised} {dataset.format} — {dataset.products.length.toLocaleString('nl-NL')}{' '}
+                {s.upload.products}, {Object.keys(dataset.mapping).length} {s.upload.mappedColumns},{' '}
+                {dataset.unmappedColumns.length} {s.upload.unmappedColumns}
+              </span>
+              <Button variant="quiet" onClick={clear}>{s.upload.remove}</Button>
+            </div>
+            <Preview s={s} dataset={dataset} />
+            {showMapping ? (
+              <MappingEditor
+                s={s}
+                locale={locale}
+                dataset={dataset}
+                overrides={source.overrides}
+                onChange={correct}
+              />
+            ) : null}
+          </div>
+        ) : (
+          <div className="mt-3">
+            <FileDropzone
+              id="catalogus"
+              label={s.upload.choose}
+              hint={s.upload.drop}
+              accept=".csv,.tsv,.txt,.json,.ndjson,.xml,.rss"
+              disabled={busy}
+              onFile={(file) => void handleFile(file)}
+            />
+          </div>
+        )}
       </div>
 
-      {datasets.feed ? (
+      {/* Alleen het adres, en bewust géén bestand. Het dient om de markt te
+          herkennen en om als één panelsite mee te gaan als er voor die markt nog
+          een vragenbank gebouwd moet worden. De productdata gaat nooit mee. */}
+      <div className="mt-4 rounded-lg border border-line p-4">
+        <label className="block">
+          <span className="font-medium">{s.upload.siteLabel}</span>
+          <p className="mt-1 text-sm leading-relaxed text-muted">{s.upload.siteHint}</p>
+          <input
+            type="url"
+            inputMode="url"
+            value={site}
+            onChange={(event) => setSite(event.target.value)}
+            placeholder={s.upload.sitePlaceholder}
+            className="mt-2 w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
+          />
+        </label>
+      </div>
+
+      {dataset ? (
         <div className="mt-4">
           <Button variant="secondary" onClick={() => setShowMapping(!showMapping)}>
             {showMapping ? s.upload.mappingHide : s.upload.mappingShow}
@@ -338,8 +331,8 @@ export function UploadStep({ s, locale, onReady }: Props) {
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <Button
-          onClick={() => datasets.feed && onReady(client, datasets.feed, datasets.catalog)}
-          disabled={!datasets.feed || busy || tooLarge}
+          onClick={() => dataset && onReady(client, dataset, site.trim() || undefined)}
+          disabled={!dataset || busy || tooLarge}
           loading={busy}
         >
           {busy ? s.upload.reading : s.upload.analyse}

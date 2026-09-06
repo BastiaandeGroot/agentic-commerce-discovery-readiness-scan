@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 
 const titel = 'Wat we controleren';
 const omschrijving =
-  'Welke vragen de scan stelt, hoe een gat wordt geclassificeerd, en waarom we naast je feed ook je PIM-export vragen.';
+  'Welke vragen de scan stelt, hoe een gat wordt geclassificeerd, en waarom beantwoordbaarheid iets anders is dan compleetheid.';
 
 export const metadata: Metadata = {
   title: titel,

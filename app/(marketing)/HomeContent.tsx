@@ -28,22 +28,21 @@ function SampleFragment() {
 
   if (error) return null; // Een landingspagina hoort niet te struikelen over een voorbeeld.
 
-  const acp = report?.protocols.acp;
-  const nearest = acp?.distance.find((bucket) => bucket.open > 0);
+  const nearest = report?.distance.find((bucket) => bucket.open > 0);
 
   return (
     <Card>
       <CardTitle sub={s.pages.home.sampleIntro}>{s.pages.home.sampleHeading}</CardTitle>
 
-      {!acp ? (
+      {!report ? (
         <SkeletonLines lines={4} />
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
             {[
-              { label: s.report.total, value: acp.funnel.total },
-              { label: s.report.findable, value: acp.funnel.findable },
-              { label: s.report.competitive, value: acp.funnel.competitive },
+              { label: s.report.total, value: report.funnel.total },
+              { label: s.report.qualified, value: report.funnel.qualified },
+              { label: s.report.findable, value: report.funnel.findable },
             ].map((row) => (
               <div key={row.label}>
                 <p className="tnum text-2xl font-semibold">{n(row.value)}</p>
@@ -53,10 +52,10 @@ function SampleFragment() {
           </div>
 
           <div className="mt-4 flex items-center gap-3 border-t border-line pt-4">
-            <TrafficLight status={statusOf(acp.funnel.avgAnswered, acp.funnel.avgApplicable)} />
+            <TrafficLight status={statusOf(report.funnel.avgAnswered, report.funnel.avgApplicable)} />
             <p className="tnum text-sm text-muted">
-              {acp.funnel.avgAnswered.toFixed(1)} {s.report.statusScale}{' '}
-              {acp.funnel.avgApplicable.toFixed(0)} {s.report.statusAnswered}
+              {report.funnel.avgAnswered.toFixed(1)} {s.report.statusScale}{' '}
+              {report.funnel.avgApplicable.toFixed(0)} {s.report.statusAnswered}
             </p>
           </div>
 

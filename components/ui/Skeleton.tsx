@@ -3,7 +3,7 @@
 /**
  * Laadtoestand in de vorm van wat er komt.
  *
- * Geen spinner in het midden: een merchant die zijn feed laat analyseren wil
+ * Geen spinner in het midden: een merchant die zijn catalogus laat analyseren wil
  * zien dat er een rapport aankomt, niet dat er iets draait. De maten komen mee
  * als Tailwind-klassen zodat een skeleton de echte rij kan nadoen.
  */

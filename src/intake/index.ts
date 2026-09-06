@@ -1,11 +1,11 @@
-// Intake: van aangeleverd bestand naar een genormaliseerde dataset.
+// Intake: van aangeleverde catalogusexport naar een genormaliseerde dataset.
 //
-// Een merchant levert altijd minstens een feed aan, en mogelijk daarnaast een
-// catalogus-export uit het PIM. Beide gaan door dezelfde molen; alleen de rol
-// verschilt. Die tweede bron is wat gap-attributie mogelijk maakt (§7): zonder
-// catalogus kunnen we niet zien of een gat een mappingfout of een echt gat is.
+// Eén bron, en dat is met opzet de export uit het systeem waar de merchant zijn
+// productkennis werkelijk onderhoudt: zijn PIM of MDM, of anders Magento of
+// Shopify. Daar staat wat hij wéét van zijn producten. Een kanaalfeed is een
+// afgeleide daarvan en zou een dunner beeld geven van dezelfde catalogus.
 
-import type { Dataset, DatasetRole, ProductRecord } from '../domain/types';
+import type { Dataset, ProductRecord } from '../domain/types';
 import { parseAny } from './parse';
 import { buildMapping } from './fieldmap';
 import { isBlank, str } from './normalize';
@@ -22,7 +22,6 @@ export const PREVIEW_ROWS = 10;
 export function ingest(
   filename: string,
   text: string,
-  role: DatasetRole,
   /** Correcties van de merchant op onze kolomherkenning. */
   overrides: Record<string, string | null> = {},
 ): Dataset {
@@ -63,13 +62,13 @@ export function ingest(
     return { key: recordKey(values, index), values, unmapped: unmappedValues };
   });
 
-  // Welke canonieke velden kent deze bron überhaupt? Een kolom die bestaat maar
-  // overal leeg is, telt mee: het systeem kán het veld dragen. Dat onderscheid
-  // is precies wat "mapping gap" van "enrichment gap" scheidt.
+  // Welke canonieke velden kent deze catalogus überhaupt? Een kolom die bestaat
+  // maar overal leeg is telt mee: het systeem kán het veld dragen. Dat
+  // onderscheid is precies wat invulwerk van modelwerk scheidt — de plek bestaat
+  // al, of hij moet nog gemaakt worden.
   const presentKeys = [...new Set(Object.values(mapping))];
 
   return {
-    role,
     filename,
     format,
     columns: columnList,

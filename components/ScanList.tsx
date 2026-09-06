@@ -44,7 +44,6 @@ export function DeltaValue({ delta, decimals = 0, higherIsBetter = true, none }:
 export function SnapshotRow({ s, locale, snapshot, onRemove }: {
   s: Strings; locale: Locale; snapshot: ScanSnapshot; onRemove?: () => void;
 }) {
-  const acp = snapshot.protocols.acp;
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line py-3">
       <div className="min-w-0 flex-1">
@@ -55,8 +54,8 @@ export function SnapshotRow({ s, locale, snapshot, onRemove }: {
         </p>
       </div>
       <div className="tnum text-right text-xs text-muted">
-        <span className="block">{acp.avgAnswered.toFixed(1)} / {acp.avgApplicable.toFixed(0)}</span>
-        <span className="block">{n(acp.findable)} {s.report.findable}</span>
+        <span className="block">{snapshot.avgAnswered.toFixed(1)} / {snapshot.avgApplicable.toFixed(0)}</span>
+        <span className="block">{n(snapshot.findable)} {s.report.findable}</span>
       </div>
       <Badge tone="neutral">v{snapshot.scanVersion}</Badge>
       {onRemove ? (
@@ -69,12 +68,12 @@ export function SnapshotRow({ s, locale, snapshot, onRemove }: {
 export function ComparisonView({ s, locale, comparison }: {
   s: Strings; locale: Locale; comparison: Comparison;
 }) {
-  const acp = comparison.protocols.acp;
   const changed = comparison.scaleChanged;
   const redenen = [
     changed.scanVersion ? s.pages.dashboard.scaleScan : undefined,
-    changed.specSnapshot ? s.pages.dashboard.scaleSpec : undefined,
+    changed.fieldRegister ? s.pages.dashboard.scaleSpec : undefined,
     changed.questionSet ? s.pages.dashboard.scaleQuestions : undefined,
+    changed.bank ? s.pages.dashboard.scaleBank : undefined,
   ].filter(Boolean);
 
   return (
@@ -93,13 +92,13 @@ export function ComparisonView({ s, locale, comparison }: {
       )}
 
       <Card>
-        <CardTitle>{s.report.protocolNames.acp}</CardTitle>
+        <CardTitle>{s.pages.dashboard.deltaHeading}</CardTitle>
         <dl className="grid gap-4 sm:grid-cols-4">
           {[
-            { label: s.pages.dashboard.deltaFindable, delta: acp.findable, decimals: 0, up: true },
-            { label: s.pages.dashboard.deltaCompetitive, delta: acp.competitive, decimals: 0, up: true },
-            { label: s.pages.dashboard.deltaAvg, delta: acp.avgAnswered, decimals: 1, up: true },
-            { label: s.pages.dashboard.deltaUnmatched, delta: acp.unmatched, decimals: 0, up: false },
+            { label: s.pages.dashboard.deltaQualified, delta: comparison.qualified, decimals: 0, up: true },
+            { label: s.pages.dashboard.deltaFindable, delta: comparison.findable, decimals: 0, up: true },
+            { label: s.pages.dashboard.deltaAvg, delta: comparison.avgAnswered, decimals: 1, up: true },
+            { label: s.pages.dashboard.deltaUnmatched, delta: comparison.unmatched, decimals: 0, up: false },
           ].map((row) => (
             <div key={row.label}>
               <dt className="text-xs text-muted">{row.label}</dt>
@@ -119,7 +118,7 @@ export function ComparisonView({ s, locale, comparison }: {
       <Card>
         <CardTitle>{s.report.gapsHeading}</CardTitle>
         <ul className="space-y-2">
-          {acp.gaps.filter((gap) => gap.status !== 'unchanged').slice(0, 12).map((gap) => (
+          {comparison.gaps.filter((gap) => gap.status !== 'unchanged').slice(0, 12).map((gap) => (
             <li key={`${gap.field}-${gap.cause}`} className="flex flex-wrap items-baseline gap-2">
               <Badge tone={gap.status === 'resolved' ? 'ok' : gap.status === 'new' ? 'danger' : 'warn'}>
                 {gap.status === 'resolved' ? s.pages.dashboard.gapsResolved
@@ -138,7 +137,7 @@ export function ComparisonView({ s, locale, comparison }: {
       <Card>
         <CardTitle>{s.explorer.categoryHeading}</CardTitle>
         <ul className="space-y-2.5">
-          {acp.categories.slice(0, 8).map((category) => (
+          {comparison.categories.slice(0, 8).map((category) => (
             <li key={category.setId}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <span className="text-sm">

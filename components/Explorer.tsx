@@ -2,27 +2,27 @@
 
 // Verkenner: hetzelfde rapport op twee fijnere niveaus.
 //
-// Een feed-breed getal vertelt een merchant dat er werk is. Pas de categorie
+// Een catalogusbreed getal vertelt een merchant dat er werk is. Pas de categorie
 // zegt waar het zit, en pas het product zegt wat er precies mist — en dat is het
 // niveau waarop iemand er maandagochtend iets aan kan doen.
 
 import { useMemo, useState } from 'react';
-import type { Locale, ProductResult, Protocol, ScanReport } from '../src/domain/types';
+import type { Locale, ProductResult, ScanReport } from '../src/domain/types';
 import type { Strings } from '../src/i18n/strings';
-import { Badge, Bar, Button, Card, CardTitle, Select, TrafficLight, statusOf } from './ui';
+import { Badge, Button, Card, CardTitle, Select, TrafficLight, statusOf } from './ui';
 
 /** Stappen voor "hoeveel wil je zien"; 0 betekent alles op één pagina. */
 const PAGE_SIZES = [25, 50, 100, 250, 0];
-type Filter = 'all' | 'not-findable' | 'not-competitive' | 'unmatched';
+type Filter = 'all' | 'not-qualified' | 'not-findable' | 'unmatched';
 
 function n(value: number): string {
   return value.toLocaleString('nl-NL');
 }
 
-function CategoryTable({ s, report, protocol, locale }: {
-  s: Strings; report: ScanReport; protocol: Protocol; locale: Locale;
+function CategoryTable({ s, report, locale }: {
+  s: Strings; report: ScanReport; locale: Locale;
 }) {
-  const rows = report.protocols[protocol].categories;
+  const rows = report.categories;
   if (rows.length === 0) return null;
 
   return (
@@ -35,8 +35,8 @@ function CategoryTable({ s, report, protocol, locale }: {
               <th className="py-2 pr-3 font-medium">{s.explorer.category}</th>
               <th className="py-2 pr-3 text-right font-medium">{s.explorer.products}</th>
               <th className="py-2 pr-3 font-medium">{s.explorer.avgAnswered}</th>
+              <th className="py-2 pr-3 text-right font-medium">{s.explorer.qualifiedCol}</th>
               <th className="py-2 pr-3 text-right font-medium">{s.explorer.findableCol}</th>
-              <th className="py-2 pr-3 text-right font-medium">{s.explorer.competitiveCol}</th>
               <th className="py-2 font-medium">{s.explorer.topGaps}</th>
             </tr>
           </thead>
@@ -53,14 +53,14 @@ function CategoryTable({ s, report, protocol, locale }: {
                     </span>
                   </div>
                 </td>
+                <td className="tnum py-2.5 pr-3 text-right">{n(row.qualified)}</td>
                 <td className="tnum py-2.5 pr-3 text-right">{n(row.findable)}</td>
-                <td className="tnum py-2.5 pr-3 text-right">{n(row.competitive)}</td>
                 <td className="py-2.5">
                   <div className="flex flex-wrap gap-1">
                     {row.topGaps.map((gap) => (
                       <Badge
                         key={gap.field}
-                        tone={gap.cause === 'mapping' ? 'accent' : gap.cause === 'no-source' ? 'danger' : 'warn'}
+                        tone={gap.cause === 'unfilled' ? 'accent' : gap.cause === 'no-source' ? 'danger' : 'warn'}
                       >
                         {gap.label[locale]}
                       </Badge>
@@ -111,13 +111,13 @@ function Thumb({ s, product }: { s: Strings; product: ProductResult }) {
   );
 }
 
-function ProductRow({ s, product, protocol, locale }: {
-  s: Strings; product: ProductResult; protocol: Protocol; locale: Locale;
+function ProductRow({ s, product, locale }: {
+  s: Strings; product: ProductResult; locale: Locale;
 }) {
   const [open, setOpen] = useState(false);
-  const result = product.perProtocol[protocol];
-  const answered = result.questions.filter((q) => q.answered).length;
-  const unanswered = result.questions.filter((q) => !q.answered);
+  const scored = product.questions.filter((q) => q.scored);
+  const answered = scored.filter((q) => q.answered).length;
+  const unanswered = scored.filter((q) => !q.answered);
 
   return (
     <li className="border-b border-line/60 py-3">
@@ -132,13 +132,13 @@ function ProductRow({ s, product, protocol, locale }: {
           ) : (
             <>
               <span className="tnum text-xs text-muted">
-                {answered}/{result.questions.length} {s.explorer.answered}
+                {answered}/{scored.length} {s.explorer.answered}
               </span>
-              <Badge tone={result.findable ? 'ok' : 'neutral'}>
-                {result.findable ? s.explorer.findableYes : s.explorer.findableNo}
+              <Badge tone={product.qualified ? 'ok' : 'warn'}>
+                {product.qualified ? s.explorer.qualifiedYes : s.explorer.qualifiedNo}
               </Badge>
-              <Badge tone={result.competitive ? 'ok' : 'neutral'}>
-                {result.competitive ? s.explorer.competitiveYes : s.explorer.competitiveNo}
+              <Badge tone={product.findable ? 'ok' : 'neutral'}>
+                {product.findable ? s.explorer.findableYes : s.explorer.findableNo}
               </Badge>
             </>
           )}
@@ -162,7 +162,14 @@ function ProductRow({ s, product, protocol, locale }: {
             ) : (
               <ul className="mt-1 space-y-1 text-sm">
                 {unanswered.map((q) => (
-                  <li key={q.questionId}>· {q.label[locale]}</li>
+                  <li key={q.questionId} className="flex flex-wrap items-baseline gap-1.5">
+                    {/* De toestand staat erbij, want "onbeantwoord" is geen
+                        opdracht: leeg vraagt om invullen, ontbreekt om een veld. */}
+                    <Badge tone={q.importance === 'critical' ? 'danger' : 'neutral'}>
+                      {s.report.states[q.state]}
+                    </Badge>
+                    <span className="min-w-0 flex-1">{q.label[locale]}</span>
+                  </li>
                 ))}
               </ul>
             )}
@@ -173,7 +180,7 @@ function ProductRow({ s, product, protocol, locale }: {
               {product.gaps.slice(0, 12).map((gap) => (
                 <li key={`${gap.field}-${gap.cause}`} className="flex flex-wrap items-baseline gap-1.5">
                   <Badge
-                    tone={gap.cause === 'mapping' ? 'accent' : gap.cause === 'no-source' ? 'danger' : 'warn'}
+                    tone={gap.cause === 'unfilled' ? 'accent' : gap.cause === 'no-source' ? 'danger' : 'warn'}
                   >
                     {s.report.causes[gap.cause]}
                   </Badge>
@@ -191,21 +198,20 @@ function ProductRow({ s, product, protocol, locale }: {
 export function Explorer({ s, locale, report }: {
   s: Strings; locale: Locale; report: ScanReport;
 }) {
-  const [protocol, setProtocol] = useState<Protocol>('acp');
   const [filter, setFilter] = useState<Filter>('all');
   const [category, setCategory] = useState('all');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
 
-  const categories = report.protocols[protocol].categories;
+  const categories = report.categories;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return report.products.filter((product) => {
       if (filter === 'unmatched' && !product.unmatched) return false;
-      if (filter === 'not-findable' && (product.unmatched || product.perProtocol[protocol].findable)) return false;
-      if (filter === 'not-competitive' && (product.unmatched || product.perProtocol[protocol].competitive)) return false;
+      if (filter === 'not-findable' && (product.unmatched || product.findable)) return false;
+      if (filter === 'not-qualified' && (product.unmatched || product.qualified)) return false;
       if (category !== 'all' && product.setId !== category) return false;
       if (q === '') return true;
       return (
@@ -214,7 +220,7 @@ export function Explorer({ s, locale, report }: {
         (product.category ?? '').toLowerCase().includes(q)
       );
     });
-  }, [report.products, filter, category, query, protocol]);
+  }, [report.products, filter, category, query]);
 
   // pageSize 0 is "alles": één pagina, hoeveel producten er ook staan.
   const size = pageSize === 0 ? Math.max(filtered.length, 1) : pageSize;
@@ -224,8 +230,8 @@ export function Explorer({ s, locale, report }: {
 
   const filters: { id: Filter; label: string }[] = [
     { id: 'all', label: s.explorer.filterAll },
+    { id: 'not-qualified', label: s.explorer.filterNotQualified },
     { id: 'not-findable', label: s.explorer.filterNotFindable },
-    { id: 'not-competitive', label: s.explorer.filterNotCompetitive },
     { id: 'unmatched', label: s.explorer.filterUnmatched },
   ];
 
@@ -233,29 +239,9 @@ export function Explorer({ s, locale, report }: {
     <div className="space-y-4">
       <Card>
         <CardTitle sub={s.explorer.intro}>{s.explorer.heading}</CardTitle>
-        {/* Protocolkeuze geldt voor alles hieronder: de uitkomsten verschillen
-            per protocol, dus ze door elkaar tonen zou misleiden. */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted">{s.explorer.protocol}</span>
-          <div className="flex rounded-lg border border-line bg-surface p-0.5">
-            {(['acp', 'ucp'] as Protocol[]).map((code) => (
-              <button
-                key={code}
-                type="button"
-                onClick={() => setProtocol(code)}
-                aria-pressed={protocol === code}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                  protocol === code ? 'bg-accent text-white' : 'text-muted hover:text-ink'
-                }`}
-              >
-                {s.report.protocolNames[code]}
-              </button>
-            ))}
-          </div>
-        </div>
       </Card>
 
-      <CategoryTable s={s} report={report} protocol={protocol} locale={locale} />
+      <CategoryTable s={s} report={report} locale={locale} />
 
       <Card>
         <CardTitle>{s.explorer.productHeading}</CardTitle>
@@ -301,7 +287,7 @@ export function Explorer({ s, locale, report }: {
         ) : (
           <ul>
             {shown.map((product) => (
-              <ProductRow key={product.key} s={s} product={product} protocol={protocol} locale={locale} />
+              <ProductRow key={product.key} s={s} product={product} locale={locale} />
             ))}
           </ul>
         )}

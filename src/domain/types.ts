@@ -1,8 +1,20 @@
-// Domeinmodel voor de Agentic Commerce Discovery Readiness Scan.
+// Domeinmodel voor de Product Catalog Question Readiness Scan.
 //
-// Twee ontwerpregels uit de design rationale sturen dit bestand:
-//   1. Core en Selection worden NOOIT tot één cijfer samengevoegd (§4).
-//   2. Elke bevinding draagt veld/vraag, tier, gap-oorzaak en eigenaar (§7).
+// De vraag die dit model beantwoordt is: **kan de catalogusdata van deze
+// merchant de vragen beantwoorden die een koper in zijn markt stelt?** Niet:
+// hoeveel velden zijn gevuld. Dat onderscheid stuurt elk type hieronder. Een
+// veld heeft in dit model geen waarde op zichzelf — het bestaat alleen als
+// bewijs onder een vraag, en een gat is pas een gat als er een vraag door
+// onbeantwoord blijft.
+//
+// De catalogus is de enige bron. Dat is de export uit het systeem waar de
+// merchant zijn productkennis werkelijk onderhoudt: zijn PIM of MDM, of anders
+// Magento of Shopify. Daar staat wat hij wéét van zijn producten, en dat is wat
+// hier gemeten wordt.
+
+import type {
+  Answerability, BankStatus, Importance, Intent,
+} from '../questions/bank';
 
 export type Locale = 'nl' | 'en';
 
@@ -11,16 +23,7 @@ export interface Bilingual {
   en: string;
 }
 
-/** De protocollen waartegen we meten. Copilot Checkout volgt zodra gedocumenteerd. */
-export type Protocol = 'acp' | 'ucp';
-
-/**
- * Tier-indeling. Dit is ONZE lijn, niet die van de specificaties — geen van beide
- * kent een categorie "discovery" (§3). Daarom is de indeling versie-gestempeld IP.
- */
-export type Tier = 'core' | 'selection' | 'out';
-
-/** Het systeem waar een veld normaal vandaan komt. Bepaalt de gap-eigenaar. */
+/** Het systeem waar een gegeven normaal vandaan komt. Bepaalt de gap-eigenaar. */
 export type OwnerSystem =
   | 'pim'
   | 'content'
@@ -29,21 +32,26 @@ export type OwnerSystem =
   | 'reviews'
   | 'returns'
   | 'legal'
-  | 'payments'
   | 'marketing'
   | 'ops';
 
-/** De drie gap-oorzaken uit §7 — de onderscheidende capability van de scan. */
-export type GapCause = 'mapping' | 'enrichment' | 'no-source';
+/**
+ * Waarom een antwoord ontbreekt, en daarmee wat voor werk het is.
+ *
+ * Dit is het onderscheid dat een lijst gaten tot een werkplan maakt. "Ontbreekt"
+ * is geen opdracht; deze drie zijn dat wel, en ze horen bij een andere persoon,
+ * een ander budget en een andere doorlooptijd.
+ *
+ * - `unfilled`   — je catalogus kent dit veld, maar het staat bij deze producten
+ *                  leeg. Invulwerk: de plek bestaat al.
+ * - `unmodelled` — je catalogus kent dit kenmerk helemaal niet. Modelwerk: er
+ *                  moet eerst een veld komen, en daarna pas een waarde.
+ * - `no-source`  — het komt uit een systeem dat je catalogus nooit gaat dragen,
+ *                  zoals je reviewplatform of je retourenadministratie.
+ */
+export type GapCause = 'unfilled' | 'unmodelled' | 'no-source';
 
-export interface ProtocolFieldSpec {
-  /** Veldnaam zoals de specificatie hem schrijft. */
-  name: string;
-  tier: Tier;
-  required: boolean;
-}
-
-/** Eén veld, één keer gedefinieerd, met per protocol zijn naam en tier. */
+/** Eén canoniek veld: de vocabulaire waarin bewijs wordt uitgedrukt. */
 export interface FieldDef {
   /** Interne, bron-onafhankelijke sleutel. */
   key: string;
@@ -51,8 +59,6 @@ export interface FieldDef {
   owner: OwnerSystem;
   /** Genormaliseerde kolomnamen die naar dit veld verwijzen (zie intake/fieldmap). */
   aliases: string[];
-  acp?: ProtocolFieldSpec;
-  ucp?: ProtocolFieldSpec;
   /** Toelichting waarom dit veld ertoe doet; verschijnt in het rapport. */
   note?: Bilingual;
 }
@@ -61,7 +67,7 @@ export interface FieldDef {
 
 /** Eén productrecord, teruggebracht tot canonieke sleutels. */
 export interface ProductRecord {
-  /** Interne join-sleutel: sku of item_id. */
+  /** Interne sleutel: sku of item_id. */
   key: string;
   /** Canonieke sleutel -> ruwe waarde zoals aangeleverd. */
   values: Record<string, string>;
@@ -69,10 +75,15 @@ export interface ProductRecord {
   unmapped: Record<string, string>;
 }
 
-export type DatasetRole = 'feed' | 'catalog';
-
+/**
+ * De catalogusexport, zoals wij hem lezen.
+ *
+ * `columns` en `presentKeys` dragen samen het datamodel van de merchant: welke
+ * velden zijn catalogus überhaupt kent. Dat is precies wat een gat dat leeg is
+ * onderscheidt van een gat dat niet bestaat, en daarom staan ze hier en niet
+ * alleen in de UI.
+ */
 export interface Dataset {
-  role: DatasetRole;
   /** Bestandsnaam zoals aangeleverd. */
   filename: string;
   /** Herkend formaat, bv. "CSV (puntkomma-gescheiden)". */
@@ -90,7 +101,18 @@ export interface Dataset {
   presentKeys: string[];
 }
 
-// --- Vragensets (§6) -------------------------------------------------------
+// --- Vragensets ------------------------------------------------------------
+
+/** Eén attribuut met de velden die het in een catalogus kunnen dragen. */
+export interface RequirementGroup {
+  /** Sleutel van het domeinattribuut uit de vragenbank. */
+  attributeKey: string;
+  label: Bilingual;
+  /** Canonieke veldsleutels of "attr:"-patronen. */
+  fields: string[];
+  /** 'any' = één gevuld veld volstaat; 'all' = alle velden nodig. */
+  mode: 'any' | 'all';
+}
 
 export interface Question {
   id: string;
@@ -103,8 +125,37 @@ export interface Question {
   disabled?: boolean;
   /** Toegevoegd door de merchant in plaats van door de generator. */
   custom?: boolean;
-  /** 'archetype' = uit de bibliotheek, 'custom' = door de merchant toegevoegd. */
-  origin?: 'archetype' | 'custom';
+  /** Waar de vraag vandaan komt. 'bank' = uit een vragenbank (zie questions/bank). */
+  origin?: 'bank' | 'custom';
+
+  // --- Uit de vragenbank ---------------------------------------------------
+  // Deze velden komen mee uit de bank en veranderen niet door toedoen van de
+  // merchant. Ze zijn optioneel omdat een zelf toegevoegde vraag ze niet heeft;
+  // die krijgt een standaardgewicht (zie compose.ts).
+
+  /** Weegt mee in de trechter: kritieke vragen vormen een eigen trede. */
+  importance?: Importance;
+  intent?: Intent;
+  /** Op hoeveel panelsites dit onderwerp voorkomt; null = niet onderzocht. */
+  coverage?: number | null;
+  /** Uit attributen te beantwoorden? 'no' betekent: buiten de score, wel advies. */
+  answerable?: Answerability;
+  /**
+   * Het bewijs, per domeinattribuut gegroepeerd.
+   *
+   * Twee lagen, omdat de vraag zelf twee lagen heeft: "hoeveel meter heb ik
+   * nodig" vraagt baanbreedte ÉN rapport, en elk van die twee kan uit meerdere
+   * kolommen komen. Platslaan tot één lijst maakt van die "of" een "en" en laat
+   * een merchant zakken op een alias die hij nooit hoefde te gebruiken.
+   *
+   * Staat dit er, dan is dit leidend voor het antwoord en is `requires` slechts
+   * de platgeslagen weergave ervan, voor de gaptoewijzing en het scherm.
+   */
+  evidence?: RequirementGroup[];
+  /** Beslisregel die bepaalt wat een goed antwoord is. */
+  ruleId?: string;
+  /** Verantwoording als het gewicht afwijkt van wat de dekking suggereert. */
+  weightNote?: Bilingual;
 }
 
 export interface QuestionSet {
@@ -117,15 +168,28 @@ export interface QuestionSet {
   category?: string;
   /** Hoeveel producten in deze categorie vallen. */
   productCount?: number;
-  /** Uit welk archetype de set is opgebouwd. */
-  archetypeId?: string;
-  /** Door de merchant bevestigd. Een set telt pas als hij gezien is (S6). */
+  /** Door de merchant bevestigd. Een set telt pas als hij gezien is. */
   validated?: boolean;
+
+  // --- Herkomst uit de vragenbank ------------------------------------------
+
+  /** De vertical-sleutel van de bank waaruit deze set is samengesteld. */
+  bankId?: string;
+  bankVersion?: string;
+  /**
+   * Voorlopig of bevroren. Een voorlopige bank is een terugval zonder panel en
+   * zonder domeinreview; dat hoort de merchant te zien, niet te moeten raden.
+   */
+  bankStatus?: BankStatus;
+  /** De categorie-overlay die op de basislaag lag, als die er was. */
+  overlayId?: string;
+  /** Toepassingsprofielen die binnen deze categorie gelden. */
+  profileIds?: string[];
 }
 
 export type ChangeLogAction = 'edited' | 'disabled' | 'enabled' | 'added' | 'removed';
 
-/** §6/§8: elke mutatie wordt vastgelegd — de sleutel tot vergelijkbaarheid. */
+/** Elke mutatie wordt vastgelegd — de sleutel tot vergelijkbaarheid. */
 export interface ChangeLogEntry {
   at: string;
   setId: string;
@@ -139,6 +203,13 @@ export interface QuestionSetState {
   version: number;
   sets: QuestionSet[];
   changeLog: ChangeLogEntry[];
+  /**
+   * Welke banken deze sets voedden, met hun versie en status.
+   *
+   * Staat op het rapport. Zonder dit kan een merchant niet zien of zijn cijfer
+   * bewoog omdat zijn data veranderde of omdat de bank onder hem vernieuwd is.
+   */
+  banks: { id: string; label: Bilingual; version: string; status: BankStatus }[];
 }
 
 // --- Bevindingen en rapport ------------------------------------------------
@@ -148,59 +219,92 @@ export interface Gap {
   field: string;
   /** Leesbare naam voor in het rapport; nooit het ruwe patroon tonen. */
   label: Bilingual;
-  tier: Tier;
   cause: GapCause;
   owner: OwnerSystem;
   /** Aantal producten waarop deze gap speelt. */
   affected: number;
+  /** Welke vragen hierdoor onbeantwoord blijven. Een gat zonder vraag bestaat niet. */
+  questions: string[];
 }
+
+/**
+ * De vijf toestanden waarin een vraag kan verkeren.
+ *
+ * Het verschil is niet cosmetisch: elke toestand wijst naar een andere handeling
+ * en soms naar een andere afdeling. Eén boolean gooit ze op één hoop en levert
+ * een lijst op waar niemand mee verder kan.
+ *
+ * - `answered`   — beantwoordbaar: de catalogus draagt het antwoord.
+ * - `unusable`   — onbruikbaar: het veld is gevuld maar haalt de kwaliteitsdrempel
+ *                  niet, zoals een omschrijving van vier woorden. Redactiewerk.
+ * - `incomplete` — onvolledig: een deel van het benodigde bewijs staat er, de rest
+ *                  niet. Alleen mogelijk bij een vraag die meerdere dingen vraagt.
+ * - `empty`      — leeg: het veld bestaat in de catalogus maar is bij dit product
+ *                  niet ingevuld. Invulwerk; de plek is er al.
+ * - `absent`     — ontbreekt: de catalogus kent dit kenmerk niet. Modelwerk.
+ */
+export type AnswerState = 'answered' | 'unusable' | 'incomplete' | 'empty' | 'absent';
 
 export interface QuestionOutcome {
   questionId: string;
   label: Bilingual;
-  /** Beantwoord uit de FEED — dat is wat de agent ziet. */
+  state: AnswerState;
+  /** De catalogus beantwoordt de vraag. `state === 'answered'`. */
   answered: boolean;
-  /**
-   * Niet uit de feed te beantwoorden, wél uit de catalogus. Dan is het geen gat
-   * maar onbenutte data: de feed kan verrijkt worden vanuit het PIM.
-   */
-  enrichable: boolean;
   /** Bij onbeantwoord: welke velden ontbraken. */
   missing: string[];
-}
-
-export interface ProtocolProductResult {
-  /** Alle fit-vragen van de categorie beantwoord (§5). */
-  findable: boolean;
-  /** Volledige Selection-checklist aanwezig en bruikbaar (§5). */
-  competitive: boolean;
-  questions: QuestionOutcome[];
-  selection: { id: string; label: Bilingual; present: boolean }[];
-  /** Out-tier bevindingen: buiten de score, wel gerapporteerd (§3). */
-  outWarnings: { id: string; label: Bilingual; present: boolean }[];
+  /** Het gewicht van deze vraag; 0 als hij buiten de score valt. */
+  weight: number;
+  /**
+   * Telt deze vraag mee in de trechter? Procesvragen en structuurvragen staan
+   * hier op false: ze leveren advies op maar geen enkel attribuut kan ze dragen,
+   * en meetellen zou de meting vertekenen.
+   */
+  scored: boolean;
+  importance: Importance;
 }
 
 export interface ProductResult {
   key: string;
   title?: string;
   category?: string;
-  /** Hoofdafbeelding uit de feed; een product zonder is zelf een bevinding. */
+  /** Hoofdafbeelding; een product zonder is zelf een bevinding. */
   image?: string;
   /** Toegepaste vragenset, of undefined als het product nergens op matchte. */
   setId?: string;
-  /** Product zonder categorie: geflagd en geteld, niet gescoord (§6). */
+  /** Product zonder categorie: geflagd en geteld, niet gescoord. */
   unmatched: boolean;
-  perProtocol: Record<Protocol, ProtocolProductResult>;
+  /** Alle vragen van de categorie beantwoord. */
+  findable: boolean;
+  /**
+   * Basisgeschikt: elke kritieke vraag beantwoord.
+   *
+   * Kritiek is in de methode niet "commercieel belangrijk" maar "voorkomt de
+   * fout die de koper niet kan terugdraaien" — op maat gemaakt, aangebroken
+   * verpakking, vervallen herroepingsrecht. Een product dat daar niet doorheen
+   * komt, hoort een agent niet aan te bevelen, hoe compleet de rest ook is.
+   */
+  qualified: boolean;
+  /** Som van de gewichten van alle gescoorde vragen. */
+  weight: number;
+  /** Daarvan behaald: de gewichten van de beantwoorde vragen. */
+  earned: number;
+  questions: QuestionOutcome[];
   gaps: Gap[];
 }
 
 export interface Funnel {
   total: number;
+  /** Elke kritieke vraag beantwoord. De trede vóór volledig. */
+  qualified: number;
+  /** Elke vraag van de eigen categorie beantwoord. */
   findable: number;
-  competitive: number;
-  /** Gemiddeld beantwoorde fit-vragen per product — "4 van de 12" (§2). */
+  /** Gemiddeld beantwoorde vragen per product — "4 van de 12". */
   avgAnswered: number;
   avgApplicable: number;
+  /** Hetzelfde in gewichtspunten: "34 van de 48" weegt kritiek zwaarder dan laag. */
+  avgEarned: number;
+  avgWeight: number;
 }
 
 /** Aggregatie op de eigen categorie-indeling van de merchant. */
@@ -208,21 +312,23 @@ export interface CategoryReport {
   setId: string;
   category: string;
   total: number;
+  qualified: number;
   findable: number;
-  competitive: number;
   avgAnswered: number;
   avgApplicable: number;
+  avgEarned: number;
+  avgWeight: number;
   /** De zwaarst wegende gaten binnen deze categorie. */
   topGaps: { field: string; label: Bilingual; cause: GapCause; affected: number }[];
 }
 
 /**
- * Hoe ver is een product nog van vindbaar af?
+ * Hoe ver is een product nog van volledig af?
  *
  * De trechter is binair en zegt bij de meeste merchants nul. Dat leest als een
  * dichte deur terwijl er in werkelijkheid al veel staat. Deze verdeling laat de
  * afstand zien zonder de lat te verlagen: nul open vragen is nog steeds het
- * enige dat vindbaar heet.
+ * enige dat volledig heet.
  */
 export interface DistanceBucket {
   /** Aantal vragen dat nog openstaat. */
@@ -230,45 +336,63 @@ export interface DistanceBucket {
   products: number;
 }
 
-export interface ProtocolReport {
-  protocol: Protocol;
-  funnel: Funnel;
-  /** Oplopend op aantal openstaande vragen; alleen de standen die voorkomen. */
-  distance: DistanceBucket[];
-  /** Per vraag: hoeveel producten hem beantwoorden. */
-  questionCoverage: {
-    setId: string;
-    questionId: string;
-    label: Bilingual;
-    /** Beantwoord uit de feed. */
-    answered: number;
-    /** Niet uit de feed, wel uit de catalogus: verrijkbaar. */
-    enrichable: number;
-    applicable: number;
-  }[];
-  /** Per Selection-item: hoeveel producten het hebben. */
-  selectionCoverage: { id: string; label: Bilingual; present: number; total: number }[];
-  /** Out-tier waarschuwingsblok, los van de score. */
-  outWarnings: { id: string; label: Bilingual; affected: number; note?: Bilingual }[];
-  gaps: Gap[];
-  categories: CategoryReport[];
+/** Per vraag: hoeveel producten hem beantwoorden, en waar de rest strandt. */
+export interface QuestionCoverage {
+  setId: string;
+  questionId: string;
+  label: Bilingual;
+  answered: number;
+  /** Het veld bestaat, maar staat leeg. */
+  empty: number;
+  /** Gevuld maar te mager om een antwoord te heten. */
+  unusable: number;
+  /** Deels bewijs aanwezig, deels niet. */
+  incomplete: number;
+  /** De catalogus kent het kenmerk niet. */
+  absent: number;
+  applicable: number;
+  importance: Importance;
+  /** Het gewicht dat hier per product op het spel staat. */
+  weight: number;
+  /** Telt niet mee in de trechter; staat in het adviesblok. */
+  scored: boolean;
 }
 
-/** §8: elke score verwijst naar spec-snapshot én vragenset-versie. */
+/** Elke score verwijst naar de scanregels, het veldenregister én de vragenbank. */
 export interface VersionStamp {
   /** Versie van de scanregels zelf; zonder dit is vergelijken over tijd blind. */
   scanVersion: string;
-  specSnapshot: string;
+  /** Snapshot van het veldenregister: de vocabulaire waarin bewijs is uitgedrukt. */
+  fieldRegister: string;
   questionSetVersion: number;
+  /**
+   * Een vragenbank kan onder een merchant vernieuwen — een panel dat uitgebreid
+   * wordt, een drempel die na de domeinreview verschuift. Zonder dit nummer
+   * lijkt zo'n verschuiving op vooruitgang.
+   */
+  banks: { id: string; label: Bilingual; version: string; status: BankStatus }[];
   scannedAt: string;
 }
 
 export interface ScanReport {
   stamp: VersionStamp;
-  sources: { feed: Dataset; catalog?: Dataset };
+  sources: { catalog: Dataset };
   productCount: number;
   /** Producten zonder categorie: geteld, niet gescoord. */
   unmatchedCount: number;
-  protocols: Record<Protocol, ProtocolReport>;
+  funnel: Funnel;
+  /** Oplopend op aantal openstaande vragen; alleen de standen die voorkomen. */
+  distance: DistanceBucket[];
+  questionCoverage: QuestionCoverage[];
+  /**
+   * Vragen die geen enkel attribuut kan dragen — proces, structuur, levenscyclus.
+   *
+   * Ze blijven in het rapport omdat ze advies opleveren ("bied een staal aan"),
+   * maar buiten de score, want een merchant afrekenen op iets wat per definitie
+   * niet in een catalogus past is geen meting.
+   */
+  advisory: { setId: string; questionId: string; label: Bilingual; importance: Importance }[];
+  gaps: Gap[];
+  categories: CategoryReport[];
   products: ProductResult[];
 }
