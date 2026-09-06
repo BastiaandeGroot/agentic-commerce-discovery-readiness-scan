@@ -31,7 +31,7 @@ verlaat de browser niet.
 | `src/intake/` | formaatdetectie en kolomherkenning |
 | `src/spec/` | veldenregister: kolomaliassen en eigenaar per veld |
 | `src/questions/` | vragenbanken, composer, generator, import en aanvraag |
-| `src/engine/` | join, evaluatie, checklists, rapportaggregatie |
+| `src/engine/` | categoriekeuze, evaluatie, rapportaggregatie, vergelijken |
 | `src/i18n/` | alle teksten, NL en EN naast elkaar |
 | `components/` | UI; `ui.tsx` draagt de gedeelde bouwstenen |
 | `app/` | routes |
@@ -102,7 +102,7 @@ in de browser en straks serverzijdig.
 - Verandert een regel die de uitkomst op ongewijzigde data kan veranderen, dan
   gaat `SCAN_VERSION` in `src/engine/version.ts` omhoog. Zonder dat lijkt een
   verschoven definitie op vooruitgang.
-- Elk resultaat draagt scanversie, spec-snapshot én vragenset-versie.
+- Elk resultaat draagt scanversie, veldenregister, vragenbank én vragenset-versie.
 
 ## Zwaar werk
 
@@ -136,6 +136,6 @@ login is. Achteraf toevoegen betekent een migratie op data die er al staat.
 - De motor headless draaien op echte bestanden:
   ```
   npx esbuild scripts/scan-cli.ts --bundle --platform=node --format=esm --outfile=/tmp/scan-cli.mjs
-  node --max-old-space-size=4096 /tmp/scan-cli.mjs <feed> [catalogus]
+  node --max-old-space-size=4096 /tmp/scan-cli.mjs <catalogus> [vragenbank.yaml]
   ```
 - Push naar `main` deployt automatisch naar Render.
