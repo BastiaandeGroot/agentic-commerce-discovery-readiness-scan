@@ -123,6 +123,17 @@ function QuestionRow({
                 {question.weightNote[locale]}
               </p>
             ) : null}
+            {/* Begrenst het antwoord in plaats van het gewicht te verantwoorden:
+                "alleen bij een leveranciersverklaring, nooit afleiden" gaat over
+                wat je met een gevuld veld wél en niet mag beweren. Staat er open
+                en niet achter een knop, want een claim die te ver gaat is niet
+                terug te nemen. */}
+            {question.caution ? (
+              <p className="mt-1.5 rounded-md bg-surface-2 p-2 text-xs leading-relaxed text-muted">
+                <span className="font-medium text-ink">{s.questions.caution}:</span>{' '}
+                {question.caution[locale]}
+              </p>
+            ) : null}
             {!scored ? (
               <p className="mt-1.5 rounded-md bg-surface-2 p-2 text-xs leading-relaxed text-muted">
                 {s.questions.notScoredExplain}
@@ -183,6 +194,42 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, ru
           <span className="text-muted">{s.questions.generatedNote}</span>
         </div>
         <p className="mt-2 text-xs leading-relaxed text-muted">{s.questions.importanceExplain}</p>
+
+        {/* De categorienamen van de lijst sloten niet aan op de boom van de
+            merchant, dus draagt elke set alleen de basislaag. Dat halveert de
+            meting stilletjes — de categoriespecifieke vragen zijn juist waar de
+            onomkeerbare fout in zit — en dat hoort niemand af te leiden uit een
+            lager cijfer. */}
+        {state.categoriesWithoutOverlay.length > 0 ? (
+          <div className="mt-3 rounded-lg border border-warn/40 bg-warn-soft px-3 py-2.5">
+            <p className="text-sm font-medium text-warn">{s.questions.noOverlayHeading}</p>
+            <p className="mt-1 text-xs leading-relaxed text-ink">{s.questions.noOverlayBody}</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-ink">
+              {state.categoriesWithoutOverlay.join(' · ')}
+            </p>
+            <p className="mt-1.5 text-xs leading-relaxed text-ink">{s.questions.noOverlayNext}</p>
+          </div>
+        ) : null}
+
+        {/* Wat de app zelf koppelde. Een gok van ons, dus controleerbaar: een
+            verkeerd gekoppelde kolom laat een gat verdwijnen dat er wel is. */}
+        {state.attributeMatches.length > 0 ? (
+          <div className="mt-3 rounded-lg border border-line bg-surface-2 px-3 py-2.5">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted">
+              {s.questions.matchedHeading}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">{s.questions.matchedBody}</p>
+            <ul className="mt-1.5 space-y-0.5 text-xs">
+              {state.attributeMatches.map((match) => (
+                <li key={match.key} className="flex flex-wrap items-baseline gap-1.5">
+                  <span className="font-mono text-muted">{match.key}</span>
+                  <span aria-hidden className="text-muted">→</span>
+                  <span className="font-mono">{match.columns.join(', ')}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </Card>
 
       {state.sets.map((set) => {

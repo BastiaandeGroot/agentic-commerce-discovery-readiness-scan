@@ -99,7 +99,7 @@ test('een bank uit de promptreeks wordt ingelezen met zijn herkomst', () => {
   assert.equal(bank.meta.origin, 'imported');
   assert.equal(bank.meta.panel.length, 2);
   assert.equal(bank.meta.panel[0].type, 'category-leader');
-  assert.match(bank.context.irreversibleMistake.nl, /geen herroepingsrecht/);
+  assert.match(bank.context.irreversibleMistake?.nl ?? '', /geen herroepingsrecht/);
   assert.equal(bank.context.unitOfSale, 'measure');
 
   // De Nederlandse termen worden vertaald naar het model, niet overgenomen.
@@ -299,7 +299,7 @@ test('een overlay zonder zijn basislaag zegt wat er ontbreekt', () => {
 
 test('de onomkeerbare fout mag uit herroepingsrecht en reden komen', () => {
   const { bank } = importBankSet([{ name: 'basis.yaml', text: BASIS }]);
-  assert.match(bank?.context.irreversibleMistake.nl ?? '', /vervalt.*op maat geknipt/i);
+  assert.match(bank?.context.irreversibleMistake?.nl ?? '', /vervalt.*op maat geknipt/i);
 });
 
 test('bevroren zonder panel wordt in review, en weigert niet', () => {

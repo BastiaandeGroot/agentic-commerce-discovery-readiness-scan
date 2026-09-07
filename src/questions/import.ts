@@ -134,8 +134,8 @@ function bilingual(source: Dict, key: string, warnings: string[], where: string)
 }
 
 /** Voorvoegsels waarop losse meldingen aan het eind worden samengevoegd. */
-const UNTRANSLATED = '\u0000untranslated:';
-const UNMAPPED = '\u0000unmapped:';
+export const UNTRANSLATED = '\u0000untranslated:';
+export const UNMAPPED = '\u0000unmapped:';
 
 function collect(warnings: string[], prefix: string): string[] {
   return [...new Set(warnings
@@ -151,7 +151,7 @@ function collect(warnings: string[], prefix: string): string[] {
  * doen erin, en dan leest niemand ze meer. Samengevouwen is de ontbrekende
  * mappinglaag één bevinding, en dat is precies wat het is.
  */
-function foldWarnings(warnings: string[]): string[] {
+export function foldWarnings(warnings: string[]): string[] {
   const untranslated = collect(warnings, UNTRANSLATED);
   const unmapped = collect(warnings, UNMAPPED);
   const rest = warnings.filter(
@@ -180,19 +180,23 @@ function foldWarnings(warnings: string[]): string[] {
  * kenmerk publiceert. De waarschuwing hoort de merchant te zien, want een
  * verkeerd geraden kolom telt als een gat dat er niet is.
  */
-function evidenceFor(key: string, source: Dict, warnings: string[]): string[] {
-  const explicit = strings(source.velden ?? source.fields ?? source.bewijs_velden);
-  if (explicit.length > 0) return explicit;
-
-  const names = [key, ...strings(source.benoemd_als ?? source.named_as)];
+export function patternFor(names: string[]): string[] {
   // Ontdubbelen ná het normaliseren: "Bandenmaat" en "bandenmaat" leveren
   // hetzelfde patroon op en zouden anders twee keer in de melding staan.
   const parts = [...new Set(names
     .map((name) => name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '.?'))
     .filter((part) => part.length >= 3))];
-  if (parts.length === 0) return [];
+  return parts.length > 0 ? [`attr:${parts.join('|')}`] : [];
+}
+
+function evidenceFor(key: string, source: Dict, warnings: string[]): string[] {
+  const explicit = strings(source.velden ?? source.fields ?? source.bewijs_velden);
+  if (explicit.length > 0) return explicit;
+
+  const pattern = patternFor([key, ...strings(source.benoemd_als ?? source.named_as)]);
+  if (pattern.length === 0) return [];
   warnings.push(`${UNMAPPED}${key}`);
-  return [`attr:${parts.join('|')}`];
+  return pattern;
 }
 
 function attributes(node: YamlValue, warnings: string[]): AttributeDef[] {

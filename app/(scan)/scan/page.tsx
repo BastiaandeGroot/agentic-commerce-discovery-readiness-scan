@@ -1,7 +1,7 @@
 'use client';
 
-// De app is een reeks van vier stappen: data aanleveren, de vragenbank, de
-// vragensets valideren, rapport.
+// De app is een reeks van vijf stappen: data aanleveren, de vragenlijst,
+// kenmerken koppelen, vragensets valideren, rapport.
 //
 // Die volgorde is niet cosmetisch. De sets kunnen pas bestaan als de data er is,
 // want ze gaan over de eigen categorieen van de merchant (S6). En de bank komt
@@ -12,26 +12,30 @@
 
 import { useEffect, useState } from 'react';
 import type { Dataset, QuestionSetState, ScanReport } from '../../../src/domain/types';
-import { deriveCategories, generateQuestionSets, type CategoryStat } from '../../../src/questions/generate';
+import { generateQuestionSets } from '../../../src/questions/generate';
+import type { Mapping } from '../../../src/questions/mapping';
 import { bankStore, LOCAL_ACCOUNT, type StoredBank } from '../../../src/storage/banks';
 import type { ScanClient } from '../../../src/worker/client';
 import { STRINGS } from '../../../src/i18n/strings';
 import { useLocale } from '../../../src/i18n/useLocale';
 import { UploadStep } from '../../../components/UploadStep';
 import { BankStep } from '../../../components/BankStep';
+import { MappingStep } from '../../../components/MappingStep';
 import { QuestionSetStep } from '../../../components/QuestionSetStep';
 import { ReportView } from '../../../components/ReportView';
 
-type Step = 'upload' | 'bank' | 'questions' | 'report';
+type Step = 'upload' | 'bank' | 'mapping' | 'questions' | 'report';
 
 export default function Home() {
   const [locale] = useLocale();
   const [step, setStep] = useState<Step>('upload');
   const [catalog, setCatalog] = useState<Dataset>();
-  const [site, setSite] = useState<string>();
-  const [categories, setCategories] = useState<CategoryStat[]>([]);
   const [banks, setBanks] = useState<StoredBank[]>([]);
   const [questionState, setQuestionState] = useState<QuestionSetState>();
+  // De koppeling van kenmerk naar kolom. Hij hoort bij deze catalogus en niet bij
+  // de vragenlijst, want de kolomnamen zijn van de merchant; hij wordt daarom op
+  // de bank gelegd op het moment van samenstellen en niet erin bewaard.
+  const [mapping, setMapping] = useState<Mapping>({});
   const [report, setReport] = useState<ScanReport>();
   // De client houdt de worker vast; de datasets blijven daar zodat ze niet voor
   // elke scan opnieuw door de structured clone hoeven.
@@ -45,6 +49,7 @@ export default function Home() {
   const steps: { id: Step; label: string }[] = [
     { id: 'upload', label: s.steps.upload },
     { id: 'bank', label: s.steps.bank },
+    { id: 'mapping', label: s.steps.mapping },
     { id: 'questions', label: s.steps.questions },
     { id: 'report', label: s.steps.report },
   ];
@@ -56,17 +61,25 @@ export default function Home() {
     void bankStore.list(LOCAL_ACCOUNT).then(setBanks);
   }, []);
 
-  /** Stel de sets opnieuw samen; elke bankwijziging verandert immers de vragen. */
-  function compose(nextBanks: StoredBank[], nextCatalog = catalog) {
+  /** Stel de sets opnieuw samen; elke bank- of koppelwijziging verandert de vragen. */
+  function compose(nextBanks: StoredBank[], nextCatalog = catalog, nextMapping = mapping) {
     if (!nextCatalog) return;
-    setQuestionState(generateQuestionSets(nextCatalog, nextBanks.map((entry) => entry.bank)));
+    setQuestionState(generateQuestionSets(
+      nextCatalog,
+      nextBanks.map((entry) => entry.bank),
+      nextMapping,
+    ));
   }
 
-  function handleReady(nextClient: ScanClient, nextCatalog: Dataset, nextSite?: string) {
+  /** Een gewijzigde koppeling verandert waar elk kenmerk op uitkomt. */
+  function handleMapping(next: Mapping) {
+    setMapping(next);
+    compose(banks, catalog, next);
+  }
+
+  function handleReady(nextClient: ScanClient, nextCatalog: Dataset) {
     setClient(nextClient);
     setCatalog(nextCatalog);
-    setSite(nextSite);
-    setCategories(deriveCategories(nextCatalog));
     compose(banks, nextCatalog);
     setStep('bank');
   }
@@ -101,9 +114,8 @@ export default function Home() {
   }
 
   function restart() {
-    setCatalog(undefined); setSite(undefined);
-    setCategories([]);
-    setQuestionState(undefined); setReport(undefined);
+    setCatalog(undefined);
+    setQuestionState(undefined); setReport(undefined); setMapping({});
     client?.dispose(); setClient(undefined);
     setStep('upload');
   }
@@ -137,18 +149,27 @@ export default function Home() {
       </header>
 
       <main>
-        {step === 'upload' ? <UploadStep s={s} locale={locale} onReady={handleReady} /> : null}
+        {step === 'upload' ? <UploadStep s={s} onReady={handleReady} /> : null}
 
         {step === 'bank' && questionState ? (
           <BankStep
             s={s}
             locale={locale}
-            state={questionState}
-            categories={categories}
-            merchantSite={site}
             stored={banks}
             onImport={(entry) => void handleImport(entry)}
             onRemove={(vertical) => void handleRemoveBank(vertical)}
+            onContinue={() => setStep('mapping')}
+          />
+        ) : null}
+
+        {step === 'mapping' && catalog && questionState ? (
+          <MappingStep
+            s={s}
+            locale={locale}
+            catalog={catalog}
+            state={questionState}
+            mapping={mapping}
+            onChange={handleMapping}
             onContinue={() => setStep('questions')}
           />
         ) : null}

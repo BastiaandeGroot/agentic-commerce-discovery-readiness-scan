@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { ingest } from '../src/intake/index';
 import { generateQuestionSets, deriveCategories } from '../src/questions/generate';
 import { runScan } from '../src/engine/report';
-import { importBank } from '../src/questions/import';
+import { importQuestionList } from '../src/questions/list';
 import type { QuestionBank } from '../src/questions/bank';
 
 const [catalogPath, bankPath] = process.argv.slice(2);
@@ -13,11 +13,13 @@ const t0 = Date.now();
 
 const catalog = ingest(catalogPath, readFileSync(catalogPath, 'utf8'));
 
-// Optioneel een onderzochte vragenbank meegeven; zonder valt hij terug op de
-// meegeleverde voorlopige banken, net als in de app.
+// Optioneel een vragenlijst meegeven — een tabel of de YAML uit de methode.
+// Zonder valt hij terug op de meegeleverde voorlopige banken, net als in de app.
 let banks: QuestionBank[] = [];
 if (bankPath) {
-  const result = importBank(readFileSync(bankPath, 'utf8'));
+  const result = importQuestionList([
+    { name: bankPath, text: readFileSync(bankPath, 'utf8') },
+  ]);
   if (result.errors.length > 0) {
     console.error(`BANK GEWEIGERD (${bankPath}):`);
     for (const error of result.errors) console.error(`  ${error}`);
@@ -35,6 +37,11 @@ console.log(`\nCATEGORIEEN (${categories.length}) — top 8:`);
 for (const c of categories.slice(0, 8)) console.log(`  ${String(c.count).padStart(6)}  ${c.name}`);
 
 const questions = generateQuestionSets(catalog, banks);
+console.log(`\nATTRIBUUTKOPPELING: ${questions.attributeMatches.length} gekoppeld, ${questions.blindAttributes.length} blind`);
+for (const m of questions.attributeMatches) console.log(`  ${m.basis.padEnd(12)} ${m.key.padEnd(32)} -> ${m.columns.join(', ')}`);
+if (questions.categoriesWithoutOverlay.length > 0) {
+  console.log(`ZONDER OVERLAY: ${questions.categoriesWithoutOverlay.join(', ')}`);
+}
 console.log(`\nVRAGENSETS: ${questions.sets.length}, versie ${questions.version}`);
 for (const set of questions.sets) {
   console.log(`  ${set.label.nl} (bank ${set.bankId ?? '—'} ${set.bankVersion ?? ''}, ${set.questions.length} vragen)`);

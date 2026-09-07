@@ -22,11 +22,9 @@ export const STRINGS = {
         dashboard: 'Dashboard',
       } as Record<string, string>,
       primaryAction: 'Bekijk een voorbeeldrapport',
-      skipToContent: 'Naar de inhoud',
       menu: 'Menu',
       footerNote:
         'De gratis scan draait volledig in je browser. Je bestand wordt niet geüpload en verlaat je apparaat niet.',
-      footerRights: 'Alle rechten voorbehouden.',
       appNav: {
         overview: 'Overzicht',
         scans: 'Scans',
@@ -91,7 +89,7 @@ export const STRINGS = {
           },
           {
             q: 'Hoe groot mag mijn bestand zijn?',
-            a: 'Tot ongeveer 20 MB gaat prima in de browser; daarboven waarschuwen we, want dan kan een tabblad omvallen. Grotere catalogi horen serverzijdig te draaien, en dat komt met een account.',
+            a: 'Tot ongeveer 50 MB gaat prima in de browser; daarboven waarschuwen we. Grotere catalogi horen serverzijdig te draaien, en dat komt met een account.',
           },
           {
             q: 'Wat kost het?',
@@ -113,7 +111,7 @@ export const STRINGS = {
         intro: 'Het resultaat van een scan, op een eigen adres zodat je het kunt delen.',
         notFound: 'Dit rapport bestaat niet of is verlopen',
         notFoundBody:
-          'Rapporten worden nog nergens bewaard, en dus ook niet op een adres dat je kunt doorsturen. Dat is een bewuste volgorde: opslaan betekent dat je productdata ons systeem in gaat, en daar hoort eerst een account met een bewaartermijn bij. Tot die tijd druk je een rapport af of sla je het op als pdf — dat gebeurt op je eigen apparaat. Draai de scan opnieuw om een vers rapport te krijgen.',
+          'Rapporten worden nog nergens bewaard. Druk een rapport af of sla het op als pdf; dat gebeurt op je eigen apparaat.',
         runScan: 'Nieuwe scan starten',
       },
       pricing: {
@@ -155,7 +153,7 @@ export const STRINGS = {
           'Accounts komen later. Tot die tijd draait elke scan in je browser en wordt er niets bewaard.',
         localTitle: 'Bewaard op dit apparaat',
         localBody:
-          'Je bewaarde scans staan in de opslag van deze browser en gaan nergens heen. Dat betekent ook: op een ander apparaat of na het wissen van je browsergegevens zijn ze weg, en je kunt ze niet delen. Daarvoor is een account nodig.',
+          'Je bewaarde scans staan in deze browser. Op een ander apparaat of na het wissen van je browsergegevens zijn ze weg.',
         saved: 'bewaarde scans',
         latest: 'Laatste scan',
         compareHeading: 'Twee scans naast elkaar',
@@ -190,7 +188,8 @@ export const STRINGS = {
 
     steps: {
       upload: 'Data aanleveren',
-      bank: 'Vragenbank',
+      bank: 'Vragenlijst',
+      mapping: 'Kenmerken koppelen',
       questions: 'Vragensets valideren',
       report: 'Rapport',
     },
@@ -198,44 +197,25 @@ export const STRINGS = {
     upload: {
       heading: 'Lever je productdata aan',
       intro:
-        'Eén bestand: de export uit het systeem waar je productdata onderhouden wordt. Daar staat wat je wéét van je producten, en dat is wat we meten. Zit er een kenmerk niet in je catalogus, dan kan geen enkel kanaal het doorgeven.',
+        'Eén export uit het systeem waar je productdata echt onderhouden wordt: je PIM, Magento of Shopify.',
       drop: 'Sleep je bestand hierheen of klik om te kiezen',
       previewHeading: 'Zo lezen wij je bestand',
       previewIntro:
-        'De eerste regels zoals wij ze zien. Staat hier iets scheef, dan klopt het scheidingsteken of de kopregel niet en heeft corrigeren verderop weinig zin.',
+        'De eerste regels zoals wij ze lezen. Staat hier iets scheef, dan klopt de kopregel of het scheidingsteken niet.',
       previewMore: 'en nog',
       previewRows: 'regels',
-      mappingHeading: 'Kolommen koppelen',
-      mappingIntro:
-        'Wij raden welke kolom welk veld draagt. Zit er iets fout, corrigeer het hier — jij weet wat er in je kolommen staat en wij leiden het af uit de naam.',
-      mappingColumn: 'Jouw kolom',
-      mappingField: 'Wij lezen dit als',
-      mappingSample: 'Eerste waarde',
-      mappingNone: '— niet koppelen —',
-      mappingGuessed: 'geraden',
-      mappingCorrected: 'door jou gezet',
-      mappingShow: 'Kolommen koppelen',
-      mappingHide: 'Koppeling verbergen',
-      mappingUnmappedNote:
-        'Kolommen die we niet plaatsen gaan niet verloren: juist daar zit de categoriespecifieke informatie waar de vragensets op afgaan.',
       tooLarge: 'Dit bestand is groot',
       tooLargeBody:
-        'Boven de {limit} MB wordt een scan in de browser traag en kan een tabblad omvallen. Je kunt het proberen, maar serverzijdig draaien is hiervoor gemaakt — dat komt met een account.',
+        'Boven de {limit} MB kan een scan in de browser traag worden. Je kunt het proberen.',
       tryAnyway: 'Toch in de browser proberen',
       workerOn: 'De scan draait naast de pagina, dus je scherm blijft reageren.',
       workerOff:
-        'Je browser staat geen achtergrondverwerking toe. De scan draait daarom op de pagina zelf en die kan even stilstaan.',
+        'Je browser staat geen achtergrondverwerking toe; het scherm kan even stilstaan.',
       progressReading: 'Bezig met lezen',
-      progressScanning: 'Bezig met beoordelen',
       catalogLabel: 'Je productcatalogus',
-      catalogHint: 'Een export uit je PIM of MDM, of anders uit Magento of Shopify. Neem alle kolommen mee die je hebt: een kolom die bestaat maar leeg is, is iets heel anders dan een kolom die er niet is.',
-      siteLabel: 'Adres van je webshop',
-      siteHint:
-        'Optioneel. Alleen het adres — je productdata gaat nooit mee. We gebruiken het om je markt te herkennen, en als één van de bronnen als er voor jouw markt nog een vragenbank gebouwd moet worden.',
-      sitePlaceholder: 'https://…',
+      catalogHint: 'Neem alle kolommen mee. Een kolom die leeg is, is iets anders dan een kolom die er niet is.',
       formats: 'CSV, TSV, puntkomma-CSV, JSON, NDJSON of XML',
       choose: 'Kies bestand',
-      chosen: 'Gekozen',
       remove: 'Verwijderen',
       sample: 'Gebruik een voorbeeldcatalogus',
       analyse: 'Analyseer',
@@ -245,97 +225,82 @@ export const STRINGS = {
       products: 'producten',
       mappedColumns: 'kolommen herkend',
       unmappedColumns: 'niet geplaatst',
-      showMapping: 'Toon kolomherkenning',
-      hideMapping: 'Verberg kolomherkenning',
-      sourceColumn: 'Kolom in jouw bestand',
-      mappedTo: 'Herkend als',
-      unmappedNote:
-        'Niet-geplaatste kolommen gaan niet verloren: juist daar zit de categoriespecifieke informatie waar de vragensets op afgaan.',
     },
 
     bank: {
-      heading: 'De vragenbank',
+      heading: 'Je vragenlijst',
       intro:
-        'De vragen waaraan je data wordt gemeten komen niet uit je eigen kolommen — dat zou meten of je catalogus zijn eigen velden draagt, en dat is altijd waar. Ze komen uit een vragenbank: de vragen die kopers in jouw markt stellen, opgebouwd uit een panel van vijf tot acht sites en nagekeken door iemand die het vak kent.',
-      marketNotShop:
-        'Een bank hoort bij een markt en niet bij een winkel. Daarom is hij herbruikbaar: is hij er eenmaal voor jouw markt, dan meet elke volgende winkel in dezelfde markt langs dezelfde lat, en pas dán is vergelijken zinvol.',
-      usedHeading: 'Welke bank je scan gebruikt',
-      version: 'Bankversie',
-      panel: 'Sitepanel',
-      panelNone: 'geen panel',
-      panelSites: 'sites geraadpleegd',
+        'De vragen komen niet uit je eigen kolommen maar uit een lijst voor jouw markt: wat kopers vragen voordat ze bestellen.',
+      // De status van de bank blijft in beeld op de vragensets en op het rapport:
+      // een cijfer dat langs een voorlopige lat gemeten is, mag daar niet
+      // hetzelfde uitzien als een cijfer langs een bevroren lat.
       status: {
         provisional: 'Voorlopig',
         'in-review': 'In review',
         frozen: 'Bevroren',
       } as Record<string, string>,
-      statusExplain: {
-        provisional:
-          'Deze vragen komen uit vakkennis, niet uit onderzoek naar jouw markt. Er is geen panel geraadpleegd, er staat geen dekking bij en er zijn geen beslisregels. Je krijgt een volledig rapport, maar de lat is beredeneerd en niet gemeten.',
-        'in-review':
-          'Deze bank komt uit onderzoek maar is nog niet door de domeinreview. De vragen kunnen nog verschuiven.',
-        frozen:
-          'Deze bank is opgebouwd uit een sitepanel, nagekeken door een domeinexpert en daarna bevroren. Dit is de lat waarlangs elke winkel in deze markt gemeten wordt.',
-      } as Record<string, string>,
-      irreversible: 'De fout die een koper niet kan terugdraaien',
-      irreversibleWhy:
-        'Dit is de vraag waar de hele weging aan hangt. In elke markt bestaat een aankoopfout die niet te herstellen is — op maat gemaakt, verpakking open, partij uitverkocht. De vragen die díe fout voorkomen wegen het zwaarst, en dat is iets anders dan de vragen die commercieel het meest besproken worden.',
-      openPoints: 'Wat er nog open staat',
-      openPointsIntro:
-        'Punten die de domeinexpert moet beslechten. Ze staan hier omdat een onbeantwoorde vraag in de bank een uitkomst kleurt, en je dat hoort te weten voordat je op een cijfer vertrouwt.',
-      rulesHeading: 'Beslisregels',
-      rulesIntro:
-        'Drempels en rekenregels die bepalen wat een goed antwoord is. Gepubliceerd betekent: overgenomen van een marktpartij, met bron. Beredeneerd betekent: door ons ingevuld, en dus nog te bevestigen.',
-      rulePublished: 'Gepubliceerd',
-      ruleReasoned: 'Beredeneerd',
-      ruleDeviation: 'Sites die hiervan afwijken',
-      rulesNone: 'Deze bank draagt geen beslisregels. Ze komen uit de bronoogst, met de site erbij — een drempel zonder bron is erger dan geen drempel.',
-      requestHeading: 'Een bank laten bouwen voor jouw markt',
-      requestIntro:
-        'Je scan draait nu op een voorlopige bank. Hieronder staat de aanvraag: alles wat nodig is om de methode te draaien, klaar om aan een agent of onderzoeker te geven. Het resultaat lees je hier weer in, en vanaf dan meet elke scan in deze markt daarlangs.',
-      requestPrivacy:
-        'In de aanvraag staan je categorieën met hun aantallen, en het adres van je webshop als je dat hebt opgegeven. Geen producten, geen veldwaarden en geen kolomnamen. Dat is niet alleen privacy: de bank hoort gebouwd te zijn vóórdat iemand je catalogus ziet, anders sturen je bestaande velden de vragen.',
-      requestBuild: 'Aanvraag samenstellen',
-      requestCopy: 'Kopieer de aanvraag',
-      requestCopied: 'Gekopieerd',
-      requestDownload: 'Bewaar als bestand',
-      requestNotNeeded:
-        'Voor elke categorie in je catalogus ligt er al een onderzochte bank. Er is niets aan te vragen.',
-      importHeading: 'Een bank inlezen',
-      importIntro:
-        'De methode levert een bank in meerdere bestanden: een basislaag plus een overlay per categorie. Kies ze in één keer — een overlay leunt op de attributen van zijn basislaag en is los ingelezen onvolledig. We controleren de set voordat hij meetelt: een bank die zijn herkomst niet kan tonen levert een rapport op dat overtuigender oogt dan het is.',
-      layers: {
-        basis: 'Basislaag',
-        overlay: 'Overlay',
-        facets: 'Facetanalyse',
-        unknown: 'Onleesbaar',
-      } as Record<string, string>,
-      importPaste: 'Plak hier de YAML van de vragenbank',
-      importFile: 'Kies de bestanden',
-      importCheck: 'Controleer',
-      importAccept: 'Gebruik deze bank',
-      importAccepted: 'In gebruik',
-      importRemove: 'Verwijderen',
-      importEmpty: 'Er is nog geen eigen bank ingelezen.',
+      choose: 'Kies je vragenlijst',
+      drop:
+        'Sleep het bestand hierheen of klik om te kiezen. Eén regel per vraag, met in elk geval een id, de vraag en het belang.',
+      reading: 'Bezig met lezen',
+      readAs: 'Gelezen als',
+      countBase: 'basisvragen',
+      countCategories: 'categorieën',
+      countCategoryQuestions: 'categoriespecifieke vragen',
+      countAttributes: 'attributen',
+      baseExplain:
+        'Basisvragen gelden voor élk product; een categorie voegt er zijn eigen aan toe.',
+      accept: 'Gebruik deze vragenlijst',
+      inUseHeading: 'In gebruik',
+      remove: 'Verwijderen',
+      storedNote: 'Bewaard op dit apparaat.',
+      empty: 'Er is nog geen vragenlijst ingelezen.',
+      fallback:
+        'Zonder eigen lijst meten we langs een voorlopige vragenbank uit vakkennis.',
       importErrors: 'Dit moet eerst hersteld worden',
       importErrorsBody:
-        'Zolang deze punten er staan, wordt de bank niet gebruikt. Herstel ze in het YAML-bestand en lees hem opnieuw in.',
+        'Herstel deze punten in het bestand en kies het opnieuw.',
       importWarnings: 'Let hierop',
       importWarningsBody:
-        'De bank is bruikbaar, maar dit hoor je te weten voordat je op de uitkomst vertrouwt.',
-      importOk: 'Deze bank is compleet en kan gebruikt worden.',
-      storedHeading: 'Ingelezen banken',
-      storedNote: 'Bewaard op dit apparaat, net als je scans. Er gaat niets naar een server.',
+        'De lijst is bruikbaar. Dit viel op.',
       continue: 'Verder naar de vragensets',
-      skip: 'Verder met de voorlopige bank',
+      skip: 'Verder zonder eigen lijst',
     },
 
+    mapping: {
+      heading: 'Koppel je kenmerken aan je kolommen',
+      intro:
+        'Je vragenlijst noemt een kenmerk zoals het vak het noemt, je export zoals je systeem het opsloeg. Wat vanzelf te koppelen was, staat al ingevuld.',
+      countLinked: 'gekoppeld',
+      agentNote:
+        'Een AI-agent die je catalogus leest, snapt zelf wel dat `rol_breedte` de baanbreedte is. Hieronder doet een taalmodel in je browser hetzelfde, zodat we meten wat zo\'n agent bij jou zou vinden. De scan zelf rekent er niet mee: jij bevestigt de koppeling, en daarna is de uitkomst weer gewoon reproduceerbaar. Geen kolom is ook een antwoord — dan legt je catalogus dit kenmerk niet vast.',
+      suggest: 'Laat de rest herkennen',
+      suggestBusy: {
+        remote: 'Kenmerken herkennen…',
+        library: 'Model laden…',
+        model: 'Model laden…',
+        embedding: 'Kenmerken vergelijken…',
+      } as Record<string, string>,
+      byModel: 'Voorgesteld door',
+      bySelf: 'Voorgesteld door het model in je browser; er is geen sleutel ingesteld op de server.',
+      suggestNote:
+        'Hiervoor gaan je kolomnamen, een paar voorbeeldwaarden per kolom en de vragen uit je lijst naar Claude. Geen bestand, geen productrijen, geen prijzen. Kan dat niet, dan draait er een kleiner model in je browser en zie je dat erbij staan. Loop de voorstellen na — een fout voorstel kost je één klik, een gemist kenmerk kost je een gat dat je niet ziet.',
+      suggestFailed: 'Het model kon niet geladen worden',
+      suggestFailedBody:
+        'De download is niet gelukt. Dat kan aan je verbinding liggen of aan een netwerk dat hem tegenhoudt.',
+      suggestFailedNext:
+        'Probeer het opnieuw, of wijs de kenmerken hieronder zelf aan — dat werkt altijd en het resultaat is hetzelfde.',
+      proposed: 'Voorstel',
+      proposedCount: 'voorstellen. Loop ze na en gooi weg wat niet klopt.',
+      noColumn: '— geen kolom —',
+      continue: 'Verder naar de vragensets',
+    },
     questions: {
       heading: 'Vragensets valideren',
       intro:
-        'Deze sets gaan over jouw eigen categorieën. Het zijn hypotheses, geen waarheid: wij kennen jouw markt niet. Loop ze langs, pas aan wat niet klopt, vul aan wat we missen, en bevestig ze — een bevestiging kun je altijd weer intrekken.',
+        'Deze sets gaan over jouw eigen categorieën. Pas aan wat niet klopt en bevestig ze.',
       generatedNote:
-        'De drempel is een benoemde checklist, geen percentage. Deze vragen bepalen of een product bij een verzoek past.',
+        'Deze vragen bepalen of een product bij een verzoek past.',
       categoriesFound: 'categorieën gevonden in je catalogus',
       productsInCategory: 'producten',
       basedOn: 'Uit vragenbank',
@@ -345,27 +310,28 @@ export const STRINGS = {
         critical: 'Kritiek', high: 'Hoog', medium: 'Middel', low: 'Laag',
       } as Record<string, string>,
       importanceExplain:
-        'Kritiek is niet hetzelfde als commercieel belangrijk. Het zijn de vragen die de aankoopfout voorkomen die je koper niet kan terugdraaien. Blijft er daar één van open, dan haalt het product de eerste trede van de trechter niet.',
+        'Kritiek zijn de vragen die de aankoopfout voorkomen die je koper niet kan terugdraaien.',
       coverage: 'Dekking',
-      coverageOf: 'van de',
-      coverageSites: 'sites',
       coverageNone: 'niet onderzocht',
-      coverageNoneExplain:
-        'Deze vraag komt uit vakkennis en niet uit een sitepanel. Dat is iets anders dan dekking nul, wat zou betekenen dat geen enkele site in het panel dit onderwerp behandelt — dát is een vondst.',
-      coverageZeroExplain:
-        'Geen enkele site in het panel behandelt dit onderwerp, terwijl kopers de vraag wel hebben. Juist daar zit ruimte om als eerste een antwoord te geven.',
       notScored: 'Buiten de score',
       notScoredExplain:
-        'Deze vraag is niet uit productattributen te beantwoorden — hij gaat over een dienst, een proces of je assortiment. Hij blijft staan omdat er advies in zit, maar hij telt niet mee: een merchant afrekenen op iets wat per definitie niet in een catalogus past is geen meting.',
+        'Deze vraag gaat over een dienst of een proces, niet over een productkenmerk. Hij telt niet mee.',
       weightNote: 'Waarom dit gewicht',
+      caution: 'Let op bij het antwoord',
+      noOverlayHeading: 'De categorieën van je vragenlijst sluiten niet aan op je catalogus',
+      noOverlayBody:
+        'Deze categorieën krijgen alleen de basisvragen; de categoriespecifieke blijven liggen. Je cijfer valt daardoor te laag uit.',
+      noOverlayNext:
+        'Zet je eigen categorienamen in de kolom `geldt_voor` van je vragenlijst, naast de namen die er al staan.',
+      matchedHeading: 'Zelf gekoppelde kenmerken',
+      matchedBody:
+        'Deze koppelde de scan zelf, op schrijfwijze en woordbetekenis. Loop ze na.',
       intents: {
         fit: 'Geschiktheid', quantity: 'Hoeveelheid', care: 'Onderhoud',
         expectation: 'Verwachting', material: 'Materiaal', processing: 'Verwerking',
         durability: 'Duurzaamheid', safety: 'Veiligheid',
-        'purchase-certainty': 'Koopzekerheid',
+        'purchase-certainty': 'Koopzekerheid', comfort: 'Comfort', function: 'Functie',
       } as Record<string, string>,
-      provisionalSet:
-        'Deze set komt uit een voorlopige bank: vakkennis zonder panel en zonder domeinreview.',
       needs: 'Nodig',
       edit: 'Bewerk',
       save: 'Opslaan',
@@ -373,7 +339,6 @@ export const STRINGS = {
       disable: 'Uitzetten',
       enable: 'Aanzetten',
       disabled: 'Uitgezet',
-      addQuestion: 'Vraag toevoegen',
       newQuestionLabel: 'De vraag die een koper stelt',
       newQuestionField: 'Welk veld beantwoordt hem',
       add: 'Toevoegen',
@@ -397,7 +362,7 @@ export const STRINGS = {
       funnelHeading: 'De trechter',
       startHeading: 'Waar begin je?',
       startIntro:
-        'De trechter is streng: volledig betekent dat élke vraag beantwoord is. Dat zegt niet hoe ver je bent, en dat staat hier wel.',
+        'De trechter is streng: volledig betekent élke vraag beantwoord. Dit zegt hoe ver je bent.',
       startNoneFindable: 'Nog geen enkel product beantwoordt alle vragen.',
       startSomeFindable: 'producten beantwoorden al elke vraag.',
       startNearest: 'Het dichtst in de buurt:',
@@ -411,19 +376,17 @@ export const STRINGS = {
       startWinBody: 'Beantwoord je deze vragen voor je hele catalogus, dan zijn',
       startWinProducts: 'producten meteen compleet.',
       startWinNone:
-        'Deze vragen alleen zijn niet genoeg: er blijven bij elk product nog andere vragen open. Dat is geen reden om ze te laten liggen — ze zijn wel de grootste stap.',
+        'Deze vragen alleen zijn niet genoeg, maar ze zijn wel de grootste stap.',
       total: 'producten in je catalogus',
       qualified: 'basisgeschikt',
       findable: 'volledig beantwoord',
       qualifiedExplain: 'Elke kritieke vraag van de eigen categorie is beantwoord.',
       qualifiedInfo:
-        'Kan een agent je product aanbevelen zonder de koper een fout te laten maken die hij niet kan terugdraaien? Elke markt heeft zo\'n fout — stof die op maat geknipt is en dus niet terug mag, een band die gemonteerd is, een verpakking die open is. De vragen die die fout voorkomen heten kritiek, en dit is de trede waar ze allemaal beantwoord moeten zijn. Het is een lagere lat dan volledig en een hardere dan niets: een product dat hier niet doorheen komt, hoort een agent niet aan te raden, hoe compleet de rest ook is.',
+        'Kan een agent je product aanraden zonder de koper een onherstelbare fout te laten maken? De vragen die die fout voorkomen heten kritiek; op deze trede zijn ze allemaal beantwoord.',
       qualifiedNoCritical:
-        'Deze vragenset kent geen kritieke vragen, dus deze trede zegt hier niets. Dat komt doordat de bank voorlopig is: welke fout in jouw markt onomkeerbaar is, volgt uit onderzoek en niet uit vakkennis op afstand.',
+        'Deze vragenset kent geen kritieke vragen, dus deze trede zegt hier niets.',
       findableExplain: 'Elke vraag van de eigen categorie is beantwoord.',
       points: 'punten',
-      pointsScale:
-        'Gewichtspunten in plaats van vragen: een kritieke vraag telt voor vijf, hoog voor drie, middel voor twee en laag voor één. Zo weegt de vraag die de onomkeerbare fout voorkomt zwaarder dan een kleurveld. Beide schalen staan er, want het aantal vragen is meteen te bevatten en de punten zeggen wat het waard is.',
       avgPointsLine: 'en haalt daarmee',
       states: {
         answered: 'Beantwoord',
@@ -441,19 +404,21 @@ export const STRINGS = {
       } as Record<string, string>,
       advisoryHeading: 'Buiten de score: waar je data niets over kan zeggen',
       advisoryIntro:
-        'Deze vragen stelt een koper wel, maar geen enkel productattribuut kan ze beantwoorden — het gaat om een dienst, een proces of je assortiment. Ze tellen daarom niet mee in de trechter. Ze staan hier omdat het advies is: dit is wat je catalogus niet gaat oplossen en je website of je klantenservice wel.',
+        'Deze vragen stelt een koper wel, maar geen productattribuut kan ze beantwoorden. Ze tellen niet mee: dit lost je website of klantenservice op, niet je catalogus.',
       bankHeading: 'Vragenbank',
       blindHeading: 'De vragenbank sluit niet aan op je kolomnamen',
       blindBody:
-        'Deze attributen uit je vragenbank komen in geen enkele kolom van je catalogus voor. Dat betekent bijna nooit dat het kenmerk ontbreekt — het betekent meestal dat het er onder een andere naam staat, bijvoorbeeld `fabric_width` waar de bank `rolbreedte_cm` schrijft. Zolang die koppeling ontbreekt, telt elk van deze vragen als onbeantwoord terwijl het antwoord er misschien gewoon staat.',
+        'Deze kenmerken komen in geen enkele kolom van je catalogus voor. Meestal staat het er wel, onder een andere naam — en dan telt de vraag onterecht als onbeantwoord.',
       blindNext:
-        'Vul per attribuut een `velden:`-lijst in de vragenbank in met je eigen kolomnamen, en lees hem opnieuw in. Dat is de mappingstap die de methode bewust ná het bevriezen plaatst.',
+        'Ga terug naar "Kenmerken koppelen" en wijs per kenmerk je eigen kolom aan.',
       blindCount: 'attributen zonder kolom',
       bankProvisional:
-        'Dit rapport is gemeten langs een voorlopige vragenbank: vakkennis zonder sitepanel en zonder domeinreview. De cijfers kloppen met de gestelde vragen, maar of dit de vragen zijn die jouw kopers stellen is beredeneerd en niet onderzocht.',
+        'Gemeten langs een voorlopige vragenbank uit vakkennis. De cijfers kloppen met de gestelde vragen; of dit de vragen van jouw kopers zijn, is beredeneerd.',
+      bankInReview:
+        'Gemeten langs de vragenlijst die je zelf hebt aangeleverd. De cijfers kloppen met de gestelde vragen; of dit de vragen van jouw kopers zijn, staat of valt met je lijst.',
       infoLabel: 'Wat betekent dit?',
       findableInfo:
-        'Kan een agent jouw product beoordelen? Dat kan pas als élke vraag die in jouw categorie speelt uit je catalogus te beantwoorden is: samenstelling, breedte, onderhoud, waarvoor het geschikt is. Blijft er één over, dan weet de agent niet of jouw product past bij wat de koper vroeg, en laat hij het liever weg. Daarom is er geen "bijna": het zijn alle vragen, of het telt niet.',
+        'Een agent kan je product pas beoordelen als élke vraag uit je categorie te beantwoorden is. Blijft er één open, dan laat hij het liever weg. Daarom is er geen "bijna".',
       status: {
         complete: 'Alle vragen beantwoord',
         partial: 'Meer dan de helft beantwoord',
@@ -469,41 +434,34 @@ export const STRINGS = {
       } as Record<string, string>,
       statusScale: 'van de',
       statusAnswered: 'vragen beantwoord',
-      avgAnsweredLine: 'Gemiddeld beantwoordt een product',
-      avgAnsweredOf: 'van de',
-      avgAnsweredSuffix: 'fit-vragen van zijn categorie.',
-      noBlend:
-        'Core en Selection worden niet tot één cijfer samengevoegd. Een product kan perfect beschreven zijn en nooit gekozen worden; één getal verbergt welke van de twee stuk is.',
-      perProtocol: 'Per protocol apart berekend, omdat de beschikbare velden verschillen.',
       unmatched: 'producten zonder categorie',
       unmatchedExplain:
-        'Deze producten worden geteld maar niet gescoord. Een catalogus waarin een deel nergens op matcht, heeft een taxonomieprobleem dat op zichzelf het melden waard is.',
+        'Deze producten worden geteld maar niet gescoord: ze vallen in geen enkele categorie.',
       questionsHeading: 'Welke vragen blijven onbeantwoord',
       questionsIntro:
-        'De onbeantwoorde vragen zijn de werklijst. Er staat bij waar elk antwoord strandt: een veld dat bestaat maar leeg is, is een heel andere opdracht dan een kenmerk waar je catalogus geen kolom voor heeft.',
+        'Je werklijst, met erbij waar elk antwoord strandt.',
       fromFeed: 'beantwoord',
       enrichable: 'veld leeg',
       neither: 'geen veld voor',
-      answeredBy: 'beantwoord door',
       ofProducts: 'van de producten',
       gapsHeading: 'Waar komt elk gat vandaan',
       gapsIntro:
-        'Omdat "ontbreekt" geen werkopdracht is. Deze tabel zegt per gat wat voor werk het is — en welke vragen erdoor blijven liggen, want een gat zonder vraag bestaat hier niet.',
+        'Per gat: wat voor werk het is, en welke vragen erdoor blijven liggen.',
       gapsWhy:
-        'Drie uitkomsten. Invulwerk betekent dat de kolom er al is en bij deze producten leeg staat — lage inspanning, en meestal de grootste winst. Modelwerk betekent dat je catalogus dit kenmerk niet kent: er moet eerst een veld bij, en dat is een beslissing over je datamodel. Geen bron betekent dat het uit een systeem moet komen dat een catalogus niet draagt, zoals je reviewplatform — één keuze die daarna voor je hele assortiment geldt.',
+        'Invulwerk: de kolom bestaat en staat leeg — meestal de grootste winst. Modelwerk: er moet eerst een veld bij. Geen bron: het komt uit een systeem dat een catalogus niet draagt.',
       gapField: 'Veld',
       gapQuestions: 'Vragen',
       gapCause: 'Oorzaak',
       gapAffected: 'Producten',
       gapColumnInfo: {
         questions:
-          'Hoeveel vragen er door dit gat onbeantwoord blijven. Staat hier nul, dan zou het veld hier niet moeten staan — een gat bestaat in dit rapport alleen als er een kopersvraag door blijft liggen.',
+          'Hoeveel vragen er door dit gat onbeantwoord blijven.',
         field:
-          'Het gegeven dat ontbreekt. Staat er een rij met schuine strepen, dan is dat geen veldnaam uit een specificatie maar een zoekpatroon: we kijken in je eigen kolommen of een van deze woorden voorkomt, zodat je kolom "wasvoorschrift" ook meetelt als het protocol hem "care" noemt.',
+          'Het gegeven dat ontbreekt. Een rij met schuine strepen is een zoekpatroon over je eigen kolommen, geen veldnaam.',
         cause:
-          'Waarom het ontbreekt, en daarmee wat voor werk het is. Invulwerk: de kolom bestaat en staat leeg. Modelwerk: je catalogus kent het kenmerk niet en er moet eerst een veld bij. Geen bron: het komt uit een systeem dat een productcatalogus niet draagt, zoals je reviewplatform.',
+          'Waarom het ontbreekt, en daarmee wat voor werk het is.',
         affected:
-          'Hoeveel van je producten dit gat hebben. Bovenaan staat wat het zwaarst weegt maal hoeveel producten het raakt — dat is meestal ook de grootste winst per handeling, omdat één ingreep in je catalogus ze allemaal tegelijk oplost.',
+          'Hoeveel van je producten dit gat hebben. Bovenaan staat de grootste winst per handeling.',
       } as Record<string, string>,
       causes: {
         unfilled: 'Invulwerk',
@@ -525,26 +483,26 @@ export const STRINGS = {
       allAnswered: 'In deze categorie is elke vraag beantwoord.',
       stampHeading: 'Versiestempel',
       stampExplain:
-        'Een score kan bewegen zonder dat je iets deed: doordat wij de scanregels of het veldenregister aanpasten, doordat de vragenbank voor jouw markt vernieuwde, of doordat je je eigen vragenset aanpaste. Alle drie staan hieronder, zodat je echte vooruitgang kunt onderscheiden van een verschoven definitie.',
+        'Een score kan bewegen doordat wij de regels aanpasten of doordat je vragenlijst veranderde. Daarom staan alle versies erbij.',
       scanVersion: 'Scanversie',
       specSnapshot: 'Veldenregister',
       questionVersion: 'Vragenset-versie',
       bankVersion: 'Vragenbank',
       scannedAt: 'Gescand op',
       disclaimer:
-        'Deze scan meet of jouw data de vragen beantwoordt die een koper in jouw categorie stelt. Dat is een uitspraak over je eigen data, niet een voorspelling van hoe een agent rangschikt. Een agent put ook uit je website, reviews van derden, marktplaatsvermeldingen en zijn eigen trainingsdata; de catalogus is één van meerdere bronnen.',
+        'Deze scan meet of jouw data de vragen van een koper beantwoordt. Een agent put ook uit je website en reviews; je catalogus is één van meerdere bronnen.',
       saveScan: 'Bewaar deze scan',
       savedScan: 'Bewaard op dit apparaat',
       printReport: 'Afdrukken of opslaan als pdf',
       shareNote:
-        'Rapporten worden nergens bewaard: dit rapport leeft zolang je dit tabblad open hebt. Wil je het delen of bewaren, druk het dan af of sla het op als pdf — dat gebeurt op je eigen apparaat, net als de scan zelf.',
+        'Dit rapport leeft zolang dit tabblad open staat. Druk het af of sla het op als pdf om het te bewaren.',
       startOver: 'Nieuwe scan',
     },
 
     explorer: {
       heading: 'Per categorie en per product',
       intro:
-        'Eén getal over je hele catalogus zegt dát er werk is. De categorie zegt waar het zit, het product zegt wat er mist.',
+        'Eén getal zegt dát er werk is. De categorie zegt waar, het product zegt wat.',
       categoryHeading: 'Per categorie',
       category: 'Categorie',
       products: 'Producten',
@@ -584,13 +542,10 @@ export const STRINGS = {
       noColumns: 'We herkennen geen enkele kolom in dit bestand',
       noColumnsNext:
         'Controleer of de eerste regel de kolomnamen bevat en niet bijvoorbeeld een titel of een lege regel. Een export uit Excel zet daar soms een regel boven.',
-      didYouMean: 'Bedoelde je deze kolom?',
-      linkIt: 'Koppel hem',
       wrongType: 'Dit bestandstype kunnen we niet lezen',
       wrongTypeNext: 'We lezen CSV, TSV, puntkomma-CSV, JSON, NDJSON en XML. Een xlsx exporteer je eerst als CSV.',
       scanFailed: 'De scan kon niet worden uitgevoerd',
-      scanFailedNext: 'Ga terug naar de eerste stap en lever je bestand opnieuw aan. Blijft het misgaan, dan helpt het om de pagina te herladen — de scan draait in je browser en verliest zijn geheugen als een tabblad lang open staat.',
-      feedRequired: 'Lever eerst je catalogusexport aan.',
+      scanFailedNext: 'Ga terug naar de eerste stap en lever je bestand opnieuw aan. Blijft het misgaan, herlaad dan de pagina.',
       readFailed: 'Kon dit bestand niet inlezen',
     },
   },
@@ -611,11 +566,9 @@ export const STRINGS = {
         dashboard: 'Dashboard',
       } as Record<string, string>,
       primaryAction: 'See an example report',
-      skipToContent: 'Skip to content',
       menu: 'Menu',
       footerNote:
         'The free scan runs entirely in your browser. Your file is not uploaded and never leaves your device.',
-      footerRights: 'All rights reserved.',
       appNav: {
         overview: 'Overview',
         scans: 'Scans',
@@ -680,7 +633,7 @@ export const STRINGS = {
           },
           {
             q: 'How large can my file be?',
-            a: 'Up to about 20 MB is fine in the browser; above that we warn you, because a tab can fall over. Larger catalogues belong server-side, and that comes with an account.',
+            a: 'Up to about 50 MB is fine in the browser; above that we warn you. Larger catalogues belong server-side, and that comes with an account.',
           },
           {
             q: 'What does it cost?',
@@ -702,7 +655,7 @@ export const STRINGS = {
         intro: 'The result of a scan, at its own address so you can share it.',
         notFound: 'This report does not exist or has expired',
         notFoundBody:
-          'Reports are not stored anywhere yet, and therefore not at an address you can forward either. That order is deliberate: storing means your product data enters our systems, and that needs an account with a retention period first. Until then, print a report or save it as a PDF — that happens on your own device. Run the scan again to get a fresh report.',
+          'Reports are not stored anywhere yet. Print a report or save it as a PDF; that happens on your own device.',
         runScan: 'Start a new scan',
       },
       pricing: {
@@ -744,7 +697,7 @@ export const STRINGS = {
           'Accounts come later. Until then every scan runs in your browser and nothing is stored.',
         localTitle: 'Saved on this device',
         localBody:
-          'Your saved scans live in this browser\'s storage and go nowhere. Which also means: on another device, or after clearing your browsing data, they are gone — and you cannot share them. That needs an account.',
+          'Your saved scans live in this browser. On another device, or after clearing your browsing data, they are gone.',
         saved: 'saved scans',
         latest: 'Latest scan',
         compareHeading: 'Two scans side by side',
@@ -779,7 +732,8 @@ export const STRINGS = {
 
     steps: {
       upload: 'Supply data',
-      bank: 'Question bank',
+      bank: 'Question list',
+      mapping: 'Link characteristics',
       questions: 'Validate question sets',
       report: 'Report',
     },
@@ -787,26 +741,13 @@ export const STRINGS = {
     upload: {
       heading: 'Supply your product data',
       intro:
-        'One file: the export from the system where your product data is maintained. That is where you keep what you know about your products, and that is what we measure. If a characteristic is not in your catalogue, no channel can pass it on.',
+        'One export from the system where your product data is really maintained: your PIM, Magento or Shopify.',
       drop: 'Drop your file here, or click to choose one',
       previewHeading: 'How we read your file',
       previewIntro:
-        'The first rows as we see them. If something looks skewed here, the delimiter or the header row is wrong, and correcting fields below will not help.',
+        'The first rows as we read them. If anything looks off, the header row or the delimiter is wrong.',
       previewMore: 'and another',
       previewRows: 'rows',
-      mappingHeading: 'Link your columns',
-      mappingIntro:
-        'We guess which column carries which field. If we got one wrong, correct it here — you know what is in your columns, we infer it from the name.',
-      mappingColumn: 'Your column',
-      mappingField: 'We read this as',
-      mappingSample: 'First value',
-      mappingNone: '— do not link —',
-      mappingGuessed: 'guessed',
-      mappingCorrected: 'set by you',
-      mappingShow: 'Link your columns',
-      mappingHide: 'Hide linking',
-      mappingUnmappedNote:
-        'Columns we do not place are not lost: that is exactly where the category-specific information lives that the question sets rely on.',
       tooLarge: 'This is a large file',
       tooLargeBody:
         'Above {limit} MB a scan in the browser gets slow and a tab can fall over. You can try, but running server-side is built for this — that comes with an account.',
@@ -815,16 +756,10 @@ export const STRINGS = {
       workerOff:
         'Your browser does not allow background processing. The scan therefore runs on the page itself, which may briefly freeze.',
       progressReading: 'Reading',
-      progressScanning: 'Assessing',
       catalogLabel: 'Your product catalogue',
-      catalogHint: 'An export from your PIM or MDM, or otherwise from Magento or Shopify. Include every column you have: a column that exists but is empty is something quite different from a column that is not there.',
-      siteLabel: 'Address of your webshop',
-      siteHint:
-        'Optional. The address only — your product data never travels with it. We use it to recognise your market, and as one of the sources if a question bank still has to be built for that market.',
-      sitePlaceholder: 'https://…',
+      catalogHint: 'Include every column you have. A column that is empty is something other than a column that is not there.',
       formats: 'CSV, TSV, semicolon CSV, JSON, NDJSON or XML',
       choose: 'Choose file',
-      chosen: 'Selected',
       remove: 'Remove',
       sample: 'Use a sample catalogue',
       analyse: 'Analyse',
@@ -834,97 +769,79 @@ export const STRINGS = {
       products: 'products',
       mappedColumns: 'columns recognised',
       unmappedColumns: 'unplaced',
-      showMapping: 'Show column mapping',
-      hideMapping: 'Hide column mapping',
-      sourceColumn: 'Column in your file',
-      mappedTo: 'Recognised as',
-      unmappedNote:
-        'Unplaced columns are not lost: that is exactly where the category-specific information lives that the question sets draw on.',
     },
 
     bank: {
-      heading: 'The question bank',
+      heading: 'Your question list',
       intro:
-        'The questions your data is measured against do not come from your own columns — that would measure whether your catalogue carries its own fields, which is always true. They come from a question bank: the questions buyers ask in your market, built from a panel of five to eight sites and reviewed by someone who knows the trade.',
-      marketNotShop:
-        'A bank belongs to a market, not to a shop. That is what makes it reusable: once it exists for your market, every next shop in that market is measured against the same yardstick — and only then does comparing mean anything.',
-      usedHeading: 'Which bank your scan uses',
-      version: 'Bank version',
-      panel: 'Site panel',
-      panelNone: 'no panel',
-      panelSites: 'sites consulted',
+        'The questions do not come from your own columns but from a list for your market: what buyers ask before they order.',
       status: {
         provisional: 'Provisional',
         'in-review': 'In review',
         frozen: 'Frozen',
       } as Record<string, string>,
-      statusExplain: {
-        provisional:
-          'These questions come from domain knowledge, not from research into your market. No panel was consulted, there is no coverage figure and there are no decision rules. You get a full report, but the bar is reasoned rather than measured.',
-        'in-review':
-          'This bank comes from research but has not been through the domain review yet. The questions may still shift.',
-        frozen:
-          'This bank was built from a site panel, checked by a domain expert and then frozen. This is the bar every shop in this market is measured against.',
-      } as Record<string, string>,
-      irreversible: 'The mistake a buyer cannot undo',
-      irreversibleWhy:
-        'This is the question the entire weighting hangs on. Every market has a purchase mistake that cannot be repaired — made to measure, packaging opened, batch sold out. The questions that prevent that mistake weigh the most, and that is something other than the questions that get discussed most commercially.',
-      openPoints: 'What is still open',
-      openPointsIntro:
-        'Points for the domain expert to settle. They are here because an unanswered question inside the bank colours an outcome, and you should know that before you rely on a figure.',
-      rulesHeading: 'Decision rules',
-      rulesIntro:
-        'Thresholds and calculations that decide what a good answer is. Published means: taken from a market party, with its source. Reasoned means: filled in by us, and therefore still to be confirmed.',
-      rulePublished: 'Published',
-      ruleReasoned: 'Reasoned',
-      ruleDeviation: 'Sites that deviate',
-      rulesNone: 'This bank carries no decision rules. They come from the source harvest, with the site attached — a threshold without a source is worse than no threshold.',
-      requestHeading: 'Have a bank built for your market',
-      requestIntro:
-        'Your scan currently runs on a provisional bank. Below is the request: everything needed to run the method, ready to hand to an agent or researcher. You import the result here again, and from then on every scan in this market is measured against it.',
-      requestPrivacy:
-        'The request contains your categories with their counts, and the address of your webshop if you supplied one. No products, no field values and no column names. That is not only privacy: the bank should be built before anyone sees your catalogue, otherwise your existing fields steer the questions.',
-      requestBuild: 'Compose the request',
-      requestCopy: 'Copy the request',
-      requestCopied: 'Copied',
-      requestDownload: 'Save as a file',
-      requestNotNeeded:
-        'A researched bank already exists for every category in your catalogue. There is nothing to request.',
-      importHeading: 'Import a bank',
-      importIntro:
-        'The method delivers a bank across several files: a base layer plus an overlay per category. Choose them together — an overlay leans on the attributes of its base layer and is incomplete on its own. We check the set before it counts: a bank that cannot show its provenance produces a report that looks more convincing than it is.',
-      layers: {
-        basis: 'Base layer',
-        overlay: 'Overlay',
-        facets: 'Facet analysis',
-        unknown: 'Unreadable',
-      } as Record<string, string>,
-      importPaste: 'Paste the question bank YAML here',
-      importFile: 'Choose the files',
-      importCheck: 'Check',
-      importAccept: 'Use this bank',
-      importAccepted: 'In use',
-      importRemove: 'Remove',
-      importEmpty: 'No bank of your own has been imported yet.',
+      choose: 'Choose your question list',
+      drop:
+        'Drag the file here or click to choose. One row per question, with at least an id, the question and its importance.',
+      reading: 'Reading',
+      readAs: 'Read as',
+      countBase: 'base questions',
+      countCategories: 'categories',
+      countCategoryQuestions: 'category-specific questions',
+      countAttributes: 'attributes',
+      baseExplain:
+        'Base questions apply to every product; a category adds its own on top.',
+      accept: 'Use this question list',
+      inUseHeading: 'In use',
+      remove: 'Remove',
+      storedNote: 'Stored on this device.',
+      empty: 'No question list has been imported yet.',
+      fallback:
+        'Without a list of your own we measure against a provisional question bank from domain knowledge.',
       importErrors: 'This has to be repaired first',
       importErrorsBody:
-        'While these points stand, the bank is not used. Repair them in the YAML file and import it again.',
+        'Repair these points in the file and choose it again.',
       importWarnings: 'Note this',
       importWarningsBody:
-        'The bank is usable, but you should know this before you rely on the outcome.',
-      importOk: 'This bank is complete and can be used.',
-      storedHeading: 'Imported banks',
-      storedNote: 'Stored on this device, just like your scans. Nothing goes to a server.',
+        'The list is usable. This stood out.',
       continue: 'Continue to the question sets',
-      skip: 'Continue with the provisional bank',
+      skip: 'Continue without a list of your own',
     },
 
+    mapping: {
+      heading: 'Link your characteristics to your columns',
+      intro:
+        'Your question list names a characteristic the way the trade names it, your export the way your system stored it. Whatever could be linked automatically is already filled in.',
+      countLinked: 'linked',
+      agentNote:
+        'An AI agent reading your catalogue works out for itself that `rol_breedte` is the roll width. Below, a language model in your browser does the same, so we measure what such an agent would find in your data. The scan itself does not use it: you confirm the mapping, and from there the outcome is reproducible again. No column is an answer too — your catalogue simply does not record it.',
+      suggest: 'Recognise the rest',
+      suggestBusy: {
+        remote: 'Recognising characteristics…',
+        library: 'Loading the model…',
+        model: 'Loading the model…',
+        embedding: 'Comparing characteristics…',
+      } as Record<string, string>,
+      byModel: 'Proposed by',
+      bySelf: 'Proposed by the model in your browser; no key is configured on the server.',
+      suggestNote:
+        'This sends your column names, a few sample values per column, and the questions from your list to Claude. No file, no product rows, no prices. If that is unavailable, a smaller model runs in your browser and you will see that noted. Check the proposals — a wrong one costs you a click, a missed characteristic costs you a gap you cannot see.',
+      suggestFailed: 'The model could not be loaded',
+      suggestFailedBody:
+        'The download failed. That may be your connection, or a network blocking it.',
+      suggestFailedNext:
+        'Try again, or point the characteristics at their column yourself below — that always works and the result is the same.',
+      proposed: 'Proposal',
+      proposedCount: 'proposals. Check them and discard what is wrong.',
+      noColumn: '— no column —',
+      continue: 'Continue to the question sets',
+    },
     questions: {
       heading: 'Validate question sets',
       intro:
-        'These sets are about your own categories. They are hypotheses, not truth: we do not know your market. Walk through them, correct what is wrong, add what we missed, and confirm them — a confirmation can always be withdrawn.',
+        'These sets are about your own categories. Correct what is wrong and confirm them.',
       generatedNote:
-        'The threshold is a named checklist, not a percentage. These questions decide whether a product fits a request.',
+        'These questions decide whether a product fits a request.',
       categoriesFound: 'categories found in your catalogue',
       productsInCategory: 'products',
       basedOn: 'From question bank',
@@ -934,27 +851,28 @@ export const STRINGS = {
         critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low',
       } as Record<string, string>,
       importanceExplain:
-        'Critical is not the same as commercially important. These are the questions that prevent the purchase mistake your buyer cannot undo. If one of those stays open, the product does not clear the first step of the funnel.',
+        'Critical means the questions that prevent the purchase mistake your buyer cannot undo.',
       coverage: 'Coverage',
-      coverageOf: 'of',
-      coverageSites: 'sites',
       coverageNone: 'not researched',
-      coverageNoneExplain:
-        'This question comes from domain knowledge rather than a site panel. That is something other than coverage zero, which would mean no site in the panel covers this topic — and that is a finding.',
-      coverageZeroExplain:
-        'No site in the panel covers this topic, while buyers do have the question. That is precisely where there is room to be the first to answer it.',
       notScored: 'Outside the score',
       notScoredExplain:
-        'This question cannot be answered from product attributes — it is about a service, a process or your assortment. It stays because there is advice in it, but it does not count: holding a merchant to something that by definition does not fit in a catalogue is not a measurement.',
+        'This question is about a service or a process, not a product characteristic. It does not count.',
       weightNote: 'Why this weight',
+      caution: 'Note when answering',
+      noOverlayHeading: 'Your question list categories do not line up with your catalogue',
+      noOverlayBody:
+        'These categories only get the base questions; the category-specific ones are left out. Your figure comes out too low.',
+      noOverlayNext:
+        'Put your own category names into the `applies_to` column of your question list, alongside the ones already there.',
+      matchedHeading: 'Characteristics linked automatically',
+      matchedBody:
+        'The scan linked these itself, by spelling and word meaning. Check them.',
       intents: {
         fit: 'Suitability', quantity: 'Quantity', care: 'Care',
         expectation: 'Expectation', material: 'Material', processing: 'Processing',
         durability: 'Durability', safety: 'Safety',
-        'purchase-certainty': 'Purchase certainty',
+        'purchase-certainty': 'Purchase certainty', comfort: 'Comfort', function: 'Function',
       } as Record<string, string>,
-      provisionalSet:
-        'This set comes from a provisional bank: domain knowledge without a panel and without a domain review.',
       needs: 'Needs',
       edit: 'Edit',
       save: 'Save',
@@ -962,7 +880,6 @@ export const STRINGS = {
       disable: 'Disable',
       enable: 'Enable',
       disabled: 'Disabled',
-      addQuestion: 'Add question',
       newQuestionLabel: 'The question a buyer asks',
       newQuestionField: 'Which field answers it',
       add: 'Add',
@@ -1006,13 +923,11 @@ export const STRINGS = {
       findable: 'fully answered',
       qualifiedExplain: 'Every critical question for the product category is answered.',
       qualifiedInfo:
-        'Can an agent recommend your product without letting the buyer make a mistake they cannot undo? Every market has such a mistake — fabric cut to length and therefore non-returnable, a tyre already fitted, a package already opened. The questions that prevent that mistake are called critical, and this is the step where all of them have to be answered. It is a lower bar than complete and a harder one than nothing: a product that does not clear it should not be recommended, however complete the rest is.',
+        'Can an agent recommend your product without letting the buyer make a mistake they cannot undo? The questions that prevent that mistake are called critical; at this step they are all answered.',
       qualifiedNoCritical:
-        'This question set has no critical questions, so this step says nothing here. That is because the bank is provisional: which mistake is irreversible in your market follows from research, not from domain knowledge at a distance.',
+        'This question set has no critical questions, so this step says nothing here.',
       findableExplain: 'Every question for the product category is answered.',
       points: 'points',
-      pointsScale:
-        'Weight points instead of questions: a critical question counts for five, high for three, medium for two and low for one. That way the question preventing the irreversible mistake outweighs a colour field. Both scales are shown, because a count of questions is immediately graspable and the points say what it is worth.',
       avgPointsLine: 'and thereby earns',
       states: {
         answered: 'Answered',
@@ -1023,26 +938,28 @@ export const STRINGS = {
       } as Record<string, string>,
       statesExplain: {
         answered: 'Your catalogue carries the answer. This is what an agent can read.',
-        empty: 'The column exists in your catalogue but sits empty for these products. Data entry: the place is already there, and this is the cheapest win available.',
+        empty: 'The column exists but sits empty for these products. The cheapest win there is.',
         unusable: 'The field is filled, but with too little to answer the question. This asks for rewriting something that is already there.',
         incomplete: 'Part of what is needed is present. For a question that asks two things at once — width and repeat — half is not an answer.',
         absent: 'Your catalogue does not know this characteristic: there is no column for it. A field has to be added first, and only then a value.',
       } as Record<string, string>,
       advisoryHeading: 'Outside the score: what your data cannot speak to',
       advisoryIntro:
-        'Buyers do ask these questions, but no product attribute can answer them — they concern a service, a process or your assortment. They therefore do not count towards the funnel. They are here because they are advice: this is what your catalogue will not solve and your website or customer service will.',
+        'Buyers do ask these, but no product attribute can answer them. They do not count: your website or customer service solves this, not your catalogue.',
       bankHeading: 'Question bank',
       blindHeading: 'The question bank does not line up with your column names',
       blindBody:
-        'These attributes from your question bank appear in none of your catalogue columns. That almost never means the characteristic is missing — usually it is there under a different name, for instance `fabric_width` where the bank writes `rolbreedte_cm`. While that mapping is absent, each of these questions counts as unanswered while the answer may simply be there.',
+        'These characteristics appear in none of your catalogue columns. Usually they are there under a different name — and then the question counts as unanswered when it should not.',
       blindNext:
-        'Add a `velden:` list per attribute in the question bank with your own column names, and import it again. That is the mapping step the method deliberately places after freezing.',
+        'Go back to "Link characteristics" and point each characteristic at your own column.',
       blindCount: 'attributes without a column',
       bankProvisional:
-        'This report was measured against a provisional question bank: domain knowledge without a site panel and without a domain review. The figures are correct for the questions asked, but whether these are the questions your buyers ask is reasoned rather than researched.',
+        'Measured against a provisional question bank from domain knowledge. The figures are correct for the questions asked; whether these are your buyers\' questions is reasoned.',
+      bankInReview:
+        'Measured against the question list you supplied yourself. The figures are correct for the questions asked; whether these are your buyers\' questions stands or falls with your list.',
       infoLabel: 'What does this mean?',
       findableInfo:
-        'Can an agent judge your product? Only once every question that matters in your category can be answered from your catalogue: composition, width, care, what it is suitable for. Leave one unanswered and the agent cannot tell whether your product matches what the buyer asked for, so it leaves it out. That is why there is no "almost": it is every question, or it does not count.',
+        'An agent can only judge your product once every question in your category can be answered. Leave one open and it leaves the product out. That is why there is no "almost".',
       status: {
         complete: 'Every question answered',
         partial: 'More than half answered',
@@ -1052,45 +969,38 @@ export const STRINGS = {
         complete:
           'Your catalogue answers every question that matters in this category. That is what the scan aims at.',
         partial:
-          'Your catalogue already answers most questions. You are only there once they can all be answered — the last few decide whether an agent dares to recommend your product.',
+          'Your catalogue answers most questions. You are only there once they can all be answered.',
         early:
           'The basics are there, but an agent can still check too little. You are only there once every question can be answered.',
       } as Record<string, string>,
       statusScale: 'of',
       statusAnswered: 'questions answered',
-      avgAnsweredLine: 'On average a product answers',
-      avgAnsweredOf: 'of the',
-      avgAnsweredSuffix: 'fit questions for its category.',
-      noBlend:
-        'Core and Selection are never blended into one number. A product can be perfectly described and never chosen; a single figure hides which of the two is broken.',
-      perProtocol: 'Computed per protocol separately, because the available fields differ.',
       unmatched: 'products without a category',
       unmatchedExplain:
         'These products are counted but not scored. A catalogue where part of it matches nothing has a taxonomy problem worth reporting in its own right.',
       questionsHeading: 'Which questions go unanswered',
       questionsIntro:
-        'The unanswered questions are the work list. It says where each answer runs aground: a field that exists but sits empty is a quite different job from a characteristic your catalogue has no column for.',
+        'Your work list, with where each answer runs aground.',
       fromFeed: 'answered',
       enrichable: 'field empty',
       neither: 'no field for it',
-      answeredBy: 'answered by',
       ofProducts: 'of products',
       gapsHeading: 'Where each gap comes from',
       gapsIntro:
-        'Because "missing" is not a work order. This table says per gap what kind of work it is — and which questions it leaves unanswered, because a gap without a question does not exist here.',
+        'Per gap: what kind of work it is, and which questions it leaves unanswered.',
       gapsWhy:
-        'Three outcomes. Data entry means the column is already there and sits empty for these products — low effort, and usually the biggest win. Model work means your catalogue does not know this characteristic: a field has to be added, and that is a decision about your data model. No source means it has to come from a system a catalogue does not carry, such as your reviews platform — one decision that then covers your whole assortment.',
+        'Data entry: the column exists and sits empty — usually the biggest win. Model work: a field has to be added first. No source: it comes from a system a catalogue does not carry.',
       gapField: 'Field',
       gapQuestions: 'Questions',
       gapCause: 'Cause',
       gapAffected: 'Products',
       gapColumnInfo: {
         field:
-          'The piece of information that is missing. A row with slashes is not a field name from a specification but a search pattern: we look through your own columns for any of these words, so your column "wasvoorschrift" still counts when the protocol calls it "care".',
+          'The piece of information that is missing. A row with slashes is a search pattern across your own columns, not a field name.',
         cause:
-          'Why it is missing, and therefore what kind of work it is. Data entry: the column exists and sits empty. Model work: your catalogue does not know the characteristic and a field has to be added first. No source: it comes from a system a product catalogue does not carry, such as your reviews platform.',
+          'Why it is missing, and therefore what kind of work it is.',
         affected:
-          'How many of your products have this gap. The top of the list is what weighs most multiplied by how many products it touches — usually the biggest win per action too, because one change in your catalogue fixes them all at once.',
+          'How many of your products have this gap. The top of the list is the biggest win per action.',
       } as Record<string, string>,
       causes: {
         unfilled: 'Data entry',
@@ -1112,19 +1022,19 @@ export const STRINGS = {
       allAnswered: 'Every question in this category is answered.',
       stampHeading: 'Version stamp',
       stampExplain:
-        'A score can move without you doing anything: because we adjusted the scan rules or the field register, because the question bank for your market was renewed, or because you adjusted your own question set. All three are recorded below, so you can tell real progress from a shifted definition.',
+        'A score can move because we adjusted the rules or because your question list changed. That is why every version is recorded.',
       scanVersion: 'Scan version',
       specSnapshot: 'Field register',
       questionVersion: 'Question set version',
       bankVersion: 'Question bank',
       scannedAt: 'Scanned at',
       disclaimer:
-        'This scan measures whether your data answers the questions a buyer in your category asks. That is a statement about your own data, not a prediction of how an agent ranks. An agent also draws on your website, third-party reviews, marketplace listings and its own training data; the catalogue is one input of several.',
+        'This scan measures whether your data answers a buyer\'s questions. An agent also draws on your website and reviews; your catalogue is one input of several.',
       saveScan: 'Save this scan',
       savedScan: 'Saved on this device',
       printReport: 'Print or save as PDF',
       shareNote:
-        'Reports are not stored anywhere: this one lives as long as you keep this tab open. To share or keep it, print it or save it as a PDF — that happens on your own device, just like the scan itself.',
+        'This report lives as long as you keep this tab open. Print it or save it as a PDF to keep it.',
       startOver: 'New scan',
     },
 
@@ -1171,13 +1081,10 @@ export const STRINGS = {
       noColumns: 'We do not recognise a single column in this file',
       noColumnsNext:
         'Check that the first row holds the column names and not, say, a title or a blank line. An export from Excel sometimes puts a row above it.',
-      didYouMean: 'Did you mean this column?',
-      linkIt: 'Link it',
       wrongType: 'We cannot read this file type',
       wrongTypeNext: 'We read CSV, TSV, semicolon CSV, JSON, NDJSON and XML. Export an xlsx as CSV first.',
       scanFailed: 'The scan could not be run',
-      scanFailedNext: 'Go back to the first step and supply your file again. If it keeps failing, reloading the page helps — the scan runs in your browser and loses its memory when a tab stays open for a long time.',
-      feedRequired: 'Supply your catalogue export first.',
+      scanFailedNext: 'Go back to the first step and supply your file again. If it keeps failing, reload the page.',
       readFailed: 'Could not read this file',
     },
   },

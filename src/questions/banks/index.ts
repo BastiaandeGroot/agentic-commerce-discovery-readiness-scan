@@ -50,21 +50,27 @@ function matches(bank: QuestionBank, category: string): boolean {
  * De bank die bij deze categorienaam hoort.
  *
  * Onderzochte banken gaan vóór de meegeleverde, en niet alleen bij een treffer.
- * Een ingelezen bank zonder `match` is het vangnet van zijn eigen markt; zou een
- * meegeleverde bank die met een regex kunnen verslaan, dan meet een merchant die
- * net een bank liet bouwen alsnog langs onze terugval — en dan levert onderzoek
- * doen niets op. Pas als er helemaal geen ingelezen bank is, komt de terugval
- * in beeld.
+ * Zou een meegeleverde bank een ingelezen bank met een regex kunnen verslaan,
+ * dan meet een merchant die net een vragenlijst aanleverde alsnog langs onze
+ * terugval — en dan levert aanleveren niets op. Pas als er helemaal geen
+ * ingelezen bank is, komt de terugval in beeld.
  */
 export function bankFor(category: string, banks: QuestionBank[]): QuestionBank {
   const imported = banks.filter((bank) => bank.meta.origin === 'imported');
   const builtIn = banks.filter((bank) => bank.meta.origin !== 'imported');
 
-  for (const group of [imported, builtIn]) {
-    const hit = group.find((bank) => matches(bank, category));
-    if (hit) return hit;
-    const fallback = group.find((bank) => !bank.meta.match);
-    if (fallback) return fallback;
-  }
-  return GENERIC_BANK;
+  const hit = imported.find((bank) => matches(bank, category));
+  if (hit) return hit;
+  // Een ingelezen bank die op géén enkele categorie matcht, wint nog steeds van
+  // de terugval. Zijn categorienamen kunnen in een andere taal staan dan de boom
+  // van de merchant — een Engelse vragenlijst op een Nederlandse catalogus is
+  // het normale geval geworden — en dan zou stil terugvallen betekenen dat de
+  // merchant een rapport krijgt langs een lat die hij niet aanleverde, terwijl
+  // hij denkt dat zijn eigen lijst gebruikt wordt. Hij krijgt dan de basislaag
+  // zonder overlay, en `categoriesWithoutOverlay` zegt dat hardop.
+  if (imported.length > 0) return imported[0];
+
+  const builtInHit = builtIn.find((bank) => matches(bank, category));
+  if (builtInHit) return builtInHit;
+  return builtIn.find((bank) => !bank.meta.match) ?? GENERIC_BANK;
 }

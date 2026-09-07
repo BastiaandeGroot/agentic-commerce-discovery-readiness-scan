@@ -1,42 +1,57 @@
 @import "tailwindcss";
 
 /* Ontwerptokens. Licht als basis, donker als variant — de kleuren dragen
-   betekenis (tier, gap-oorzaak) en moeten in beide standen leesbaar blijven. */
+   betekenis (status, gap-oorzaak) en moeten in beide standen leesbaar blijven.
+   Alle 21 tekst-op-vlak-combinaties zijn nagerekend op WCAG AA in beide
+   standen; laagste waarde is `ok` op `ok-soft` met 4,66 in de lichte stand. */
 :root {
-  --bg: #faf7f1;
-  --surface: #fffdfa;
-  --surface-2: #f3efe6;
-  --border: #e6ded1;
-  --text: #211c15;
-  --muted: #6f6558;
-  --accent: #22684f;
-  --accent-soft: #e4efe9;
-  --warn: #9a5b12;
-  --warn-soft: #fbf0e0;
-  --danger: #8f2f2a;
-  --danger-soft: #f9e8e6;
+  --bg: #f4eee1;
+  --surface: #fdfaf4;
+  --surface-2: #ebe3d4;
+  --border: #ddd2bd;
+  --text: #221f1a;
+  --muted: #6a6156;
+  --accent: #a8451f;
+  --accent-soft: #f9e6d9;
+  /* Tekst óp het accent. Een eigen token omdat wit alleen in de lichte stand
+     werkt: in de donkere is het accent zelf licht, en dan haalt wit erop 1,9:1. */
+  --accent-ink: #ffffff;
+  --warn: #87610f;
+  --warn-soft: #faefd8;
+  --danger: #a11f2a;
+  --danger-soft: #f9e6e6;
   --ok: #3a7637;
-  --ok-soft: #eaf2e5;
+  --ok-soft: #e8f0e2;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #17150f;
-    --surface: #201d16;
-    --surface-2: #2a251d;
-    --border: #3b352b;
-    --text: #f3eee4;
-    --muted: #aca090;
-    --accent: #63c4a4;
-    --accent-soft: #18302a;
-    --warn: #d69a4e;
-    --warn-soft: #322618;
-    --danger: #e08b84;
-    --danger-soft: #311d1a;
-    --ok: #93cf82;
-    --ok-soft: #1d2c1a;
-  }
+/* Donker is opt-in en niet automatisch.
+ *
+ * Dit is gereedschap voor iemand die zijn productdata niet dagelijks in handen
+ * heeft, en dan is warm papier de juiste toon: uitnodigend, en niet het
+ * bijna-zwarte hoogcontrastvlak waar elk AI-product tegenwoordig op lijkt. Zou
+ * de systeeminstelling beslissen, dan krijgt driekwart van de bezoekers die
+ * donkere stand zonder er ooit om gevraagd te hebben.
+ *
+ * De donkere set blijft compleet en nagerekend: hij hangt aan `data-theme` en
+ * is één schakelaar van terugkomen. */
+:root[data-theme='dark'] {
+  --bg: #1a1712;
+  --surface: #231f19;
+  --surface-2: #2f2921;
+  --border: #413931;
+  --text: #f4efe6;
+  --muted: #b3a897;
+  --accent: #e58a5e;
+  --accent-soft: #3a2317;
+  --accent-ink: #1a1712;
+  --warn: #dda45a;
+  --warn-soft: #342714;
+  --danger: #ea8f8b;
+  --danger-soft: #35201f;
+  --ok: #96d184;
+  --ok-soft: #1e2d1b;
 }
+
 
 /* Schalen. Bewust kort: wie kan kiezen uit twintig tekstgroottes kiest er
    uiteindelijk vijfentwintig. Wat hier niet staat, gebruik je niet. */
@@ -91,6 +106,7 @@
   --color-muted: var(--muted);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
   --color-warn: var(--warn);
   --color-warn-soft: var(--warn-soft);
   --color-danger: var(--danger);
@@ -98,6 +114,9 @@
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
 }
+
+:root { color-scheme: light; }
+:root[data-theme='dark'] { color-scheme: dark; }
 
 body {
   background: var(--bg);

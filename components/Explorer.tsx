@@ -272,7 +272,7 @@ export function Explorer({ s, locale, report }: {
                 onClick={() => { setFilter(entry.id); setPage(0); }}
                 className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition ${
                   filter === entry.id
-                    ? 'border-transparent bg-accent text-white'
+                    ? 'border-transparent bg-accent text-accent-ink'
                     : 'border-line text-muted hover:text-ink'
                 }`}
               >

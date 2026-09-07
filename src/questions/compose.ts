@@ -82,6 +82,7 @@ export function toQuestion(
     answerable: question.answerable,
     ruleId: question.ruleId,
     weightNote: question.weightNote,
+    caution: question.caution,
   };
 }
 
