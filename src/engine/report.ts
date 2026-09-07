@@ -163,6 +163,7 @@ export function runScan(
       fieldRegister: FIELD_REGISTER_ID,
       questionSetVersion: questionState.version,
       banks: questionState.banks,
+      blindAttributes: questionState.blindAttributes,
       scannedAt: options.scannedAt,
     },
     sources: { catalog },

@@ -113,6 +113,53 @@ function splitFlow(text: string, line: number): string[] {
   return parts.map((part) => part.trim()).filter((part) => part !== '');
 }
 
+/**
+ * Staan alle haken van een flow-collectie dicht?
+ *
+ * Nodig omdat een lijst over meerdere regels mag lopen:
+ *
+ *     subcategorieen: [sierkussenstoffen, lampenkapstoffen,
+ *                      tafelkleedstoffen]
+ *
+ * Regel voor regel lezen maakt van de tweede regel een losse inspringing, en dat
+ * is precies de fout waar dit op stukliep.
+ */
+function flowBalance(text: string): number {
+  let depth = 0;
+  let quote: string | undefined;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (quote) {
+      if (char === '\\' && quote === '"') i++;
+      else if (char === quote) quote = undefined;
+      continue;
+    }
+    if (char === '"' || char === "'") quote = char;
+    else if (char === '[' || char === '{') depth++;
+    else if (char === ']' || char === '}') depth--;
+  }
+  return depth;
+}
+
+/**
+ * Voeg vervolgregels samen tot de haken dichtstaan.
+ *
+ * Levert de samengevoegde tekst plus de index van de eerste regel erna. Loopt
+ * het bestand af zonder sluithaak, dan geven we terug wat we hebben; `scalar`
+ * maakt er dan tekst van in plaats van een halve lijst.
+ */
+function joinFlow(
+  lines: Line[], start: number, first: string,
+): { text: string; next: number } {
+  let text = first;
+  let index = start + 1;
+  while (flowBalance(text) > 0 && index < lines.length) {
+    text += ` ${lines[index].text}`;
+    index++;
+  }
+  return { text, next: index };
+}
+
 function scalarKey(raw: string, line: number): string {
   const value = scalar(raw, line);
   if (typeof value !== 'string' && typeof value !== 'number') {
@@ -154,6 +201,7 @@ function parseBlock(lines: Line[], start: number, indent: number): { value: Yaml
   while (index < lines.length && lines[index].text.trim() === '') index++;
   if (index >= lines.length || lines[index].indent < indent) return { value: null, next: index };
 
+
   if (lines[index].text.startsWith('- ') || lines[index].text.trim() === '-') {
     return parseSequence(lines, index, lines[index].indent);
   }
@@ -179,6 +227,15 @@ function parseSequence(lines: Line[], start: number, indent: number): { value: Y
       continue;
     }
 
+    // Een lijstitem mag zelf een bloktekst zijn: "- >" met de regels eronder.
+    const marker = rest.trim();
+    if (marker === '|' || marker === '|-' || marker === '>' || marker === '>-') {
+      const block = readBlock(lines, index + 1, marker, indent);
+      items.push(block.value);
+      index = block.next;
+      continue;
+    }
+
     // "- key: waarde" begint een mapping die op de streep zelf inspringt.
     const key = leadingKey(rest, line.number);
     if (key !== undefined) {
@@ -190,6 +247,13 @@ function parseSequence(lines: Line[], start: number, indent: number): { value: Y
       items.push(mapping.value);
       // Eén regel is de virtuele; de rest telt door in het echte bestand.
       index = mapping.next === 0 ? index + 1 : index + mapping.next;
+      continue;
+    }
+
+    if (flowBalance(rest) > 0) {
+      const joined = joinFlow(lines, index, rest);
+      items.push(scalar(joined.text, line.number));
+      index = joined.next;
       continue;
     }
 
@@ -243,11 +307,33 @@ function parseMapping(
       continue;
     }
     if (rest === '') {
-      const block = parseBlock(lines, index + 1, indent + 1);
+      // Een lijst mag op dezelfde inspringing staan als zijn sleutel — dat is
+      // geldige YAML en het is hoe de promptreeks `vragen:` schrijft:
+      //
+      //     vragen:
+      //     - id: BAS-M01
+      //
+      // Zonder dit leest die sleutel als leeg en verdwijnt de hele vragenlijst.
+      let peek = index + 1;
+      while (peek < lines.length && lines[peek].text === '') peek++;
+      const sameLevelList = peek < lines.length
+        && lines[peek].indent === indent
+        && (lines[peek].text.startsWith('- ') || lines[peek].text === '-');
+
+      const block = parseBlock(lines, index + 1, sameLevelList ? indent : indent + 1);
       out[key] = block.value;
       index = block.next;
       continue;
     }
+
+    // Een flow-collectie mag over meerdere regels lopen.
+    if (flowBalance(rest) > 0) {
+      const joined = joinFlow(lines, index, rest);
+      out[key] = scalar(joined.text, line.number);
+      index = joined.next;
+      continue;
+    }
+
     out[key] = scalar(rest, line.number);
     index++;
   }

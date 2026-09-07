@@ -210,6 +210,16 @@ export interface QuestionSetState {
    * bewoog omdat zijn data veranderde of omdat de bank onder hem vernieuwd is.
    */
   banks: { id: string; label: Bilingual; version: string; status: BankStatus }[];
+  /**
+   * Attributen uit de bank die in deze catalogus op geen enkele kolom uitkomen.
+   *
+   * Dit is de mappinglaag die de methode ná het bevriezen plaatst, en het is de
+   * stap die het vaakst ontbreekt: een bank schrijft `rolbreedte_cm` terwijl de
+   * kolom `fabric_width` heet. Zonder dit getal leest zo'n bank als een lege
+   * catalogus, en dat is de verkeerde conclusie — het rapport moet dit hardop
+   * zeggen voordat iemand ernaar handelt.
+   */
+  blindAttributes: { key: string; label: Bilingual }[];
 }
 
 // --- Bevindingen en rapport ------------------------------------------------
@@ -371,6 +381,8 @@ export interface VersionStamp {
    * lijkt zo'n verschuiving op vooruitgang.
    */
   banks: { id: string; label: Bilingual; version: string; status: BankStatus }[];
+  /** Attributen uit de bank die op geen enkele kolom van deze catalogus slaan. */
+  blindAttributes: { key: string; label: Bilingual }[];
   scannedAt: string;
 }
 

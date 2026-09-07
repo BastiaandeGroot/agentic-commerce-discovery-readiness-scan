@@ -478,6 +478,25 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
         </div>
       ) : null}
 
+      {report.stamp.blindAttributes.length > 0 ? (
+        <div className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3">
+          <p className="font-medium text-warn">
+            {s.report.blindHeading} —{' '}
+            <span className="tnum">{report.stamp.blindAttributes.length}</span>{' '}
+            {s.report.blindCount}
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-ink">{s.report.blindBody}</p>
+          <p className="mt-2 text-sm leading-relaxed text-ink">{s.report.blindNext}</p>
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {report.stamp.blindAttributes.slice(0, 16).map((attribute) => (
+              <li key={attribute.key}>
+                <Badge tone="neutral">{attribute.key}</Badge>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-2">
         <FunnelCard s={s} report={report} />
         <NextStep s={s} report={report} locale={locale} />

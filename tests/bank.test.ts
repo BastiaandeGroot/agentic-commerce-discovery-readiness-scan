@@ -177,3 +177,25 @@ test('het rapport draagt de herkomst van elke gebruikte bank', () => {
   assert.equal(state.banks[0].status, 'provisional');
   assert.equal(state.banks[0].version, HOME_TEXTILES_BANK.meta.version);
 });
+
+test('attributen die op geen kolom slaan worden geteld en benoemd', () => {
+  // Een bank schrijft `rolbreedte_cm` terwijl de kolom `fabric_width` heet. Dan
+  // is de vraag onbeantwoord terwijl het antwoord er staat, en zonder dit getal
+  // leest zo'n bank als een lege catalogus.
+  const catalog = ingest('catalogus.csv', [
+    'sku,name,category,fabric_width',
+    '1,Meubelstof blauw,Meubelstoffen,140',
+  ].join('\n'));
+  const state = generateQuestionSets(catalog);
+
+  const keys = state.blindAttributes.map((a) => a.key);
+  // Baanbreedte staat er niet bij: het patroon zoekt onder meer op "width", en
+  // dat zit in `fabric_width`. Precies waarvoor die aliassen bestaan.
+  assert.ok(!keys.includes('roll-width'), keys.join(', '));
+  assert.ok(!keys.includes('identity'), 'titel komt uit de kolom name');
+  // Schuurweerstand wél: geen enkele kolom draagt martindale of slijtage.
+  assert.ok(keys.includes('abrasion'), keys.join(', '));
+
+  const report = runScan(catalog, state, { scannedAt: VAST_TIJDSTIP });
+  assert.deepEqual(report.stamp.blindAttributes, state.blindAttributes);
+});

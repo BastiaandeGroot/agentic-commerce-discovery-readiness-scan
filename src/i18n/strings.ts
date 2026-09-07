@@ -303,9 +303,15 @@ export const STRINGS = {
         'Voor elke categorie in je catalogus ligt er al een onderzochte bank. Er is niets aan te vragen.',
       importHeading: 'Een bank inlezen',
       importIntro:
-        'Plak de YAML uit de promptreeks, of kies het bestand. We controleren hem voordat hij meetelt: een bank die zijn herkomst niet kan tonen levert een rapport op dat overtuigender oogt dan het is.',
+        'De methode levert een bank in meerdere bestanden: een basislaag plus een overlay per categorie. Kies ze in één keer — een overlay leunt op de attributen van zijn basislaag en is los ingelezen onvolledig. We controleren de set voordat hij meetelt: een bank die zijn herkomst niet kan tonen levert een rapport op dat overtuigender oogt dan het is.',
+      layers: {
+        basis: 'Basislaag',
+        overlay: 'Overlay',
+        facets: 'Facetanalyse',
+        unknown: 'Onleesbaar',
+      } as Record<string, string>,
       importPaste: 'Plak hier de YAML van de vragenbank',
-      importFile: 'Kies een bestand',
+      importFile: 'Kies de bestanden',
       importCheck: 'Controleer',
       importAccept: 'Gebruik deze bank',
       importAccepted: 'In gebruik',
@@ -437,6 +443,12 @@ export const STRINGS = {
       advisoryIntro:
         'Deze vragen stelt een koper wel, maar geen enkel productattribuut kan ze beantwoorden — het gaat om een dienst, een proces of je assortiment. Ze tellen daarom niet mee in de trechter. Ze staan hier omdat het advies is: dit is wat je catalogus niet gaat oplossen en je website of je klantenservice wel.',
       bankHeading: 'Vragenbank',
+      blindHeading: 'De vragenbank sluit niet aan op je kolomnamen',
+      blindBody:
+        'Deze attributen uit je vragenbank komen in geen enkele kolom van je catalogus voor. Dat betekent bijna nooit dat het kenmerk ontbreekt — het betekent meestal dat het er onder een andere naam staat, bijvoorbeeld `fabric_width` waar de bank `rolbreedte_cm` schrijft. Zolang die koppeling ontbreekt, telt elk van deze vragen als onbeantwoord terwijl het antwoord er misschien gewoon staat.',
+      blindNext:
+        'Vul per attribuut een `velden:`-lijst in de vragenbank in met je eigen kolomnamen, en lees hem opnieuw in. Dat is de mappingstap die de methode bewust ná het bevriezen plaatst.',
+      blindCount: 'attributen zonder kolom',
       bankProvisional:
         'Dit rapport is gemeten langs een voorlopige vragenbank: vakkennis zonder sitepanel en zonder domeinreview. De cijfers kloppen met de gestelde vragen, maar of dit de vragen zijn die jouw kopers stellen is beredeneerd en niet onderzocht.',
       infoLabel: 'Wat betekent dit?',
@@ -880,9 +892,15 @@ export const STRINGS = {
         'A researched bank already exists for every category in your catalogue. There is nothing to request.',
       importHeading: 'Import a bank',
       importIntro:
-        'Paste the YAML from the prompt series, or choose the file. We check it before it counts: a bank that cannot show its provenance produces a report that looks more convincing than it is.',
+        'The method delivers a bank across several files: a base layer plus an overlay per category. Choose them together — an overlay leans on the attributes of its base layer and is incomplete on its own. We check the set before it counts: a bank that cannot show its provenance produces a report that looks more convincing than it is.',
+      layers: {
+        basis: 'Base layer',
+        overlay: 'Overlay',
+        facets: 'Facet analysis',
+        unknown: 'Unreadable',
+      } as Record<string, string>,
       importPaste: 'Paste the question bank YAML here',
-      importFile: 'Choose a file',
+      importFile: 'Choose the files',
       importCheck: 'Check',
       importAccept: 'Use this bank',
       importAccepted: 'In use',
@@ -1014,6 +1032,12 @@ export const STRINGS = {
       advisoryIntro:
         'Buyers do ask these questions, but no product attribute can answer them — they concern a service, a process or your assortment. They therefore do not count towards the funnel. They are here because they are advice: this is what your catalogue will not solve and your website or customer service will.',
       bankHeading: 'Question bank',
+      blindHeading: 'The question bank does not line up with your column names',
+      blindBody:
+        'These attributes from your question bank appear in none of your catalogue columns. That almost never means the characteristic is missing — usually it is there under a different name, for instance `fabric_width` where the bank writes `rolbreedte_cm`. While that mapping is absent, each of these questions counts as unanswered while the answer may simply be there.',
+      blindNext:
+        'Add a `velden:` list per attribute in the question bank with your own column names, and import it again. That is the mapping step the method deliberately places after freezing.',
+      blindCount: 'attributes without a column',
       bankProvisional:
         'This report was measured against a provisional question bank: domain knowledge without a site panel and without a domain review. The figures are correct for the questions asked, but whether these are the questions your buyers ask is reasoned rather than researched.',
       infoLabel: 'What does this mean?',

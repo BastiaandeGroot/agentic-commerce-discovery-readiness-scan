@@ -38,16 +38,33 @@ export function resolveBanks(imported: QuestionBank[] = []): QuestionBank[] {
   return [...imported, ...BUILT_IN_BANKS];
 }
 
+/** Slaat deze bank op deze categorie? */
+function matches(bank: QuestionBank, category: string): boolean {
+  if (bank.meta.match && new RegExp(bank.meta.match, 'i').test(category)) return true;
+  // Ook zonder `match` op de bank telt een overlay die op de categorie slaat:
+  // die draagt zijn categorienaam al.
+  return bank.overlays.some((overlay) => new RegExp(overlay.match, 'i').test(category));
+}
+
 /**
  * De bank die bij deze categorienaam hoort.
  *
- * Zonder match is een bank het vangnet. Is er meer dan één vangnet, dan wint het
- * eerste; dat is de ingelezen bank zodra die er is.
+ * Onderzochte banken gaan vóór de meegeleverde, en niet alleen bij een treffer.
+ * Een ingelezen bank zonder `match` is het vangnet van zijn eigen markt; zou een
+ * meegeleverde bank die met een regex kunnen verslaan, dan meet een merchant die
+ * net een bank liet bouwen alsnog langs onze terugval — en dan levert onderzoek
+ * doen niets op. Pas als er helemaal geen ingelezen bank is, komt de terugval
+ * in beeld.
  */
 export function bankFor(category: string, banks: QuestionBank[]): QuestionBank {
-  for (const bank of banks) {
-    if (!bank.meta.match) continue;
-    if (new RegExp(bank.meta.match, 'i').test(category)) return bank;
+  const imported = banks.filter((bank) => bank.meta.origin === 'imported');
+  const builtIn = banks.filter((bank) => bank.meta.origin !== 'imported');
+
+  for (const group of [imported, builtIn]) {
+    const hit = group.find((bank) => matches(bank, category));
+    if (hit) return hit;
+    const fallback = group.find((bank) => !bank.meta.match);
+    if (fallback) return fallback;
   }
-  return banks.find((bank) => !bank.meta.match) ?? GENERIC_BANK;
+  return GENERIC_BANK;
 }

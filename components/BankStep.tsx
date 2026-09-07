@@ -16,7 +16,7 @@ import { Download, FileUp, Trash2 } from 'lucide-react';
 import type { Locale, QuestionSetState } from '../src/domain/types';
 import type { QuestionBank } from '../src/questions/bank';
 import { bankFor, resolveBanks } from '../src/questions/banks';
-import { importBank, type ImportResult } from '../src/questions/import';
+import { importBankSet, layerOf, type BankFile, type ImportResult } from '../src/questions/import';
 import { buildBankRequest, needsBank, renderBankRequest } from '../src/questions/request';
 import type { CategoryStat } from '../src/questions/generate';
 import type { StoredBank } from '../src/storage/banks';
@@ -164,7 +164,10 @@ export function BankStep({
   s, locale, state, categories, merchantSite, stored, onImport, onRemove, onContinue,
 }: Props) {
   const [draft, setDraft] = useState('');
-  const [source, setSource] = useState('');
+  // De methode splitst een bank over meerdere bestanden: een basislaag plus een
+  // overlay per categorie. Ze los inlezen zou elke overlay laten zakken op
+  // attributen die in de basislaag staan, en dat is geen fout in de bank.
+  const [chosen, setChosen] = useState<BankFile[]>([]);
   const [result, setResult] = useState<ImportResult>();
   const [copied, setCopied] = useState(false);
   const [readError, setReadError] = useState<string>();
@@ -179,13 +182,15 @@ export function BankStep({
   const briefing = useMemo(() => renderBankRequest(request, locale), [request, locale]);
   const provisional = needsBank(state);
 
-  async function readFile(file: File) {
+  async function readFiles(list: FileList) {
     setReadError(undefined);
     try {
-      const text = await file.text();
-      setDraft(text);
-      setSource(file.name);
-      setResult(importBank(text));
+      const files = await Promise.all(
+        [...list].map(async (file) => ({ name: file.name, text: await file.text() })),
+      );
+      setChosen(files);
+      setDraft('');
+      setResult(importBankSet(files));
     } catch {
       setReadError(s.errors.readFailed);
     }
@@ -261,8 +266,10 @@ export function BankStep({
 
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Button
-            disabled={draft.trim() === ''}
-            onClick={() => { setSource(source || 'geplakt'); setResult(importBank(draft)); }}
+            disabled={draft.trim() === '' && chosen.length === 0}
+            onClick={() => setResult(importBankSet(
+              draft.trim() !== '' ? [{ name: 'geplakt', text: draft }] : chosen,
+            ))}
           >
             {s.bank.importCheck}
           </Button>
@@ -271,15 +278,35 @@ export function BankStep({
             {s.bank.importFile}
             <input
               type="file"
+              multiple
               accept=".yaml,.yml,.json,.txt"
               className="sr-only"
               onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void readFile(file);
+                const files = event.target.files;
+                if (files && files.length > 0) void readFiles(files);
               }}
             />
           </label>
         </div>
+
+        {/* Welke bestanden er gekozen zijn en wat voor laag ze dragen. Zonder
+            dit is niet te zien dát er een basislaag bij zit, en juist het
+            ontbreken daarvan is de fout die je het vaakst maakt. */}
+        {chosen.length > 0 ? (
+          <ul className="mt-3 space-y-1">
+            {chosen.map((file) => {
+              const layer = layerOf(file.text);
+              return (
+                <li key={file.name} className="flex flex-wrap items-center gap-2 text-xs">
+                  <Badge tone={layer === 'basis' ? 'accent' : layer === 'unknown' ? 'danger' : 'neutral'}>
+                    {s.bank.layers[layer]}
+                  </Badge>
+                  <span className="min-w-0 flex-1 truncate font-mono text-muted">{file.name}</span>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
 
         {readError ? (
           <div className="mt-3">
@@ -322,10 +349,12 @@ export function BankStep({
                     onImport({
                       accountId: 'lokaal',
                       savedAt: new Date().toISOString(),
-                      source: source || 'geplakt',
+                      source: chosen.length > 0
+                        ? chosen.map((file) => file.name).join(', ')
+                        : 'geplakt',
                       bank: result.bank,
                     });
-                    setDraft(''); setSource(''); setResult(undefined);
+                    setDraft(''); setChosen([]); setResult(undefined);
                   }}
                 >
                   {s.bank.importAccept}

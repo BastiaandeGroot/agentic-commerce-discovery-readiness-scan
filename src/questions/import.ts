@@ -22,7 +22,7 @@
 
 import type { Bilingual } from '../domain/types';
 import type {
-  AnswerType, Answerability, AttributeDef, BankQuestion, BankStatus, DecisionRule,
+  AnswerType, Answerability, ApplicationProfile, AttributeDef, BankQuestion, BankStatus, DecisionRule,
   EvidenceSource, Importance, Intent, OpenPoint, Overlay, PanelSite, PanelSiteType,
   QuestionBank,
 } from './bank';
@@ -133,20 +133,43 @@ function bilingual(source: Dict, key: string, warnings: string[], where: string)
   return { nl, en: en ?? nl };
 }
 
-/** Voorvoegsel waarop de losse taalmeldingen aan het eind worden samengevoegd. */
+/** Voorvoegsels waarop losse meldingen aan het eind worden samengevoegd. */
 const UNTRANSLATED = '\u0000untranslated:';
+const UNMAPPED = '\u0000unmapped:';
 
+function collect(warnings: string[], prefix: string): string[] {
+  return [...new Set(warnings
+    .filter((warning) => warning.startsWith(prefix))
+    .map((warning) => warning.slice(prefix.length)))];
+}
+
+/**
+ * Eén melding per soort in plaats van één per veld.
+ *
+ * Bij een echte bank zijn dit er honderden — elk attribuut zonder veldkoppeling
+ * levert er een op. Los getoond verdrinken de waarschuwingen die er wél toe
+ * doen erin, en dan leest niemand ze meer. Samengevouwen is de ontbrekende
+ * mappinglaag één bevinding, en dat is precies wat het is.
+ */
 function foldWarnings(warnings: string[]): string[] {
-  const untranslated = warnings
-    .filter((warning) => warning.startsWith(UNTRANSLATED))
-    .map((warning) => warning.slice(UNTRANSLATED.length));
-  const rest = warnings.filter((warning) => !warning.startsWith(UNTRANSLATED));
-  if (untranslated.length === 0) return rest;
-  const unique = [...new Set(untranslated)];
-  return [
-    ...rest,
-    `${unique.length} onderde${unique.length === 1 ? 'el heeft' : 'len hebben'} geen Engelse tekst; daar staat de Nederlandse nu in beide talen. Het gaat om: ${unique.slice(0, 6).join(', ')}${unique.length > 6 ? ` en ${unique.length - 6} meer` : ''}.`,
-  ];
+  const untranslated = collect(warnings, UNTRANSLATED);
+  const unmapped = collect(warnings, UNMAPPED);
+  const rest = warnings.filter(
+    (warning) => !warning.startsWith(UNTRANSLATED) && !warning.startsWith(UNMAPPED),
+  );
+
+  const folded = [...rest];
+  if (unmapped.length > 0) {
+    folded.push(
+      `${unmapped.length} attribu${unmapped.length === 1 ? 'ut heeft' : 'ten hebben'} geen \`velden:\`-koppeling. Er wordt dan gezocht op de attribuutnaam zelf, en dat is een gok: heet de kolom in je catalogus anders, dan telt het kenmerk als ontbrekend terwijl het er staat. Het gaat om: ${unmapped.slice(0, 8).join(', ')}${unmapped.length > 8 ? ` en ${unmapped.length - 8} meer` : ''}.`,
+    );
+  }
+  if (untranslated.length > 0) {
+    folded.push(
+      `${untranslated.length} onderde${untranslated.length === 1 ? 'el heeft' : 'len hebben'} geen Engelse tekst; daar staat de Nederlandse nu in beide talen.`,
+    );
+  }
+  return folded;
 }
 
 /**
@@ -168,7 +191,7 @@ function evidenceFor(key: string, source: Dict, warnings: string[]): string[] {
     .map((name) => name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '.?'))
     .filter((part) => part.length >= 3))];
   if (parts.length === 0) return [];
-  warnings.push(`attribuut "${key}": geen veldkoppeling opgegeven; er wordt gezocht op ${parts.join(', ')}.`);
+  warnings.push(`${UNMAPPED}${key}`);
   return [`attr:${parts.join('|')}`];
 }
 
@@ -200,6 +223,34 @@ function attributes(node: YamlValue, warnings: string[]): AttributeDef[] {
       evidence: evidenceFor(key, value, warnings),
       mode: text(value.modus ?? value.mode) === 'all' ? 'all' : 'any',
     });
+  }
+  return out;
+}
+
+/**
+ * De leesbare regels van een beslisregel.
+ *
+ * Een bank schrijft ze op drie manieren: als losse zinnen onder `regels`, als
+ * een conditie onder `regel` met een `berekening` erbij, of als een lijst
+ * als-dan-paren. Alle drie zeggen hetzelfde soort ding en horen alle drie in
+ * het rapport terecht te komen; alleen de eerste vorm lezen betekent dat een
+ * drempel stilletjes verdwijnt.
+ */
+function ruleLines(value: Dict): string[] {
+  const out: string[] = [];
+  const condition = text(value.regel ?? value.rule);
+  if (condition) out.push(condition);
+  const calculation = text(value.berekening ?? value.calculation);
+  if (calculation) out.push(calculation);
+
+  for (const item of list(value.regels ?? value.rules)) {
+    const line = text(item);
+    if (line !== undefined) { out.push(line); continue; }
+    if (!isDict(item)) continue;
+    const when = text(item.als ?? item.when);
+    const then = text(item.dan ?? item.then);
+    if (when && then) out.push(`als ${when} → ${then}`);
+    else if (then) out.push(then);
   }
   return out;
 }
@@ -241,7 +292,7 @@ function rules(node: YamlValue, warnings: string[], errors: string[]): DecisionR
         url: text(value.url),
         rationale: bilingual(value, 'onderbouwing', warnings, `beslisregel ${id}`),
       },
-      rules: strings(value.regels ?? value.rules).map((rule) => ({ nl: rule, en: rule })),
+      rules: ruleLines(value).map((rule) => ({ nl: rule, en: rule })),
       deviations: list(value.afwijkingen ?? value.deviations)
         .filter(isDict)
         .map((item) => ({
@@ -292,9 +343,11 @@ function questions(
       importance: importance ?? 'medium',
       coverage,
       coverageSites: strings(item.dekking_bronnen ?? item.coverage_sites),
+      // Een bank mag eigen bron-id's voeren en die in `meta.bronnen` uitleggen.
+      // Alleen de namen uit de methode accepteren zou die stilletjes weggooien,
+      // en dan staat er straks "geen bron" bij een vraag die er wél een heeft.
       sources: strings(item.bron ?? item.sources)
-        .map((source) => SOURCE[source.toLowerCase()])
-        .filter((source): source is EvidenceSource => source !== undefined),
+        .map((source) => SOURCE[source.toLowerCase()] ?? 'expertise' as EvidenceSource),
       evidence,
       mode: text(item.modus ?? item.mode) === 'any' ? 'any' : 'all',
       ruleId: text(item.beslisregel ?? item.rule),
@@ -304,6 +357,40 @@ function questions(
     });
   }
   return out;
+}
+
+/**
+ * De onomkeerbare fout, opgebouwd uit `herroepingsrecht` en `reden`.
+ *
+ * "herroepingsrecht: vervalt" plus "reden: stof wordt op maat geknipt" is
+ * dezelfde uitspraak als een zin onder `onomkeerbare_fout`, alleen in twee
+ * velden. Alleen de ene vorm accepteren zou een bank weigeren die de vraag
+ * gewoon beantwoordt.
+ */
+function reasonAsMistake(context: Dict, warnings: string[]): Bilingual | undefined {
+  const reason = text(context.reden ?? context.reason);
+  const withdrawal = text(context.herroepingsrecht ?? context.right_of_withdrawal);
+  if (!reason && !withdrawal) return undefined;
+
+  const nl = withdrawal && reason
+    ? `Herroepingsrecht ${withdrawal}: ${reason.replace(/\.$/, '')}.`
+    : reason ?? `Herroepingsrecht ${withdrawal}.`;
+  warnings.push('De onomkeerbare fout is afgeleid uit `herroepingsrecht` en `reden`. Schrijf hem als `onomkeerbare_fout` als je de formulering zelf in de hand wilt houden.');
+  return { nl, en: nl };
+}
+
+/**
+ * Eén regex uit de categorieën waarvoor deze bank geldt.
+ *
+ * Bron is `geldt_voor` plus de id's van de overlays. Levert undefined als er
+ * niets te matchen valt; dan is de bank het vangnet, en dat is een andere
+ * uitspraak dan "hij matcht nergens op".
+ */
+function categoryMatch(appliesTo: string[], overlays: Overlay[]): string | undefined {
+  const names = [...new Set([...appliesTo, ...overlays.map((overlay) => overlay.id)])]
+    .map((name) => name.trim().replace(/[_\s]+/g, '.?'))
+    .filter((name) => name.length >= 3);
+  return names.length > 0 ? names.join('|') : undefined;
 }
 
 function panel(node: YamlValue, warnings: string[]): PanelSite[] {
@@ -339,6 +426,51 @@ function openPoints(node: YamlValue, warnings: string[]): OpenPoint[] {
   }).filter((point): point is OpenPoint => point !== undefined);
 }
 
+/** Sleutels van een profiel die geen drempel zijn maar structuur. */
+const PROFILE_KEYS = new Set([
+  'id', 'naam', 'label', 'label_en', 'match', 'kritieke_vragen', 'critical',
+  'toelichting', 'toelichting_en', 'extra_aandacht', 'note',
+]);
+
+/**
+ * Toepassingsprofielen, als mapping of als lijst.
+ *
+ * De methode schrijft ze als mapping op id — `banken:`, `stoelen:` — met de
+ * drempels als losse sleutels eronder: `martindale_min: 30000`. Die drempels
+ * zijn per vertical anders en niet vooraf te kennen, dus alles wat geen
+ * structuursleutel is nemen we mee als drempel. Zo verdwijnt er geen getal.
+ */
+function profiles(node: YamlValue, where: string, warnings: string[]): ApplicationProfile[] {
+  const entries: [string, Dict][] = [];
+  if (isDict(node)) {
+    for (const [key, value] of Object.entries(node)) if (isDict(value)) entries.push([key, value]);
+  } else {
+    for (const [index, item] of list(node).entries()) {
+      if (!isDict(item)) continue;
+      entries.push([text(item.id ?? item.naam) ?? `profiel-${index + 1}`, item]);
+    }
+  }
+
+  return entries.map(([id, value]) => {
+    const thresholds: Record<string, string> = {};
+    for (const [key, raw] of Object.entries(value)) {
+      if (PROFILE_KEYS.has(key)) continue;
+      const asText = Array.isArray(raw) ? raw.map((v) => text(v) ?? '').join(' – ') : text(raw);
+      if (asText) thresholds[key] = asText;
+    }
+    return {
+      id,
+      label: bilingual(value, 'label', warnings, `profiel in ${where}`)
+        ?? { nl: text(value.naam) ?? id, en: text(value.naam) ?? id },
+      match: text(value.match),
+      thresholds: Object.keys(thresholds).length > 0 ? thresholds : undefined,
+      criticalQuestions: strings(value.kritieke_vragen ?? value.critical),
+      note: bilingual(value, 'toelichting', warnings, `profiel in ${where}`)
+        ?? bilingual(value, 'extra_aandacht', warnings, `profiel in ${where}`),
+    };
+  });
+}
+
 function overlays(node: YamlValue, warnings: string[], errors: string[]): Overlay[] {
   return list(node).filter(isDict).map((item, index) => {
     const id = text(item.id ?? item.categorie) ?? `overlay-${index + 1}`;
@@ -365,18 +497,35 @@ function overlays(node: YamlValue, warnings: string[], errors: string[]): Overla
       attributes: attributes(item.attributen ?? item.attributes, warnings),
       rules: rules(item.beslisregels ?? item.rules, warnings, errors),
       questions: questions(item.vragen ?? item.questions, new Set(strings(item.uitgesloten_van_score)), warnings, errors),
-      profiles: list(item.toepassingsprofielen ?? item.profiles).filter(isDict).map((profile, i) => ({
-        id: text(profile.id ?? profile.naam) ?? `profiel-${i + 1}`,
-        label: bilingual(profile, 'label', warnings, `profiel in ${id}`) ?? { nl: text(profile.naam) ?? '', en: text(profile.naam) ?? '' },
-        match: text(profile.match),
-        criticalQuestions: strings(profile.kritieke_vragen ?? profile.critical),
-        note: bilingual(profile, 'toelichting', warnings, `profiel in ${id}`),
-      })),
+      profiles: profiles(item.toepassingsprofielen ?? item.profiles, id, warnings),
     };
   });
 }
 
 // --- De ingang --------------------------------------------------------------
+
+/**
+ * Wat voor bestand is dit?
+ *
+ * De methode levert een basisbestand plus een overlay per categorie, elk als
+ * eigen bestand. Ze hebben dezelfde vorm maar een andere betekenis: een overlay
+ * leunt op de attributen van zijn basis en is in zijn eentje onvolledig.
+ */
+export type LayerKind = 'basis' | 'overlay' | 'facets' | 'unknown';
+
+export function layerOf(source: string): LayerKind {
+  try {
+    const parsed = source.trimStart().startsWith('{') ? JSON.parse(source) : parseYaml(source);
+    if (!isDict(parsed)) return 'unknown';
+    if (parsed.facetten !== undefined && parsed.vragen === undefined) return 'facets';
+    const meta = isDict(parsed.meta) ? parsed.meta : {};
+    const layer = text(meta.laag ?? meta.layer)?.toLowerCase();
+    if (layer === 'overlay' || parsed.herweging_basisvragen !== undefined) return 'overlay';
+    return 'basis';
+  } catch {
+    return 'unknown';
+  }
+}
 
 /**
  * Lees een vragenbank uit YAML of JSON.
@@ -411,9 +560,16 @@ export function importBank(source: string): ImportResult {
   if (declared !== undefined && declared !== sites.length) {
     errors.push(`meta.panelomvang zegt ${declared} maar er staan ${sites.length} sites in het panel. Dekking is dan niet na te rekenen.`);
   }
-  if (status === 'frozen' && sites.length === 0) {
-    // Bevroren zonder panel is de vorm van de methode zonder de inhoud ervan.
-    errors.push('Deze bank staat op bevroren maar heeft geen sitepanel. Dekking is dan een getal zonder noemer.');
+  // Bevroren zonder panel is de vorm van de methode zonder de inhoud ervan. Dat
+  // is een reden om de status terug te zetten, niet om de bank te weigeren: de
+  // vragen kunnen prima kloppen, maar "bevroren" belooft een panel en een
+  // domeinreview die er niet zijn. Het rapport toont hem dan als "in review",
+  // en dat is precies wat er aan de hand is.
+  const effectiveStatus: BankStatus = status === 'frozen' && sites.length === 0
+    ? 'in-review'
+    : status;
+  if (effectiveStatus !== status) {
+    warnings.push('Deze bank staat op bevroren maar draagt geen sitepanel. Hij is ingelezen als "in review": dekking is zonder panel een getal zonder noemer, en het rapport hoort dat te laten zien.');
   }
 
   // De weging is onderdeel van de scanregels en niet van de bank: zou elke bank
@@ -428,16 +584,21 @@ export function importBank(source: string): ImportResult {
   }
 
   const context = isDict(parsed.context_vertical) ? parsed.context_vertical : {};
-  const irreversible = bilingual(context, 'onomkeerbare_fout', warnings, 'context_vertical');
+  // De methode noemt dit veld `onomkeerbare_fout`, maar in de praktijk schrijft
+  // een bank het uit als het herroepingsrecht plus de reden. Allebei zeggen
+  // hetzelfde: welke fout kan de koper niet terugdraaien. Alleen de vorm eisen
+  // zou een bank weigeren die de vraag wél beantwoordt.
+  const irreversible = bilingual(context, 'onomkeerbare_fout', warnings, 'context_vertical')
+    ?? reasonAsMistake(context, warnings);
   if (!irreversible) {
-    errors.push('context_vertical.onomkeerbare_fout ontbreekt. Dat is de vraag waar de hele weging aan hangt: zonder die fout is "kritiek" een mening.');
+    errors.push('context_vertical mist de onomkeerbare fout. Zet er `onomkeerbare_fout` in, of `herroepingsrecht` met `reden`. Zonder die fout is "kritiek" een mening.');
   }
 
   const excluded = new Set(strings(parsed.uitgesloten_van_score ?? parsed.excluded_from_score));
   const bankQuestions = questions(parsed.vragen ?? parsed.questions, excluded, warnings, errors);
   if (bankQuestions.length === 0) errors.push('De bank bevat geen vragen.');
 
-  const bankAttributes = attributes(parsed.attributen ?? parsed.attributes, warnings);
+  const bankAttributes = attributes(mergeAttributeBlocks(parsed), warnings);
   const known = new Set(bankAttributes.map((attribute) => attribute.key));
   const bankOverlays = overlays(parsed.overlays ?? parsed.categorieen, warnings, errors);
   for (const overlay of bankOverlays) for (const attribute of overlay.attributes ?? []) known.add(attribute.key);
@@ -468,11 +629,16 @@ export function importBank(source: string): ImportResult {
         vertical: vertical as string,
         label: bilingual(meta, 'label', warnings, 'meta') ?? { nl: vertical as string, en: vertical as string },
         version: text(meta.versie ?? meta.version) ?? '1.0.0',
-        status,
+        status: effectiveStatus,
         panel: sites,
-        match: text(meta.match ?? meta.categoriematch),
+        // Een bank hoeft geen `match` te schrijven: `geldt_voor` zegt al voor
+        // welke categorieën hij geldt, en de overlays dragen hun categorienaam.
+        // Alleen naar `match` kijken zou een bank die zijn bereik netjes opgeeft
+        // laten verliezen van de meegeleverde terugval.
+        match: text(meta.match ?? meta.categoriematch)
+          ?? categoryMatch(strings(meta.geldt_voor ?? meta.applies_to), bankOverlays),
         sources: strings(meta.bronnen ?? meta.sources),
-        frozenAt: status === 'frozen' ? text(meta.bevroren_op ?? meta.frozen_at) : undefined,
+        frozenAt: effectiveStatus === 'frozen' ? text(meta.bevroren_op ?? meta.frozen_at ?? meta.opgesteld_op) : undefined,
         origin: 'imported',
       },
       context: {
@@ -490,4 +656,169 @@ export function importBank(source: string): ImportResult {
         .map((note) => ({ nl: note, en: note })),
     },
   };
+}
+
+// --- Meerdere bestanden tot één bank ---------------------------------------
+
+export interface BankFile {
+  name: string;
+  text: string;
+}
+
+/**
+ * Lees een basisbestand met zijn overlays tot één bank.
+ *
+ * De methode splitst een bank over meerdere bestanden — `_basis_{vertical}.yaml`
+ * plus `{categorie}.yaml` per categorie — en waarschuwt dat je achteraf nooit
+ * meer splitst. Dat betekent dat ze ook samen ingelezen moeten worden: een
+ * overlay leunt op de attributen van zijn basis, en in zijn eentje verwijst hij
+ * naar tientallen attributen die er dan niet zijn. Dat is geen fout in de bank
+ * maar in het inlezen.
+ *
+ * De volgorde van de bestanden doet er niet toe; ze worden gekoppeld op
+ * `meta.vertical`.
+ */
+export function importBankSet(files: BankFile[]): ImportResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  if (files.length === 0) return { errors: ['Geen bestanden gekozen.'], warnings };
+
+  const parsed = files.map((file) => ({ file, layer: layerOf(file.text) }));
+  const bases = parsed.filter((entry) => entry.layer === 'basis');
+  const overlayFiles = parsed.filter((entry) => entry.layer === 'overlay');
+
+  for (const entry of parsed.filter((e) => e.layer === 'facets')) {
+    // De facetanalyse is geen vragenbank maar een categoriebevinding. Hem
+    // stilzwijgend negeren zou de indruk wekken dat hij meegenomen is.
+    warnings.push(`${entry.file.name} is een facetanalyse en geen vragenbank; hij is niet ingelezen.`);
+  }
+
+  if (bases.length === 0) {
+    const namen = overlayFiles.map((entry) => entry.file.name).join(', ');
+    return {
+      errors: [overlayFiles.length > 0
+        ? `Er is alleen een overlaag gekozen (${namen}). Een overlaag leunt op de attributen van zijn basislaag; kies het bestand \`_basis_….yaml\` erbij.`
+        : 'Geen basislaag gevonden. Eén van de bestanden hoort `laag: basis` te dragen.'],
+      warnings,
+    };
+  }
+  if (bases.length > 1) {
+    return {
+      errors: [`Er zijn ${bases.length} basislagen gekozen (${bases.map((b) => b.file.name).join(', ')}). Lees ze één markt tegelijk in, anders is niet te bepalen welke basis bij welke overlay hoort.`],
+      warnings,
+    };
+  }
+
+  const base = importBank(bases[0].file.text);
+  errors.push(...base.errors.map((error) => `${bases[0].file.name}: ${error}`));
+  warnings.push(...base.warnings.map((warning) => `${bases[0].file.name}: ${warning}`));
+  if (!base.bank) return { errors, warnings };
+
+  const bank = base.bank;
+  const merged: Overlay[] = [...bank.overlays];
+
+  for (const entry of overlayFiles) {
+    const result = importOverlay(entry.file, bank.meta.vertical);
+    errors.push(...result.errors);
+    warnings.push(...result.warnings);
+    if (result.overlay) merged.push(result.overlay);
+  }
+
+  // Pas nu kloppen de attributen: de overlays kennen die van de basis erbij.
+  const known = new Set(bank.attributes.map((attribute) => attribute.key));
+  for (const overlay of merged) for (const attribute of overlay.attributes ?? []) known.add(attribute.key);
+  for (const overlay of merged) {
+    for (const question of overlay.questions ?? []) {
+      for (const key of question.evidence) {
+        if (!known.has(key)) {
+          errors.push(`vraag ${question.id} leunt op attribuut "${key}", en dat staat in geen van de gekozen bestanden.`);
+        }
+      }
+    }
+    for (const id of Object.keys(overlay.reweight ?? {})) {
+      if (!bank.questions.some((question) => question.id === id)) {
+        warnings.push(`overlay ${overlay.id} herweegt ${id}, maar die vraag staat niet in de basislaag.`);
+      }
+    }
+  }
+
+  if (errors.length > 0) return { errors, warnings };
+  return { errors, warnings, bank: { ...bank, overlays: merged } };
+}
+
+/** Eén overlaybestand als `Overlay`, gekoppeld aan de vertical van zijn basis. */
+function importOverlay(file: BankFile, vertical: string): {
+  overlay?: Overlay; errors: string[]; warnings: string[];
+} {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  let parsed: YamlValue;
+  try {
+    parsed = file.text.trimStart().startsWith('{') ? JSON.parse(file.text) : parseYaml(file.text);
+  } catch (error) {
+    const message = error instanceof YamlError ? error.message : (error as Error).message;
+    return { errors: [`${file.name} is niet te lezen — ${message}`], warnings };
+  }
+  if (!isDict(parsed)) return { errors: [`${file.name} bevat geen overlaag.`], warnings };
+
+  const meta = isDict(parsed.meta) ? parsed.meta : {};
+  const own = text(meta.vertical);
+  if (own && own !== vertical) {
+    errors.push(`${file.name} hoort bij vertical "${own}" en de basislaag bij "${vertical}". Die twee horen niet bij elkaar.`);
+    return { errors, warnings };
+  }
+
+  const category = text(meta.categorie ?? meta.category) ?? file.name.replace(/\.(ya?ml|json)$/i, '');
+  const reweight: Overlay['reweight'] = {};
+  const source = parsed.herweging_basisvragen ?? parsed.reweight;
+  if (isDict(source)) {
+    for (const [questionId, value] of Object.entries(source)) {
+      const raw = isDict(value) ? text(value.belang ?? value.importance) : text(value);
+      const importance = IMPORTANCE[raw?.toLowerCase() ?? ''];
+      if (!importance) {
+        errors.push(`${file.name}: herweging van ${questionId} noemt geen geldig belang (${raw ?? 'leeg'}).`);
+        continue;
+      }
+      reweight[questionId] = {
+        importance,
+        why: isDict(value) ? bilingual(value, 'waarom', warnings, file.name) : undefined,
+      };
+    }
+  }
+
+  const excluded = new Set(strings(parsed.uitgesloten_van_score ?? parsed.excluded_from_score));
+  const overlay: Overlay = {
+    id: category,
+    label: bilingual(meta, 'label', warnings, file.name) ?? { nl: category, en: category },
+    // Ankeren op de categorienaam, hoofdletterongevoelig. De merchant schrijft
+    // "Meubelstoffen" en het bestand heet "meubelstoffen".
+    match: text(meta.match ?? meta.categoriematch) ?? category.replace(/_/g, '.?'),
+    reweight,
+    suppress: strings(parsed.uitschakelen ?? parsed.suppress),
+    attributes: attributes(mergeAttributeBlocks(parsed), warnings),
+    rules: rules(parsed.beslisregels ?? parsed.rules, warnings, errors),
+    questions: questions(parsed.vragen ?? parsed.questions, excluded, warnings, errors),
+    profiles: profiles(parsed.toepassingsprofielen ?? parsed.profiles, category, warnings),
+  };
+
+  return { overlay, errors, warnings: foldWarnings(warnings).map((w) => `${file.name}: ${w}`) };
+}
+
+/**
+ * Alle attribuutblokken van een bestand samen.
+ *
+ * Een bank mag zijn attributen over meerdere blokken verdelen als de categorie
+ * dat vraagt — `attributen_naaigaren` naast `attributen_onderhoud`. Alleen naar
+ * `attributen` kijken laat de rest onzichtbaar verdwijnen, en dan lijkt elke
+ * vraag die erop leunt kapot.
+ */
+function mergeAttributeBlocks(parsed: Dict): YamlValue {
+  const blocks = Object.entries(parsed)
+    .filter(([key, value]) => /^attributen(_|$)|^attributes(_|$)/.test(key) && isDict(value));
+  if (blocks.length === 0) return parsed.attributen ?? parsed.attributes ?? {};
+  if (blocks.length === 1) return blocks[0][1];
+  const out: Record<string, YamlValue> = {};
+  for (const [, value] of blocks) Object.assign(out, value as Dict);
+  return out;
 }

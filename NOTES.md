@@ -162,11 +162,25 @@ alleen of het veld gevuld is. Dat vereist waarden parsen uit `attr:`-kolommen
 regels en de profielen al; alleen de uitvoering ontbreekt. Doe dit pas als er een
 bank met gepubliceerde drempels ligt — anders reken je met verzonnen getallen.
 
-**Mappinglaag bij een ingelezen bank** — draagt een attribuut geen `velden:`,
-dan bouwt de importeur een zoekpatroon uit `benoemd_als` en zegt dat erbij als
-waarschuwing. Dat werkt, maar het is een gok. Een scherm waarin de merchant per
-attribuut zijn eigen kolom aanwijst zou hem wegnemen — en dat is precies de stap
-die de methode ná het bevriezen plaatst.
+**Mappinglaag bij een ingelezen bank** — de grootste openstaande blokkade, en op
+7 september van theorie naar meting gegaan. De echte bank voor interieurstoffen
+leest nu foutloos in (34 basisvragen, 4 overlays, 77 categorievragen), maar geen
+van de 47 attributen draagt een `velden:`-koppeling. De bank benoemt ze in het
+Nederlands (`rolbreedte_cm`, `vezelsamenstelling`, `gewicht_gm2`) en de
+Magento-export in het Engels (`fabric_width`, `composition_info`,
+`weight_per_m2`). Geen enkele gok overbrugt dat, en het resultaat is een rapport
+van 0 van de 52 vragen op een catalogus die de antwoorden gewoon bevat.
+
+De app zegt dat nu hardop: `QuestionSetState.blindAttributes` telt de attributen
+die op geen enkele kolom uitkomen, en dat staat als waarschuwing bovenaan het
+rapport. Dat voorkomt de verkeerde conclusie, maar lost hem niet op.
+
+Twee wegen, en ze sluiten elkaar niet uit. Een `velden:`-lijst per attribuut in
+de YAML is het goedkoopst en hoort volgens de methode toch bij die fase. Een
+scherm waarin de merchant per attribuut zijn kolom aanwijst is meer werk maar
+schaalt naar elke merchant die dezelfde bank gebruikt — en dat is nu juist het
+punt van een bank op vertical-niveau. Waarschijnlijk het tweede, met het eerste
+als voorrang.
 
 **Prijzen** — de bedragen en de exacte bestandsgrens staan nog niet vast. De
 prijzenpagina draagt daar een zichtbare TODO in plaats van een verzonnen bedrag.

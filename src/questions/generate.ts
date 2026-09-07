@@ -21,12 +21,13 @@
 // gestructureerde attributen, niet uit lopende tekst, en er komt geen model aan
 // te pas — de uitkomst is daarmee reproduceerbaar en kost niets per scan.
 
-import type { Dataset, Question, QuestionSet, QuestionSetState } from '../domain/types';
+import type { Bilingual, Dataset, Question, QuestionSet, QuestionSetState } from '../domain/types';
 import type { QuestionBank } from './bank';
 import { bankFor, resolveBanks } from './banks';
 import { composeSet } from './compose';
 import { str } from '../intake/normalize';
 import { mainCategory } from '../engine/join';
+import { catalogKnows } from '../engine/evaluate';
 
 /** Hoeveel categorieen een eigen set krijgen; de staart wordt samengevoegd. */
 const MAX_SETS = 30;
@@ -135,10 +136,24 @@ export function generateQuestionSets(
     });
   }
 
+  // Welke attributen slaan op geen enkele kolom? Dat is de mappinglaag, en zonder
+  // dat getal leest een bank waarvan de attribuutnamen niet op de kolomnamen
+  // aansluiten als een lege catalogus.
+  const blind = new Map<string, { key: string; label: Bilingual }>();
+  for (const set of sets) {
+    for (const question of set.questions) {
+      for (const group of question.evidence ?? []) {
+        if (group.fields.some((field) => catalogKnows(catalog, field))) continue;
+        blind.set(group.attributeKey, { key: group.attributeKey, label: group.label });
+      }
+    }
+  }
+
   return {
     version: 1,
     sets,
     changeLog: [],
+    blindAttributes: [...blind.values()],
     // De herkomst reist mee tot op het rapport: een cijfer dat beweegt omdat de
     // bank onder de merchant vernieuwd is, mag niet op vooruitgang lijken.
     banks: [...used.values()].map((bank) => ({

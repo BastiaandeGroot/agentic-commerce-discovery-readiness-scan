@@ -8,7 +8,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { importBank } from '../src/questions/import';
+import { importBank, importBankSet } from '../src/questions/import';
 import { ingest } from '../src/intake/index';
 import { generateQuestionSets } from '../src/questions/generate';
 
@@ -129,12 +129,19 @@ test('een gepubliceerde drempel zonder site komt er niet in', () => {
   assert.ok(errors.some((e) => /gepubliceerd maar noemt geen site/.test(e)), errors.join(' | '));
 });
 
-test('dekking zonder panel dat erbij past, komt er niet in', () => {
+test('een panelomvang die niet klopt met het panel komt er niet in', () => {
   const scheef = importBank(BANK.replace('panelomvang: 2', 'panelomvang: 6'));
   assert.ok(scheef.errors.some((e) => /panelomvang/.test(e)), scheef.errors.join(' | '));
+});
 
+test('bevroren zonder panel wordt teruggezet in plaats van geweigerd', () => {
   const zonderPanel = importBank(BANK.replace(/  sitepanel:[\s\S]*?  panelomvang: 2\n/, ''));
-  assert.ok(zonderPanel.errors.some((e) => /geen sitepanel/.test(e)), zonderPanel.errors.join(' | '));
+  // De vragen kunnen prima kloppen; alleen belooft "bevroren" een panel en een
+  // domeinreview die er niet zijn. Weigeren maakt de bank onbruikbaar, en dan
+  // valt een merchant terug op een voorlopige bank die zwakker is.
+  assert.ok(zonderPanel.bank, zonderPanel.errors.join(' | '));
+  assert.equal(zonderPanel.bank?.meta.status, 'in-review');
+  assert.ok(zonderPanel.warnings.some((w) => /ingelezen als "in review"/.test(w)));
 });
 
 test('zonder onomkeerbare fout is kritiek een mening en gaat de bank niet door', () => {
@@ -156,7 +163,7 @@ test('zonder veldkoppeling wordt er gezocht op de namen die de markt gebruikt', 
   // hij, dan is `benoemd_als` de beste gok — maar wel een gok, en dat staat erbij.
   assert.match(breedte?.evidence[0] ?? '', /^attr:/);
   assert.match(breedte?.evidence[0] ?? '', /rolbreedte/);
-  assert.ok(warnings.some((w) => /geen veldkoppeling/.test(w)), warnings.join(' | '));
+  assert.ok(warnings.some((w) => /geen `velden:`-koppeling/.test(w)), warnings.join(' | '));
 
   // Met expliciete velden blijft het bij die velden, zonder waarschuwing.
   const schuur = bank?.attributes.find((a) => a.key === 'schuurweerstand');
@@ -212,5 +219,115 @@ test('een zoekpatroon bevat elk woord één keer', () => {
   );
   const breedte = bank?.attributes.find((a) => a.key === 'baanbreedte');
   assert.equal(breedte?.evidence[0], 'attr:baanbreedte|rolbreedte');
-  assert.ok(warnings.some((w) => /baanbreedte, rolbreedte/.test(w)), warnings.join(' | '));
+  // De losse meldingen zijn samengevouwen tot één regel met de namen erin.
+  assert.ok(warnings.some((w) => /baanbreedte/.test(w) && /koppeling/.test(w)), warnings.join(' | '));
+});
+
+// --- Meerdere bestanden, zoals de methode ze oplevert -----------------------
+
+const BASIS = `
+meta:
+  vertical: interieurstoffen
+  laag: basis
+  versie: "1.0.0"
+  status: bevroren
+  match: stof
+context_vertical:
+  herroepingsrecht: vervalt
+  reden: "Stof wordt op maat geknipt"
+attributen:
+  rolbreedte_cm:
+    type: getal
+    velden: ["attr:rolbreedte|baanbreedte"]
+vragen:
+- id: BAS-01
+  vraag: "Hoe breed is de baan?"
+  belang: kritiek
+  bewijs: [rolbreedte_cm]
+`.trim();
+
+const OVERLAY = `
+meta:
+  vertical: interieurstoffen
+  categorie: meubelstoffen
+  laag: overlay
+herweging_basisvragen:
+  BAS-01: hoog
+attributen:
+  schuurweerstand:
+    type: getal
+    velden: ["attr:martindale"]
+vragen:
+- id: MEU-01
+  vraag: "Hoeveel slijtage kan het hebben?"
+  belang: kritiek
+  bewijs: [schuurweerstand, rolbreedte_cm]
+toepassingsprofielen:
+  banken:
+    label: "Banken"
+    martindale_min: 30000
+    meterage: [8.0, 14.0]
+    kritieke_vragen: [MEU-01]
+`.trim();
+
+test('een basislaag met zijn overlays wordt één bank', () => {
+  const { bank, errors } = importBankSet([
+    { name: 'meubelstoffen.yaml', text: OVERLAY },
+    { name: '_basis_interieurstoffen.yaml', text: BASIS },
+  ]);
+  assert.deepEqual(errors, []);
+  assert.ok(bank);
+
+  // De volgorde van de bestanden doet er niet toe; ze koppelen op vertical.
+  assert.equal(bank.meta.vertical, 'interieurstoffen');
+  assert.equal(bank.overlays.length, 1);
+  const overlay = bank.overlays[0];
+  assert.equal(overlay.id, 'meubelstoffen');
+  assert.equal(overlay.reweight?.['BAS-01']?.importance, 'high');
+
+  // En de overlayvraag mag op een attribuut uit de basislaag leunen. Los
+  // ingelezen zou dat een fout zijn; samen is het precies de bedoeling.
+  assert.deepEqual(bank.overlays[0].questions?.[0].evidence, ['schuurweerstand', 'rolbreedte_cm']);
+});
+
+test('een overlay zonder zijn basislaag zegt wat er ontbreekt', () => {
+  const { bank, errors } = importBankSet([{ name: 'meubelstoffen.yaml', text: OVERLAY }]);
+  assert.equal(bank, undefined);
+  assert.match(errors[0], /alleen een overlaag/);
+  assert.match(errors[0], /_basis_/);
+});
+
+test('de onomkeerbare fout mag uit herroepingsrecht en reden komen', () => {
+  const { bank } = importBankSet([{ name: 'basis.yaml', text: BASIS }]);
+  assert.match(bank?.context.irreversibleMistake.nl ?? '', /vervalt.*op maat geknipt/i);
+});
+
+test('bevroren zonder panel wordt in review, en weigert niet', () => {
+  const { bank, warnings } = importBankSet([{ name: 'basis.yaml', text: BASIS }]);
+  // De vragen kunnen prima kloppen; "bevroren" belooft alleen een panel en een
+  // domeinreview die er niet zijn. Weigeren zou de bank onbruikbaar maken.
+  assert.equal(bank?.meta.status, 'in-review');
+  assert.ok(warnings.some((w) => /ingelezen als "in review"/.test(w)));
+});
+
+test('een toepassingsprofiel houdt zijn drempels vast', () => {
+  const { bank } = importBankSet([
+    { name: 'basis.yaml', text: BASIS },
+    { name: 'meubelstoffen.yaml', text: OVERLAY },
+  ]);
+  const profiel = bank?.overlays[0].profiles?.[0];
+  assert.equal(profiel?.id, 'banken');
+  // De drempels heten per vertical anders en zijn niet vooraf te kennen; alles
+  // wat geen structuursleutel is telt mee, anders verdwijnt er een getal.
+  assert.equal(profiel?.thresholds?.martindale_min, '30000');
+  assert.equal(profiel?.thresholds?.meterage, '8 – 14');
+  assert.deepEqual(profiel?.criticalQuestions, ['MEU-01']);
+});
+
+test('een facetanalyse is geen vragenbank en zegt dat', () => {
+  const { warnings } = importBankSet([
+    { name: 'basis.yaml', text: BASIS },
+    { name: '_facetcategorieen.yaml', text: 'meta:\n  vertical: interieurstoffen\nfacetten:\n  - pad: Effen\n' },
+  ]);
+  assert.ok(warnings.some((w) => /facetanalyse en geen vragenbank/.test(w)), warnings.join(' | '));
 });
