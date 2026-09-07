@@ -186,9 +186,17 @@ helft), de teksten, en of de labels de meting noemen of een oordeel.
 haalt de randgevallen (BOM, puntkomma, quotes met scheidingstekens en newlines,
 CRLF, rafelige regels) en staat onder test, maar leest het hele bestand in het
 geheugen. Gemeten in de browser: 27 MB met 160.000 producten gaat goed in de
-worker, zonder dat de hoofddraad ook maar één tik mist. De grens ligt nu op
-20 MB met een uitweg ("toch proberen"); streamend lezen wordt pas een echte
-vraag als die grens knelt of als het serverzijdig moet.
+worker, zonder dat de hoofddraad ook maar één tik mist.
+
+De grens stond op 20 MB en is op 7 september naar 50 gegaan. Reden: toen de
+invoer een kanaalfeed was, was 20 MB een uitzondering. Een catalogusexport draagt
+élke kolom die het PIM kent — bij deze merchant 157 kolommen tegen 34 in de feed
+— en is daarmee structureel groter. Hun Magento-export is 20 MB en de
+samengevoegde catalogus 27 MB, dus de oude grens blokkeerde het normale geval in
+plaats van de uitzondering. Die 20 MB-export scant in 1,4 seconde. De
+waarschuwing met de uitweg blijft staan voor wat daarboven komt, want dáár is
+niets gemeten. Streamend lezen wordt pas een echte vraag als 50 MB knelt of als
+het serverzijdig moet.
 
 **Echte kwaliteitscontroles** — nu alleen een woordentelling op titel en
 omschrijving. Kandidaten: schijn-volledigheid (veld overal dezelfde waarde),

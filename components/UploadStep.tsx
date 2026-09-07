@@ -19,8 +19,21 @@ import type { Locale, Strings } from '../src/i18n/strings';
 import { ScanClient, type Progress } from '../src/worker/client';
 import { Badge, Button, Card, CardTitle, ErrorState, FileDropzone, Select } from './ui';
 
-/** Boven deze grens wordt een scan in de browser onprettig traag. */
-const LARGE_FILE_MB = 20;
+/**
+ * Boven deze grens waarschuwen we voordat de scan in de browser draait.
+ *
+ * De grens stond op 20 toen de invoer een kanaalfeed was. Een catalogusexport is
+ * structureel groter: die draagt élke kolom die het PIM kent, ook de honderden
+ * die een feed weglaat. Bij de testmerchant is de Magento-export 20 MB en de
+ * samengevoegde catalogus 27 MB — beide zouden dus de normale situatie blokkeren
+ * in plaats van de uitzondering, en een grens die het normale geval tegenhoudt
+ * is erger dan geen grens.
+ *
+ * 27 MB met 160.000 producten is gemeten en gaat goed in de worker (zie NOTES).
+ * Daarboven is het niet gemeten; vandaar dat de waarschuwing blijft staan, met
+ * de uitweg ernaast.
+ */
+const LARGE_FILE_MB = 50;
 
 interface Props {
   s: Strings;
@@ -246,20 +259,6 @@ export function UploadStep({ s, locale, onReady }: Props) {
         </div>
       ) : null}
 
-      {tooLarge ? (
-        <div className="mb-4 rounded-lg border border-warn/40 bg-warn-soft px-4 py-3">
-          <p className="font-medium text-warn">{s.upload.tooLarge}</p>
-          <p className="mt-1 text-sm leading-relaxed text-ink">
-            {s.upload.tooLargeBody.replace('{limit}', String(LARGE_FILE_MB))}
-          </p>
-          <div className="mt-3">
-            <Button variant="secondary" onClick={() => setAcceptedLarge(true)}>
-              {s.upload.tryAnyway}
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
       <div className="rounded-lg border border-line p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="font-medium">{s.upload.catalogLabel}</h3>
@@ -326,6 +325,26 @@ export function UploadStep({ s, locale, onReady }: Props) {
           <Button variant="secondary" onClick={() => setShowMapping(!showMapping)}>
             {showMapping ? s.upload.mappingHide : s.upload.mappingShow}
           </Button>
+        </div>
+      ) : null}
+
+      {/* De waarschuwing staat hier en niet bovenaan de kaart: hij blokkeert de
+          knop hieronder, en met de voorbeeldtabel ertussen was hij uit beeld —
+          dan zie je een grijze knop zonder te weten waarom. Een blokkade hoort
+          te staan waar hij bijt. */}
+      {tooLarge ? (
+        <div className="mt-5 rounded-lg border border-warn/40 bg-warn-soft px-4 py-3">
+          <p className="font-medium text-warn">
+            {s.upload.tooLarge} — <span className="tnum">{Math.round(largeMb)} MB</span>
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-ink">
+            {s.upload.tooLargeBody.replace('{limit}', String(LARGE_FILE_MB))}
+          </p>
+          <div className="mt-3">
+            <Button variant="secondary" onClick={() => setAcceptedLarge(true)}>
+              {s.upload.tryAnyway}
+            </Button>
+          </div>
         </div>
       ) : null}
 
