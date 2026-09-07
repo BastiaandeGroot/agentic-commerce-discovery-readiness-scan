@@ -94,7 +94,7 @@ export function HomeContent() {
         <div className="mt-8 flex flex-wrap items-center gap-3">
           <Link
             href="/demo"
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-base font-medium text-white transition hover:opacity-90"
+            className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-base font-medium text-accent-ink transition hover:opacity-90"
           >
             {s.shell.primaryAction}
             <ArrowRight className="size-4" aria-hidden />
@@ -161,7 +161,7 @@ export function HomeContent() {
         <div className="mt-5">
           <Link
             href="/scan"
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-base font-medium text-white transition hover:opacity-90"
+            className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-base font-medium text-accent-ink transition hover:opacity-90"
           >
             {s.shell.nav.scan}
             <ArrowRight className="size-4" aria-hidden />

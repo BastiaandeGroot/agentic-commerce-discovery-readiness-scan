@@ -38,16 +38,39 @@ export function resolveBanks(imported: QuestionBank[] = []): QuestionBank[] {
   return [...imported, ...BUILT_IN_BANKS];
 }
 
+/** Slaat deze bank op deze categorie? */
+function matches(bank: QuestionBank, category: string): boolean {
+  if (bank.meta.match && new RegExp(bank.meta.match, 'i').test(category)) return true;
+  // Ook zonder `match` op de bank telt een overlay die op de categorie slaat:
+  // die draagt zijn categorienaam al.
+  return bank.overlays.some((overlay) => new RegExp(overlay.match, 'i').test(category));
+}
+
 /**
  * De bank die bij deze categorienaam hoort.
  *
- * Zonder match is een bank het vangnet. Is er meer dan één vangnet, dan wint het
- * eerste; dat is de ingelezen bank zodra die er is.
+ * Onderzochte banken gaan vóór de meegeleverde, en niet alleen bij een treffer.
+ * Zou een meegeleverde bank een ingelezen bank met een regex kunnen verslaan,
+ * dan meet een merchant die net een vragenlijst aanleverde alsnog langs onze
+ * terugval — en dan levert aanleveren niets op. Pas als er helemaal geen
+ * ingelezen bank is, komt de terugval in beeld.
  */
 export function bankFor(category: string, banks: QuestionBank[]): QuestionBank {
-  for (const bank of banks) {
-    if (!bank.meta.match) continue;
-    if (new RegExp(bank.meta.match, 'i').test(category)) return bank;
-  }
-  return banks.find((bank) => !bank.meta.match) ?? GENERIC_BANK;
+  const imported = banks.filter((bank) => bank.meta.origin === 'imported');
+  const builtIn = banks.filter((bank) => bank.meta.origin !== 'imported');
+
+  const hit = imported.find((bank) => matches(bank, category));
+  if (hit) return hit;
+  // Een ingelezen bank die op géén enkele categorie matcht, wint nog steeds van
+  // de terugval. Zijn categorienamen kunnen in een andere taal staan dan de boom
+  // van de merchant — een Engelse vragenlijst op een Nederlandse catalogus is
+  // het normale geval geworden — en dan zou stil terugvallen betekenen dat de
+  // merchant een rapport krijgt langs een lat die hij niet aanleverde, terwijl
+  // hij denkt dat zijn eigen lijst gebruikt wordt. Hij krijgt dan de basislaag
+  // zonder overlay, en `categoriesWithoutOverlay` zegt dat hardop.
+  if (imported.length > 0) return imported[0];
+
+  const builtInHit = builtIn.find((bank) => matches(bank, category));
+  if (builtInHit) return builtInHit;
+  return builtIn.find((bank) => !bank.meta.match) ?? GENERIC_BANK;
 }

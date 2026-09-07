@@ -22,7 +22,7 @@ export function InfoButton({ label, open, onToggle }: {
       title={label}
       className={`inline-flex size-4 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold leading-none transition ${
         open
-          ? 'border-transparent bg-accent text-white'
+          ? 'border-transparent bg-accent text-accent-ink'
           : 'border-line text-muted hover:border-accent hover:text-accent'
       }`}
     >

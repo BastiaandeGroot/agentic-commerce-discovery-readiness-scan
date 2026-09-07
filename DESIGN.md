@@ -42,22 +42,32 @@ geen `blue-500`, geen `rgb()`.
 | `line` | randen en scheidingslijnen |
 | `ink` | lopende tekst |
 | `muted` | bijschriften, kolomkoppen, uitleg |
-| `accent` | de handeling die je wilt dat iemand doet, en "uit je feed" |
+| `accent` | de handeling die je wilt dat iemand doet — terracotta |
+| `accent-ink` | tekst óp het accent; wit in de lichte stand, de paginakleur in de donkere |
 | `ok` / `warn` / `danger` | status, los van de accentkleur |
 | `*-soft` | de bijbehorende achtergrond voor een badge of blok |
 
 De statuskleuren staan bewust los van `accent`: groen betekent hier "beantwoord",
 niet "klik hier". Zouden ze samenvallen, dan leest elke knop als een goedkeuring.
 
-**Dark mode is geen variant maar een tweede volwaardige set.** Beide staan in
-`globals.css`. Elke nieuwe kleur krijgt meteen zijn donkere tegenhanger.
+**Licht is de stand, donker is opt-in.** De app volgt de systeeminstelling
+bewust *niet*: dit is gereedschap voor iemand die zijn productdata niet dagelijks
+in handen heeft, en warm papier nodigt uit waar een bijna-zwart hoogcontrastvlak
+afstand schept — en op elk ander AI-product lijkt. De donkere set staat compleet
+in `globals.css` onder `[data-theme="dark"]` en is nagerekend; hij is één
+schakelaar van terugkomen. Elke nieuwe kleur krijgt nog steeds meteen zijn
+donkere tegenhanger.
 
 ### Contrast
 
-Alle 32 tekst-op-achtergrond combinaties voldoen aan WCAG AA (≥ 4.5:1), in beide
-standen. Nagerekend na het warmer maken van het palet; laagste waarde is `ok` op
-`ok-soft` met 4.79 in de lichte stand. Voeg je een kleurpaar toe, reken het na
-voordat je het gebruikt.
+Alle tekst-op-achtergrond combinaties voldoen aan WCAG AA (≥ 4.5:1), in beide
+standen. Nagerekend na het terracotta accent en het gebroken witte vlak; laagste
+waarde is `ok` op `ok-soft` met 4,66 in de lichte stand. Voeg je een kleurpaar
+toe, reken het na voordat je het gebruikt.
+
+Tekst op een gevuld accentvlak gebruikt **altijd** `accent-ink` en nooit
+`text-white`. In de donkere stand is het accent zelf licht, en dan haalt wit
+erop 1,9:1.
 
 ### Wat we hier bewust niet deden
 

@@ -463,18 +463,44 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
     setSaved(true);
   }
 
-  const provisional = report.stamp.banks.filter((bank) => bank.status !== 'frozen');
+  // Niet-bevroren banken dragen allebei een voorbehoud, maar niet hetzelfde.
+  // Een voorlopige bank is ónze terugval uit vakkennis; een ingelezen lijst zonder
+  // sitepanel is de lijst van de merchant zelf. Die over één kam scheren vertelt
+  // hem dat zijn eigen vragen uit onze vakkennis komen, en dat klopt niet.
+  const unfrozen = report.stamp.banks.filter((bank) => bank.status !== 'frozen');
+  const anyProvisional = unfrozen.some((bank) => bank.status === 'provisional');
 
   return (
     <div className="space-y-4">
       {/* Bovenaan en niet in het stempel onderaan: wie een cijfer leest hoort
           meteen te weten dat de lat beredeneerd is en niet onderzocht. */}
-      {provisional.length > 0 ? (
+      {unfrozen.length > 0 ? (
         <div className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3">
           <p className="font-medium text-warn">
-            {s.report.bankHeading}: {provisional.map((bank) => bank.label[locale]).join(', ')}
+            {s.report.bankHeading}: {unfrozen.map((bank) => bank.label[locale]).join(', ')}
           </p>
-          <p className="mt-1 text-sm leading-relaxed text-ink">{s.report.bankProvisional}</p>
+          <p className="mt-1 text-sm leading-relaxed text-ink">
+            {anyProvisional ? s.report.bankProvisional : s.report.bankInReview}
+          </p>
+        </div>
+      ) : null}
+
+      {report.stamp.blindAttributes.length > 0 ? (
+        <div className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3">
+          <p className="font-medium text-warn">
+            {s.report.blindHeading} —{' '}
+            <span className="tnum">{report.stamp.blindAttributes.length}</span>{' '}
+            {s.report.blindCount}
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-ink">{s.report.blindBody}</p>
+          <p className="mt-2 text-sm leading-relaxed text-ink">{s.report.blindNext}</p>
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {report.stamp.blindAttributes.slice(0, 16).map((attribute) => (
+              <li key={attribute.key}>
+                <Badge tone="neutral">{attribute.key}</Badge>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
 

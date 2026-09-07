@@ -7,4 +7,7 @@ import './compare.test';
 import './bank.test';
 import './yaml.test';
 import './import.test';
+import './list.test';
+import './match.test';
+import './semantic.test';
 import './request.test';

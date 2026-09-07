@@ -16,7 +16,7 @@ export function Button({
   type?: 'button' | 'submit';
 }) {
   const styles = {
-    primary: 'bg-accent text-white hover:opacity-90 border-transparent',
+    primary: 'bg-accent text-accent-ink hover:opacity-90 border-transparent',
     secondary: 'bg-surface text-ink border-line hover:bg-surface-2',
     quiet: 'bg-transparent text-muted border-transparent hover:text-ink hover:bg-surface-2',
   }[variant];

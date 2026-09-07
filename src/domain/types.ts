@@ -156,6 +156,11 @@ export interface Question {
   ruleId?: string;
   /** Verantwoording als het gewicht afwijkt van wat de dekking suggereert. */
   weightNote?: Bilingual;
+  /**
+   * Wat je met dit antwoord niet mag beweren. Begrenst het antwoord in plaats
+   * van het gewicht te verantwoorden; zie `BankQuestion.caution`.
+   */
+  caution?: Bilingual;
 }
 
 export interface QuestionSet {
@@ -210,6 +215,32 @@ export interface QuestionSetState {
    * bewoog omdat zijn data veranderde of omdat de bank onder hem vernieuwd is.
    */
   banks: { id: string; label: Bilingual; version: string; status: BankStatus }[];
+  /**
+   * Attributen uit de bank die in deze catalogus op geen enkele kolom uitkomen.
+   *
+   * Dit is de mappinglaag die de methode ná het bevriezen plaatst, en het is de
+   * stap die het vaakst ontbreekt: een bank schrijft `rolbreedte_cm` terwijl de
+   * kolom `fabric_width` heet. Zonder dit getal leest zo'n bank als een lege
+   * catalogus, en dat is de verkeerde conclusie — het rapport moet dit hardop
+   * zeggen voordat iemand ernaar handelt.
+   */
+  blindAttributes: { key: string; label: Bilingual }[];
+  /**
+   * Attributen die de app zelf aan een kolom heeft gekoppeld, met de kolom erbij.
+   *
+   * Een gok, en daarom controleerbaar: koppelt hij `rolbreedte_cm` aan de
+   * verkeerde kolom, dan verdwijnt er een gat dat er wel is — precies de fout
+   * die dit product hoort te voorkomen.
+   */
+  attributeMatches: { key: string; columns: string[]; basis: string }[];
+  /**
+   * Categorieën waarvoor de bank geen overlay had, terwijl hij er wel heeft.
+   *
+   * Bijna altijd een taalverschil: de vragenlijst noemt "curtain fabrics" en de
+   * catalogus "Gordijnstoffen". De set draagt dan alleen de basislaag, en dat
+   * hoort niemand zelf te moeten ontdekken uit een lager cijfer.
+   */
+  categoriesWithoutOverlay: string[];
 }
 
 // --- Bevindingen en rapport ------------------------------------------------
@@ -371,6 +402,8 @@ export interface VersionStamp {
    * lijkt zo'n verschuiving op vooruitgang.
    */
   banks: { id: string; label: Bilingual; version: string; status: BankStatus }[];
+  /** Attributen uit de bank die op geen enkele kolom van deze catalogus slaan. */
+  blindAttributes: { key: string; label: Bilingual }[];
   scannedAt: string;
 }
 

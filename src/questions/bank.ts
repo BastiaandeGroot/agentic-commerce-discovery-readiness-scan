@@ -93,7 +93,11 @@ export type Intent =
   | 'processing'
   | 'durability'
   | 'safety'
-  | 'purchase-certainty';
+  | 'purchase-certainty'
+  /** Hoe het product aanvoelt of zit — de vraag achter het stofstaal. */
+  | 'comfort'
+  /** Wat het product doet: verduisteren, isoleren, geluid dempen. */
+  | 'function';
 
 export type AnswerType =
   | 'enum'
@@ -194,6 +198,15 @@ export interface BankQuestion {
   ruleId?: string;
   answerType: AnswerType;
   answerable: Answerability;
+  /**
+   * Wat er misgaat als dit antwoord verkeerd getoond wordt.
+   *
+   * Iets anders dan `weightNote`: dat verantwoordt het gewicht, dit begrenst het
+   * antwoord. "Alleen bij aantoonbare leveranciersverklaring, nooit afleiden"
+   * gaat niet over hoe zwaar de vraag weegt maar over wat je met een gevuld veld
+   * wél en niet mag beweren.
+   */
+  caution?: Bilingual;
   /**
    * Waarom deze vraag zwaarder of lichter weegt dan de dekking suggereert.
    * Verplicht zodra weging en dekking uiteenlopen — anders is het een mening
@@ -315,7 +328,13 @@ export interface BankMeta {
  * producten wijst maar naar de duurste vergissingen.
  */
 export interface VerticalContext {
-  irreversibleMistake: Bilingual;
+  /**
+   * Optioneel omdat niet elke vorm waarin een vragenbank binnenkomt hem draagt:
+   * een vragenlijst als tabel heeft per vraag een belang maar geen zin over de
+   * fout die eronder ligt. Ontbreekt hij, dan is `critical` een oordeel dat de
+   * lijst zelf niet verantwoordt, en dat hoort de merchant te horen.
+   */
+  irreversibleMistake?: Bilingual;
   consequence?: Bilingual;
   /** Verkocht per stuk of per maateenheid; bepaalt of hoeveelheid een cluster is. */
   unitOfSale?: 'piece' | 'measure';

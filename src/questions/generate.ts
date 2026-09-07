@@ -21,12 +21,15 @@
 // gestructureerde attributen, niet uit lopende tekst, en er komt geen model aan
 // te pas — de uitkomst is daarmee reproduceerbaar en kost niets per scan.
 
-import type { Dataset, Question, QuestionSet, QuestionSetState } from '../domain/types';
-import type { QuestionBank } from './bank';
+import type { Bilingual, Dataset, Question, QuestionSet, QuestionSetState } from '../domain/types';
+import type { AttributeDef, QuestionBank } from './bank';
 import { bankFor, resolveBanks } from './banks';
 import { composeSet } from './compose';
 import { str } from '../intake/normalize';
 import { mainCategory } from '../engine/join';
+import { catalogKnows } from '../engine/evaluate';
+import { matchAttributes, type AttributeMatch } from '../spec/match';
+import { applyMapping, requirementFor, type Mapping } from './mapping';
 
 /** Hoeveel categorieen een eigen set krijgen; de staart wordt samengevoegd. */
 const MAX_SETS = 30;
@@ -83,6 +86,57 @@ export function slug(value: string): string {
 }
 
 /**
+ * Leg de attributen van een bank op de kolommen van déze catalogus.
+ *
+ * De bank noemt een kenmerk zoals het vak het noemt en de export zoals het
+ * systeem het opsloeg. Zolang die twee niet op elkaar liggen leest een volle
+ * catalogus als een lege, en dat is de verkeerde conclusie — niet een strenge
+ * meting maar een kapotte.
+ *
+ * De gevonden kolommen komen erbij en niet ervoor in de plaats: een expliciete
+ * `velden:`-koppeling uit de bank blijft leidend, en de modus van een attribuut
+ * is `any`, dus één van de kolommen volstaat. Attributen die al ergens op
+ * uitkomen worden met rust gelaten — daar valt niets te verbeteren en wel iets
+ * te verpesten.
+ */
+function mapToCatalog(bank: QuestionBank, catalog: Dataset): {
+  bank: QuestionBank; matches: AttributeMatch[];
+} {
+  const all = [bank.attributes, ...bank.overlays.map((overlay) => overlay.attributes ?? [])];
+  const open = all.flat().filter(
+    (attribute) => !attribute.evidence.some((field) => catalogKnows(catalog, field)),
+  );
+  if (open.length === 0) return { bank, matches: [] };
+
+  const matches = matchAttributes(
+    open.map((attribute) => ({ key: attribute.key, namedAs: attribute.namedAs })),
+    catalog.columns,
+  );
+  if (matches.length === 0) return { bank, matches };
+
+  const byKey = new Map(matches.map((match) => [match.key, match]));
+  const extend = (attributes: AttributeDef[]): AttributeDef[] => attributes.map((attribute) => {
+    const match = byKey.get(attribute.key);
+    if (!match) return attribute;
+    // Door dezelfde vertaalslag als een handmatige keuze: een kolomnaam is pas
+    // bewijs zodra hij in de vorm staat waarin de motor hem terugvindt.
+    const found = match.columns.map((column) => requirementFor(column, catalog));
+    return { ...attribute, evidence: [...attribute.evidence, ...found], mode: 'any' as const };
+  });
+
+  return {
+    matches,
+    bank: {
+      ...bank,
+      attributes: extend(bank.attributes),
+      overlays: bank.overlays.map((overlay) => (
+        overlay.attributes ? { ...overlay, attributes: extend(overlay.attributes) } : overlay
+      )),
+    },
+  };
+}
+
+/**
  * Bouw de vragensets voor deze merchant. Levert versie 1 met een lege changelog;
  * elke bewerking daarna verhoogt de versie en schrijft een regel bij (S8).
  *
@@ -92,8 +146,15 @@ export function slug(value: string): string {
 export function generateQuestionSets(
   catalog: Dataset,
   imported: QuestionBank[] = [],
+  /** Wat de merchant zelf aanwees; die keuze gaat vóór de automatische match. */
+  manual: Mapping = {},
 ): QuestionSetState {
-  const banks = resolveBanks(imported);
+  const mapped = new Map<string, AttributeMatch[]>();
+  const banks = resolveBanks(imported).map((bank) => {
+    const result = mapToCatalog(applyMapping(bank, manual, catalog), catalog);
+    mapped.set(bank.meta.vertical, result.matches);
+    return result.bank;
+  });
   const categories = deriveCategories(catalog);
   // Vragen die in deze catalogus niets te vragen hebben, laten we weg in plaats
   // van ze als permanent gat te laten staan.
@@ -135,10 +196,36 @@ export function generateQuestionSets(
     });
   }
 
+  // Welke attributen slaan op geen enkele kolom? Dat is de mappinglaag, en zonder
+  // dat getal leest een bank waarvan de attribuutnamen niet op de kolomnamen
+  // aansluiten als een lege catalogus.
+  const blind = new Map<string, { key: string; label: Bilingual }>();
+  for (const set of sets) {
+    for (const question of set.questions) {
+      for (const group of question.evidence ?? []) {
+        if (group.fields.some((field) => catalogKnows(catalog, field))) continue;
+        blind.set(group.attributeKey, { key: group.attributeKey, label: group.label });
+      }
+    }
+  }
+
   return {
     version: 1,
     sets,
     changeLog: [],
+    blindAttributes: [...blind.values()],
+    // Wat de koppeling wél opleverde. Dit is een gok van de app en geen uitspraak
+    // van de merchant, dus het hoort controleerbaar in beeld: een verkeerd
+    // gekoppelde kolom laat een gat verdwijnen dat er wel degelijk is.
+    attributeMatches: [...used.keys()].flatMap((vertical) => mapped.get(vertical) ?? []),
+    // Categorieën waar wél een bank met overlays op uitkwam, maar geen overlay
+    // op aansloeg. Dan draagt de set alleen de basislaag, en dat is een stille
+    // halvering: de categoriespecifieke vragen zijn juist de vragen waar de
+    // onomkeerbare fout in zit.
+    categoriesWithoutOverlay: sets
+      .filter((set) => set.category !== undefined && set.overlayId === undefined
+        && (used.get(set.bankId ?? '')?.overlays.length ?? 0) > 0)
+      .map((set) => set.category as string),
     // De herkomst reist mee tot op het rapport: een cijfer dat beweegt omdat de
     // bank onder de merchant vernieuwd is, mag niet op vooruitgang lijken.
     banks: [...used.values()].map((bank) => ({

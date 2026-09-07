@@ -11,3 +11,9 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      # De sleutel voor `/api/mapping`, de enige route die een model aanroept.
+      # `sync: false` betekent: niet in deze repo, maar in het Render-dashboard
+      # zetten. Zonder sleutel valt het koppelscherm terug op het model in de
+      # browser en zegt dat erbij; de scan zelf raakt hem nooit aan.
+      - key: ANTHROPIC_API_KEY
+        sync: false
