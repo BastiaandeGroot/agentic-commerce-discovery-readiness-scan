@@ -10,7 +10,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyPaths, facetDebt, normalizeName, pathsFromProducts, segmentsToResearch, splitMemberships } from '../src/intake/facets';
+import { applyProposals, classifyPaths, facetDebt, normalizeName, pathKey, pathsFromProducts, segmentsToResearch, splitMemberships } from '../src/intake/facets';
 
 const path = (p: string, n = 10) => ({ segments: p.split('>').map((s) => s.trim()), productCount: n });
 const kindOf = (rows: ReturnType<typeof classifyPaths>, leaf: string) =>
@@ -97,4 +97,23 @@ test('elk lidmaatschap telt voor zijn eigen pad', () => {
 test('namen worden vergeleken zonder opmaak', () => {
   assert.equal(normalizeName('  Vlam-Vertragend '), 'vlam vertragend');
   assert.equal(normalizeName('Café-stoffen'), 'cafe stoffen');
+});
+
+test('een voorstel vult alleen aan waar we het niet weten', () => {
+  // Hard bewijs blijft staan. Zegt de site dat "Effen" een filter is, dan is dat
+  // een feit; een voorstel hoort dat niet te kunnen overschrijven, ook niet als
+  // het model iets anders vindt.
+  const rows = classifyPaths(
+    [path('Meubelstoffen > Effen'), path('Meubelstoffen > Premium')],
+    { navigation: [], filters: ['Effen'] },
+  );
+  const met = applyProposals(rows, {
+    [pathKey(['Meubelstoffen', 'Effen'])]: 'category',
+    [pathKey(['Meubelstoffen', 'Premium'])]: 'facet',
+  });
+  const find = (leaf: string) => met.find((r) => r.segments.includes(leaf));
+  assert.equal(find('Effen')?.kind, 'facet', 'de site wint van het voorstel');
+  assert.equal(find('Effen')?.reason, 'in-filters');
+  assert.equal(find('Premium')?.kind, 'facet');
+  assert.equal(find('Premium')?.reason, 'model', 'herkomst blijft zichtbaar');
 });

@@ -51,6 +51,7 @@ export type PathReason =
   | 'in-nav-only'
   | 'not-on-site'
   | 'no-site'
+  | 'model'
   | 'merchant';
 
 export interface ClassifiedPath {
@@ -245,6 +246,23 @@ export type Verdicts = Record<string, PathKind>;
 
 export function pathKey(segments: string[]): string {
   return segments.map(normalizeName).join(' > ');
+}
+
+/**
+ * Een voorstel van het model erover leggen.
+ *
+ * Alleen waar de app het zelf niet weet. Hard bewijs wint: staat "Vlekwerend" in
+ * het filterpaneel van de site, dan is dat een feit en hoeft er niets voorgesteld
+ * te worden. Dat is goedkoper — het model krijgt alleen de twijfelgevallen — en
+ * het houdt zichtbaar wat gemeten is en wat geraden.
+ */
+export function applyProposals(rows: ClassifiedPath[], proposals: Verdicts): ClassifiedPath[] {
+  return rows.map((row) => {
+    if (row.kind !== 'unclear') return row;
+    const proposed = proposals[pathKey(row.segments)];
+    if (!proposed || proposed === 'unclear') return row;
+    return { ...row, kind: proposed, reason: 'model' as const };
+  });
 }
 
 /** Het oordeel van de merchant erover leggen. */

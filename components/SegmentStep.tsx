@@ -13,10 +13,10 @@
 // structuur. Hij weet wat hij verkoopt; wij leiden af.
 
 import { useMemo, useState } from 'react';
-import { Globe, HelpCircle, TriangleAlert } from 'lucide-react';
+import { Globe, HelpCircle, Sparkles, TriangleAlert } from 'lucide-react';
 import { Badge, Button, Card, CardTitle, EmptyState, ErrorState, Input, TableWrap, Td, Th } from './ui';
 import {
-  applyVerdicts, classifyPaths, facetDebt, pathKey,
+  applyProposals, applyVerdicts, classifyPaths, facetDebt, pathKey,
   type CategoryPath, type ClassifiedPath, type PathKind, type PathReason,
   type SiteEvidence, type Verdicts,
 } from '../src/intake/facets';
@@ -39,6 +39,7 @@ function why(s: Strings, reason: PathReason): string {
     case 'in-both': return s.segments.whyBoth;
     case 'many-parents': return s.segments.whyManyParents;
     case 'top-level': return s.segments.whyTop;
+    case 'model': return s.segments.whyModel;
     case 'merchant': return s.segments.settledBody;
     default: return s.segments.whyUnknown;
   }
@@ -69,6 +70,9 @@ function Rows({ s, rows, onDecide }: {
             <Td>
               <div className="flex flex-wrap items-center gap-1.5">
                 <Badge tone={TONE[row.kind]}>{s.segments.kinds[row.kind]}</Badge>
+                {/* Een voorstel is geen koppeling tot de merchant het laat
+                    staan; dat hoort hij te kunnen zien. */}
+                {row.reason === 'model' ? <Badge tone="accent">{s.segments.proposed}</Badge> : null}
                 {/* De keuze staat naast het oordeel en niet in de plaats ervan:
                     zo blijft zichtbaar waar de app op uitkwam. */}
                 {(['category', 'facet'] as const)
@@ -96,11 +100,17 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
 }) {
   const [site, setSite] = useState('');
   const [state, setState] = useState<SiteState>({ kind: 'idle' });
+  /** Wat het model voorstelde. Los van `verdicts`: een voorstel is geen keuze. */
+  const [proposals, setProposals] = useState<Verdicts>({});
+  const [judging, setJudging] = useState(false);
+  const [judgeFailed, setJudgeFailed] = useState(false);
 
   const evidence = state.kind === 'done' ? state.evidence : undefined;
+  // Volgorde van gezag: de merchant wint van het model, het model vult aan waar
+  // het bewijs zweeg, en hard bewijs uit de site blijft daaronder overeind.
   const rows = useMemo(
-    () => applyVerdicts(classifyPaths(paths, evidence), verdicts),
-    [paths, evidence, verdicts],
+    () => applyVerdicts(applyProposals(classifyPaths(paths, evidence), proposals), verdicts),
+    [paths, evidence, proposals, verdicts],
   );
   const debt = facetDebt(rows);
 
@@ -124,6 +134,57 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
       });
     } catch {
       setState({ kind: 'failed' });
+    }
+  }
+
+  /**
+   * Het model laten kijken naar wat we zelf niet konden bepalen.
+   *
+   * Alleen de twijfelgevallen, en dat is geen zuinigheid: waar de site zegt dat
+   * iets een filter is, is dat een feit dat een voorstel niet hoort te
+   * overschrijven. Het scheelt bovendien tokens en het houdt zichtbaar wat
+   * gemeten is en wat geraden.
+   */
+  async function judge() {
+    const open = rows.filter((row) => row.kind === 'unclear');
+    if (open.length === 0) return;
+    setJudging(true);
+    setJudgeFailed(false);
+    try {
+      const response = await fetch('/api/mapping', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          kind: 'facets',
+          attributes: open.map((row) => ({
+            key: row.segments.join(' > '),
+            text: `${row.productCount} producten`,
+          })),
+          // De filternamen van de site als context; leeg mag.
+          columns: (evidence?.filters ?? []).slice(0, 60).map((name) => ({ key: name, text: '' })),
+        }),
+      });
+      if (!response.ok) throw new Error('mislukt');
+      const { text } = await response.json();
+      const found: Verdicts = {};
+      for (const line of String(text ?? '').split('\n')) {
+        const at = line.lastIndexOf(':');
+        if (at === -1) continue;
+        const path = line.slice(0, at).trim().replace(/^[-*]\s*/, '');
+        const answer = line.slice(at + 1).trim().toLowerCase();
+        const match = open.find((row) => row.segments.join(' > ') === path);
+        if (!match) continue;
+        if (answer.startsWith('kenmerk') || answer.startsWith('facet')) {
+          found[pathKey(match.segments)] = 'facet';
+        } else if (answer.startsWith('categorie') || answer.startsWith('category')) {
+          found[pathKey(match.segments)] = 'category';
+        }
+      }
+      setProposals((current) => ({ ...current, ...found }));
+    } catch {
+      setJudgeFailed(true);
+    } finally {
+      setJudging(false);
     }
   }
 
@@ -212,6 +273,18 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
               {s.segments.rule}
             </p>
             <p className="mt-1 text-sm leading-relaxed text-muted">{s.segments.ruleBody}</p>
+          </div>
+          <div className="mb-4">
+            <Button onClick={() => void judge()} loading={judging} variant="secondary">
+              <Sparkles className="size-4" aria-hidden />
+              {judging ? s.segments.judgeBusy : s.segments.judge}
+            </Button>
+            <p className="mt-2 text-xs leading-relaxed text-muted">{s.segments.judgeNote}</p>
+            {judgeFailed ? (
+              <div className="mt-3">
+                <ErrorState title={s.segments.judgeFailed} body={s.segments.judgeFailedNext} />
+              </div>
+            ) : null}
           </div>
           <Rows s={s} rows={rows.filter((row) => row.kind === 'unclear')} onDecide={decide} />
         </Card>
