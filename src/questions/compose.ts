@@ -116,10 +116,12 @@ export function composeQuestions(bank: QuestionBank, overlay?: Overlay): Questio
       // De verantwoording van de herweging hoort bij de vraag, niet in een
       // losse tabel: wie zich afvraagt waarom deze vraag hier zwaarder weegt,
       // kijkt naar de vraag.
-      return reweight?.why ? { ...composed, weightNote: reweight.why } : composed;
+      const withLayer = { ...composed, layer: 'base' as const };
+      return reweight?.why ? { ...withLayer, weightNote: reweight.why } : withLayer;
     });
 
-  const extra = (overlay?.questions ?? []).map((question) => toQuestion(question, attributes));
+  const extra = (overlay?.questions ?? [])
+    .map((question) => ({ ...toQuestion(question, attributes), layer: 'category' as const }));
   return [...base, ...extra];
 }
 
@@ -133,8 +135,23 @@ export function composeQuestions(bank: QuestionBank, overlay?: Overlay): Questio
 export function composeSet(
   bank: QuestionBank,
   category: { id: string; name: string; count: number },
+  /**
+   * De overlay die de merchant zelf koos, als hij dat deed.
+   *
+   * Zonder deze uitweg bepaalt alleen de regex of de categoriespecifieke vragen
+   * landen, en die faalt zodra de lijst zijn categorieën anders noemt dan de
+   * catalogus — een Engelse lijst op een Nederlandse boom is inmiddels het
+   * normale geval. Dan krijgt elke categorie dezelfde basisvragen en valt het
+   * cijfer te gunstig uit, want de kritieke vragen van die categorie zijn er
+   * niet bij. `null` betekent uitdrukkelijk "alleen de basisvragen".
+   */
+  chosen?: string | null,
 ): QuestionSet {
-  const overlay = overlayFor(bank, category.name);
+  const overlay = chosen === null
+    ? undefined
+    : chosen !== undefined
+      ? bank.overlays.find((entry) => entry.id === chosen)
+      : overlayFor(bank, category.name);
   return {
     id: category.id,
     label: { nl: category.name, en: category.name },

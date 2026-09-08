@@ -15,7 +15,7 @@
 // is. Ongemarkeerd overnemen zou precies de fout maken die deze scan hoort te
 // voorkomen.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import type { Dataset, Locale, QuestionSetState } from '../src/domain/types';
 import { attributeInventory, type Mapping } from '../src/questions/mapping';
@@ -33,13 +33,18 @@ interface Props {
   state: QuestionSetState;
   mapping: Mapping;
   onChange: (mapping: Mapping) => void;
+  /** Welke vragenset uit de lijst bij welke eigen categorie hoort. */
+  categories: Record<string, string | null>;
+  onCategories: (next: Record<string, string | null>) => void;
   onContinue: () => void;
 }
 
 /** Geen kolom is een geldig antwoord; die keuze moet expliciet kunnen. */
 const NONE = '';
 
-export function MappingStep({ s, locale, catalog, state, mapping, onChange, onContinue }: Props) {
+export function MappingStep({
+  s, locale, catalog, state, mapping, onChange, categories, onCategories, onContinue,
+}: Props) {
   const [busy, setBusy] = useState<LoadProgress | 'remote'>();
   const [failed, setFailed] = useState(false);
   /** Welk model de voorstellen deed; dat hoort de merchant te zien. */
@@ -48,6 +53,9 @@ export function MappingStep({ s, locale, catalog, state, mapping, onChange, onCo
   const [notes, setNotes] = useState<string[]>([]);
   /** Welke keuzes van het model komen; ze blijven gemarkeerd tot je ze wijzigt. */
   const [proposed, setProposed] = useState<Record<string, string>>({});
+  /** Bezig met het koppelen van de vragensets, en wie het deed. */
+  const [matchingSets, setMatchingSets] = useState(false);
+  const [setsBy, setSetsBy] = useState<string>();
 
   const rows = useMemo(() => attributeInventory(state), [state]);
   const columns = useMemo(
@@ -58,6 +66,94 @@ export function MappingStep({ s, locale, catalog, state, mapping, onChange, onCo
   const linked = rows.filter((row) => row.fields.length > 0).length;
   const open = rows.filter((row) => row.fields.length === 0);
   const proposals = Object.keys(proposed).length;
+
+  /**
+   * Leg de vragensets uit de lijst op de eigen categorieën van de merchant.
+   *
+   * Dit gebeurt vanzelf en niet pas na een klik, want zonder deze koppeling
+   * krijgt élke categorie stilzwijgend alleen de algemene vragen — en dan valt
+   * het cijfer te gunstig uit, want juist de categoriespecifieke vragen dragen
+   * de onomkeerbare fout. Een merchant hoort niet te moeten weten dat hij eerst
+   * een knop moet indrukken voordat zijn eigen lijst helemaal meetelt.
+   *
+   * Wat de deur uit gaat zijn twee lijstjes namen. Geen aantallen, geen
+   * producten: het aantal producten per categorie zegt niets over wélke set
+   * erbij hoort, en het is data die er niet hoeft te zijn.
+   */
+  async function matchCategories(open: typeof state.sets) {
+    const namen = state.overlays.map((overlay) => ({ key: overlay.id, text: overlay.label[locale] }));
+    const eigen = open.map((set) => ({ key: set.category as string, text: set.category as string }));
+
+    const toepassen = (pairs: { key: string; columns: string[] }[], from: string) => {
+      if (pairs.length === 0) return false;
+      const next = { ...categories };
+      for (const pair of pairs) if (pair.columns[0]) next[pair.columns[0]] = pair.key;
+      onCategories(next);
+      setSetsBy(from);
+      return true;
+    };
+
+    try {
+      const gevonden = await requestMapping(
+        { kind: 'categories', attributes: namen, columns: eigen },
+        eigen.map((entry) => entry.key),
+      );
+      if (toepassen(gevonden.pairs, gevonden.model)) return;
+    } catch (caught) {
+      if (!(caught instanceof MappingNotConfigured)) return;
+    }
+
+    // Terugval op het browsermodel. Dat haalt de categorieën met een verwant
+    // woord (Decoratiestoffen ↔ Decorative fabrics) en laat de rest los —
+    // gemeten 2 van de 4 goed en 0 fout, dankzij de wederzijds-beste-eis.
+    try {
+      const vectors = await embed([...namen.map((n) => n.text), ...eigen.map((e) => e.text)]);
+      const found = suggestMappings(
+        namen.map((n, i) => ({ key: n.key, vector: vectors[i] })),
+        eigen.map((e, i) => ({ key: e.key, vector: vectors[namen.length + i] })),
+      );
+      toepassen(found.map((f) => ({ key: f.key, columns: [f.column] })), 'browser');
+    } catch {
+      // Geen model beschikbaar: de keuzelijsten staan er, de merchant wijst aan.
+    }
+  }
+
+  // Eén keer per scherm, en alleen als er iets te koppelen valt.
+  const tried = useRef(false);
+  useEffect(() => {
+    if (tried.current) return;
+    const open = state.sets.filter(
+      (set) => set.category !== undefined && set.overlayId === undefined,
+    );
+    if (open.length === 0 || state.overlays.length === 0) return;
+    tried.current = true;
+    // Buiten de effect-body zetten: React waarschuwt terecht dat een setState
+    // in het lichaam van een effect een extra render uitlokt, en de vlag is toch
+    // pas interessant zodra het koppelen echt begint.
+    void (async () => {
+      setMatchingSets(true);
+      try {
+        await matchCategories(open);
+      } finally {
+        setMatchingSets(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.sets, state.overlays]);
+
+  /**
+   * Wat de knop zegt terwijl hij bezig is.
+   *
+   * Met percentage zodra dat bekend is: het browsermodel is 113 MB, en een knop
+   * die een minuut lang hetzelfde zegt leest als vastgelopen. Die download
+   * gebeurt één keer; daarna staat hij in de cache van de browser en is het
+   * rekenwerk twee seconden.
+   */
+  function label(state: LoadProgress | 'remote'): string {
+    if (state === 'remote') return s.mapping.suggestBusy.remote;
+    const text = s.mapping.suggestBusy[state.step];
+    return state.ratio === undefined ? text : `${text} ${Math.round(state.ratio * 100)}%`;
+  }
 
   /** Neem voorstellen over en markeer ze, zodat ze na te lopen blijven. */
   function accept(pairs: { key: string; columns: string[] }[], from: string) {
@@ -153,9 +249,7 @@ export function MappingStep({ s, locale, catalog, state, mapping, onChange, onCo
           <div className="mt-3">
             <Button onClick={() => void suggest()} loading={busy !== undefined}>
               <Sparkles className="size-4" aria-hidden />
-              {busy
-                ? s.mapping.suggestBusy[busy === 'remote' ? 'remote' : busy.step]
-                : s.mapping.suggest}
+              {busy ? label(busy) : s.mapping.suggest}
             </Button>
             <p className="mt-2 text-xs leading-relaxed text-muted">{s.mapping.suggestNote}</p>
           </div>
@@ -185,8 +279,66 @@ export function MappingStep({ s, locale, catalog, state, mapping, onChange, onCo
         ) : null}
       </Card>
 
+      {/* Eerst welke vragenset bij welke categorie hoort, en pas daarna de
+          kenmerken. Die volgorde is niet willekeurig: kiest de merchant hier een
+          andere set, dan verandert de lijst kenmerken eronder mee — een
+          gordijnenset vraagt naar lichtdoorlatendheid, een meubelset naar
+          slijtvastheid. */}
+      {state.overlays.length > 0 ? (
+        <Card>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted">
+            {s.mapping.setsHeading}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">{s.mapping.setsNote}</p>
+          {matchingSets ? (
+            <p className="mt-1.5 text-xs text-muted">{s.mapping.setsMatching}</p>
+          ) : setsBy ? (
+            <p className="mt-1.5 text-xs text-muted">
+              {s.mapping.setsMatched}{' '}
+              <span className="text-ink">
+                {setsBy === 'browser' ? s.mapping.bySelf : s.mapping.byModel}
+              </span>
+            </p>
+          ) : null}
+          <ul className="mt-2">
+            {state.sets.filter((set) => set.category !== undefined).map((set) => (
+              <li
+                key={set.id}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-2 first:border-t-0"
+              >
+                <span className="min-w-0 flex-1 truncate text-sm">
+                  {set.category}
+                  <span className="ml-2 text-xs text-muted">
+                    {set.questions.filter((q) => q.layer === 'category').length > 0
+                      ? `${set.questions.length} ${s.mapping.setQuestions}`
+                      : s.mapping.setBaseOnly}
+                  </span>
+                </span>
+                <select
+                  aria-label={set.category}
+                  value={categories[set.category as string] ?? set.overlayId ?? ''}
+                  onChange={(event) => onCategories({
+                    ...categories,
+                    [set.category as string]: event.target.value === '' ? null : event.target.value,
+                  })}
+                  className="shrink-0 rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink"
+                >
+                  <option value="">{s.mapping.setNone}</option>
+                  {state.overlays.map((overlay) => (
+                    <option key={overlay.id} value={overlay.id}>{overlay.label[locale]}</option>
+                  ))}
+                </select>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
       <Card>
-        <ul>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted">
+          {s.mapping.listHeading}
+        </p>
+        <ul className="mt-2">
           {rows.map((row) => {
             const current = mapping[row.key]?.[0] ?? row.fields[0] ?? NONE;
             const isProposal = proposed[row.key] !== undefined;

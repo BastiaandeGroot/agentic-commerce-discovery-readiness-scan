@@ -101,6 +101,17 @@ vragenlijst en niet om een bestandsformaat. Vier regels die altijd gelden:
   van een basisvraag mogen veranderen, dan meten twee categorieën verschillende
   dingen onder hetzelfde id.
 
+Het **aggregatieniveau volgt de vragen**. Een subcategorie krijgt alleen een
+eigen rij in het rapport als de vragenlijst er een ándere vragenset voor kent
+(`QuestionSet.distinguishes`); anders is het dezelfde meting op minder producten
+en suggereert de rij een onderscheid dat de lijst niet maakt. Zelfde regel voor
+elk niveau dat je ooit toevoegt.
+
+De **algemene vragen worden één keer bevestigd** (`QuestionSetState.baseValidated`),
+de categorie-eigen per categorie. Een algemene vraag bewerken werkt op élke
+categorie tegelijk — anders meten twee categorieën verschillende dingen onder
+hetzelfde id.
+
 `belang` weegt mee in de trechter via een eigen trede: **basisgeschikt** is elke
 kritieke vraag beantwoord, **volledig** blijft élke gescoorde vraag. Geen gewogen
 percentagedrempel — zie de afgevallen richtingen in `NOTES.md`.

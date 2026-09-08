@@ -23,6 +23,8 @@ export class MappingFailed extends Error {}
 export interface RemoteInput {
   attributes: { key: string; text: string }[];
   columns: { key: string; text: string }[];
+  /** Kenmerken op kolommen, of vragensets op categorieën. Zelfde vorm. */
+  kind?: 'attributes' | 'categories';
 }
 
 export interface RemoteResult {

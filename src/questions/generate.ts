@@ -24,9 +24,9 @@
 import type { Bilingual, Dataset, Question, QuestionSet, QuestionSetState } from '../domain/types';
 import type { AttributeDef, QuestionBank } from './bank';
 import { bankFor, resolveBanks } from './banks';
-import { composeSet } from './compose';
+import { composeSet, overlayFor } from './compose';
 import { str } from '../intake/normalize';
-import { mainCategory } from '../engine/join';
+import { mainCategory, subCategory } from '../engine/join';
 import { catalogKnows } from '../engine/evaluate';
 import { matchAttributes, type AttributeMatch } from '../spec/match';
 import { applyMapping, requirementFor, type Mapping } from './mapping';
@@ -47,6 +47,26 @@ export interface CategoryStat {
  * Bij de testmerchant werd "Outdoorstoffen > Gestreept" onderweg tot los
  * "Gestreept" en verdween een hele hoofdcategorie.
  */
+/**
+ * De subcategorieën per hoofdcategorie, zoals ze in de catalogus staan.
+ *
+ * Niet om er vragensets van te maken — dat zou je filters meten in plaats van je
+ * markt — maar om te kunnen bepalen of de vragenlijst er iets over te zeggen
+ * heeft.
+ */
+export function deriveSubcategories(catalog: Dataset): Map<string, string[]> {
+  const out = new Map<string, Set<string>>();
+  for (const product of catalog.products) {
+    const main = mainCategory(product);
+    const sub = subCategory(product);
+    if (!main || !sub) continue;
+    const set = out.get(main) ?? new Set<string>();
+    set.add(sub);
+    out.set(main, set);
+  }
+  return new Map([...out.entries()].map(([main, subs]) => [main, [...subs].sort()]));
+}
+
 export function deriveCategories(catalog: Dataset): CategoryStat[] {
   const counts = new Map<string, number>();
   for (const product of catalog.products) {
@@ -148,6 +168,14 @@ export function generateQuestionSets(
   imported: QuestionBank[] = [],
   /** Wat de merchant zelf aanwees; die keuze gaat vóór de automatische match. */
   manual: Mapping = {},
+  /**
+   * Welke vragenset uit de lijst bij welke eigen categorie hoort.
+   *
+   * Sleutel is de categorienaam van de merchant, waarde het overlay-id uit zijn
+   * vragenlijst, of `null` voor "alleen de basisvragen". Staat een categorie er
+   * niet in, dan beslist de regex zoals altijd.
+   */
+  chosenOverlays: Record<string, string | null> = {},
 ): QuestionSetState {
   const mapped = new Map<string, AttributeMatch[]>();
   const banks = resolveBanks(imported).map((bank) => {
@@ -162,6 +190,7 @@ export function generateQuestionSets(
   const applicable = (question: Question) =>
     askCondition || !question.requires.includes('condition');
 
+  const subcategories = deriveSubcategories(catalog);
   const named = categories.slice(0, MAX_SETS);
   const tail = categories.slice(MAX_SETS);
   const used = new Map<string, QuestionBank>();
@@ -169,8 +198,23 @@ export function generateQuestionSets(
   const sets: QuestionSet[] = named.map((category) => {
     const bank = bankFor(category.name, banks);
     used.set(bank.meta.vertical, bank);
-    const set = composeSet(bank, { id: slug(category.name), name: category.name, count: category.count });
-    return { ...set, questions: set.questions.filter(applicable) };
+    const set = composeSet(
+      bank,
+      { id: slug(category.name), name: category.name, count: category.count },
+      category.name in chosenOverlays ? chosenOverlays[category.name] : undefined,
+    );
+    // Welke subcategorieën kent de vragenlijst als eigen categorie? Alleen die
+    // verdienen een eigen niveau; de rest krijgt dezelfde vragen en is dus
+    // dezelfde meting op minder producten.
+    const distinguishes = (subcategories.get(category.name) ?? []).filter((sub) => {
+      const own = overlayFor(bank, sub);
+      return own !== undefined && own.id !== set.overlayId;
+    });
+    return {
+      ...set,
+      questions: set.questions.filter(applicable),
+      distinguishes: distinguishes.length > 0 ? distinguishes : undefined,
+    };
   });
 
   // De staart van kleine categorieen deelt een vangnet-set, zodat die producten
@@ -222,6 +266,10 @@ export function generateQuestionSets(
     // op aansloeg. Dan draagt de set alleen de basislaag, en dat is een stille
     // halvering: de categoriespecifieke vragen zijn juist de vragen waar de
     // onomkeerbare fout in zit.
+    // Welke vragensets de lijst kent, zodat de merchant er zelf een kan
+    // aanwijzen als de namen niet op zijn boom uitkomen.
+    overlays: [...used.values()].flatMap((bank) =>
+      bank.overlays.map((overlay) => ({ id: overlay.id, label: overlay.label }))),
     categoriesWithoutOverlay: sets
       .filter((set) => set.category !== undefined && set.overlayId === undefined
         && (used.get(set.bankId ?? '')?.overlays.length ?? 0) > 0)

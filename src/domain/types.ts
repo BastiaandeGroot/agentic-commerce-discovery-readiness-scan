@@ -127,6 +127,16 @@ export interface Question {
   custom?: boolean;
   /** Waar de vraag vandaan komt. 'bank' = uit een vragenbank (zie questions/bank). */
   origin?: 'bank' | 'custom';
+  /**
+   * Uit de basislaag of uit de categorie.
+   *
+   * Dit onderscheid is het hele punt van de laagopzet en hoort dus zichtbaar te
+   * zijn: "hoe breed is deze stof" geldt voor élke stof, "is deze stof sterk
+   * genoeg voor mijn bank" alleen voor meubelstoffen. Zonder dat verschil leest
+   * een vragenset als één hoop en kan een merchant niet zien of zijn
+   * categoriespecifieke vragen überhaupt zijn aangekomen.
+   */
+  layer?: 'base' | 'category';
 
   // --- Uit de vragenbank ---------------------------------------------------
   // Deze velden komen mee uit de bank en veranderen niet door toedoen van de
@@ -190,6 +200,16 @@ export interface QuestionSet {
   overlayId?: string;
   /** Toepassingsprofielen die binnen deze categorie gelden. */
   profileIds?: string[];
+  /**
+   * Subcategorieën waarvoor de vragenlijst eigen vragen kent.
+   *
+   * Alleen deze mogen als apart niveau getoond worden. Een subcategorie die
+   * dezelfde vragen krijgt als zijn categorie is geen tweede meting maar
+   * dezelfde meting op minder producten; hem als eigen rij tonen suggereert een
+   * onderscheid dat de vragenlijst niet maakt. Het aggregatieniveau volgt de
+   * vragen, niet de categorieboom.
+   */
+  distinguishes?: string[];
 }
 
 export type ChangeLogAction = 'edited' | 'disabled' | 'enabled' | 'added' | 'removed';
@@ -207,6 +227,14 @@ export interface ChangeLogEntry {
 export interface QuestionSetState {
   version: number;
   sets: QuestionSet[];
+  /**
+   * De algemene vragen zijn gezien, in één keer voor alle categorieën.
+   *
+   * Los van `QuestionSet.validated`, dat over de eigen vragen van één categorie
+   * gaat. Ze zijn overal dezelfde vraag, dus ze vier keer voorleggen levert vier
+   * keer hetzelfde oordeel op — en dat is geen oordeel meer.
+   */
+  baseValidated?: boolean;
   changeLog: ChangeLogEntry[];
   /**
    * Welke banken deze sets voedden, met hun versie en status.
@@ -233,6 +261,14 @@ export interface QuestionSetState {
    * die dit product hoort te voorkomen.
    */
   attributeMatches: { key: string; columns: string[]; basis: string }[];
+  /**
+   * De categoriespecifieke vragensets die de vragenlijst kent.
+   *
+   * Nodig om de merchant er zelf een te laten kiezen: zijn catalogus heet
+   * "Meubelstoffen" en zijn lijst "upholstery fabrics", en dan is er niets dat
+   * die twee vanzelf op elkaar legt.
+   */
+  overlays: { id: string; label: Bilingual }[];
   /**
    * Categorieën waarvoor de bank geen overlay had, terwijl hij er wel heeft.
    *
@@ -279,6 +315,10 @@ export type AnswerState = 'answered' | 'unusable' | 'incomplete' | 'empty' | 'ab
 export interface QuestionOutcome {
   questionId: string;
   label: Bilingual;
+  /** Algemene vraag of categorie-eigen; zie `Question.layer`. */
+  layer?: 'base' | 'category';
+  /** Waar deze vraag zijn antwoord vandaan zou halen; zie `QuestionCoverage`. */
+  evidence?: { attributeKey: string; label: Bilingual; fields: string[] }[];
   state: AnswerState;
   /** De catalogus beantwoordt de vraag. `state === 'answered'`. */
   answered: boolean;
@@ -299,6 +339,8 @@ export interface ProductResult {
   key: string;
   title?: string;
   category?: string;
+  /** Tweede segment van het categoriepad; een doorsnede, geen eigen vragenset. */
+  subcategory?: string;
   /** Hoofdafbeelding; een product zonder is zelf een bevinding. */
   image?: string;
   /** Toegepaste vragenset, of undefined als het product nergens op matchte. */
@@ -339,9 +381,25 @@ export interface Funnel {
 }
 
 /** Aggregatie op de eigen categorie-indeling van de merchant. */
+/** Eén gemiddelde met zijn doel ernaast; het doel is altijd "alles". */
+export interface Average {
+  /** Gemiddeld aantal beantwoorde vragen per product. */
+  answered: number;
+  /** Hoeveel vragen van dit soort er per product gesteld worden. */
+  total: number;
+}
+
 export interface CategoryReport {
   setId: string;
   category: string;
+  /**
+   * Het tweede segment van het categoriepad, als deze rij een subcategorie is.
+   *
+   * Een subcategorie krijgt geen eigen vragenset — de vragenlijst kent vragen
+   * per markt en niet per filter — maar wel een eigen rij, zodat je binnen een
+   * categorie kunt zien waar het werk zit.
+   */
+  subcategory?: string;
   total: number;
   qualified: number;
   findable: number;
@@ -349,6 +407,17 @@ export interface CategoryReport {
   avgApplicable: number;
   avgEarned: number;
   avgWeight: number;
+  /**
+   * De drie gemiddelden waar een merchant op stuurt.
+   *
+   * `critical` is de eerste poort: zijn ze alle beantwoord, dan is het product
+   * basisgeschikt. `all` is de tweede: alles beantwoord is volledig. `general`
+   * staat ertussen omdat het de vragen zijn die in élke categorie terugkomen —
+   * daar werken aan telt overal mee.
+   */
+  critical: Average;
+  general: Average;
+  all: Average;
   /** De zwaarst wegende gaten binnen deze categorie. */
   topGaps: { field: string; label: Bilingual; cause: GapCause; affected: number }[];
 }
@@ -383,6 +452,17 @@ export interface QuestionCoverage {
   absent: number;
   applicable: number;
   importance: Importance;
+  /** Algemene vraag of categorie-eigen; zie `Question.layer`. */
+  layer?: 'base' | 'category';
+  /**
+   * Waar deze vraag zijn antwoord vandaan zou halen: per kenmerk de velden.
+   *
+   * Zonder dit is een onbeantwoorde vraag een mededeling. Een merchant kan er
+   * pas iets mee als hij ziet wélk kenmerk het blokkeert en welke kolom daaraan
+   * hangt — dan is het invulwerk in een kolom die hij kent, in plaats van een
+   * cijfer dat te laag is.
+   */
+  evidence?: { attributeKey: string; label: Bilingual; fields: string[] }[];
   /** Het gewicht dat hier per product op het spel staat. */
   weight: number;
   /** Telt niet mee in de trechter; staat in het adviesblok. */

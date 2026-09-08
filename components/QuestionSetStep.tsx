@@ -11,9 +11,10 @@
 import { useMemo, useState } from 'react';
 import type { Dataset, Locale, Question, QuestionSetState } from '../src/domain/types';
 import { isScored } from '../src/questions/compose';
-import { FIELDS, FIELD_BY_KEY } from '../src/spec/fields';
+import { FIELDS, requirementLabel } from '../src/spec/fields';
 import {
-  addQuestion, allValidated, editQuestion, toggleQuestion, toggleValidated,
+  addQuestion, allValidated, baseQuestions, editBaseQuestion, editQuestion, hasOwnQuestions,
+  toggleBaseQuestion, toggleBaseValidated, toggleQuestion, toggleValidated,
 } from '../src/questions/mutate';
 import type { Strings } from '../src/i18n/strings';
 import { Badge, Button, Card, CardTitle, ErrorState } from './ui';
@@ -31,13 +32,7 @@ interface Props {
   error?: string;
 }
 
-/** Leesbare omschrijving van wat een vraag nodig heeft. */
-function requirementLabel(requirement: string, locale: Locale): string {
-  if (requirement.startsWith('attr:')) {
-    return requirement.slice(5).replace(/[$^\\]/g, '').replace(/\|/g, ' / ');
-  }
-  return FIELD_BY_KEY[requirement]?.label[locale] ?? requirement;
-}
+
 
 /**
  * Het gewicht van een vraag, in woord en in vorm.
@@ -52,10 +47,17 @@ const IMPORTANCE_TONE = {
 } as const;
 
 function QuestionRow({
-  s, locale, setId, question, onChange, state,
+  s, locale, setId, question, onChange, state, shared, note,
 }: {
   s: Strings; locale: Locale; setId: string; question: Question;
   state: QuestionSetState; onChange: (n: QuestionSetState) => void;
+  /**
+   * Een algemene vraag: bewerken en uitzetten werken dan op élke categorie.
+   * Anders meten twee categorieën verschillende dingen onder hetzelfde id.
+   */
+  shared?: boolean;
+  /** Waar deze vraag anders weegt; alleen bij de algemene vragen. */
+  note?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(question.label[locale]);
@@ -65,7 +67,10 @@ function QuestionRow({
 
   function save() {
     const label = { ...question.label, [locale]: draft } as { nl: string; en: string };
-    onChange(editQuestion(state, new Date().toISOString(), setId, question.id, label));
+    const at = new Date().toISOString();
+    onChange(shared
+      ? editBaseQuestion(state, at, question.id, label)
+      : editQuestion(state, at, setId, question.id, label));
     setEditing(false);
   }
 
@@ -87,7 +92,18 @@ function QuestionRow({
           </div>
         ) : (
           <>
-            <p className="text-sm">{question.label[locale]}</p>
+            <p className="text-sm">
+              {/* De laag vóór de vraag: algemeen geldt voor élk product,
+                  categorie-eigen gaat over wat in déze categorie misgaat. Zonder
+                  dat verschil leest een set als één hoop en kan niemand zien of
+                  de categoriespecifieke vragen überhaupt zijn aangekomen. */}
+              {question.layer === 'category' ? (
+                <span className="mr-2 align-middle text-xs font-medium uppercase tracking-wide text-accent">
+                  {s.questions.layerCategory}
+                </span>
+              ) : null}
+              {question.label[locale]}
+            </p>
             <p className="mt-0.5 text-xs text-muted">
               {/* Het bewijs per attribuut, niet als één platte lijst velden: een
                   vraag die twee dingen tegelijk vraagt is iets anders dan een
@@ -139,6 +155,9 @@ function QuestionRow({
                 {s.questions.notScoredExplain}
               </p>
             ) : null}
+            {/* Dezelfde vraag, elders zwaarder. Dat is geen tweede vraag maar
+                een aantekening bij deze; apart tonen zou de lijst verdubbelen. */}
+            {note ? <p className="mt-1 text-xs text-muted">{note}</p> : null}
           </>
         )}
       </div>
@@ -154,7 +173,15 @@ function QuestionRow({
             {question.origin === 'custom' ? s.questions.fromData : s.questions.fromArchetype}
           </Badge>
           <Button variant="quiet" onClick={() => setEditing(true)}>{s.questions.edit}</Button>
-          <Button variant="quiet" onClick={() => onChange(toggleQuestion(state, new Date().toISOString(), setId, question.id))}>
+          <Button
+            variant="quiet"
+            onClick={() => {
+              const at = new Date().toISOString();
+              onChange(shared
+                ? toggleBaseQuestion(state, at, question.id)
+                : toggleQuestion(state, at, setId, question.id));
+            }}
+          >
             {question.disabled ? s.questions.enable : s.questions.disable}
           </Button>
         </div>
@@ -168,8 +195,11 @@ function columnPattern(column: string): string {
   return `attr:^${column.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`;
 }
 
+/** Sleutel voor de kaart met de algemene vragen; geen set-id, dus botst niet. */
+const BASE = '\u0000base';
+
 export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, running, error }: Props) {
-  const [openSet, setOpenSet] = useState<string | undefined>(state.sets[0]?.id);
+  const [openSet, setOpenSet] = useState<string | undefined>(BASE);
   const [newLabel, setNewLabel] = useState('');
   const [newField, setNewField] = useState('');
 
@@ -180,6 +210,7 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, ru
     return [...canonical, ...own];
   }, [catalog.unmappedColumns, locale]);
 
+  const base = useMemo(() => baseQuestions(state), [state]);
   const ready = allValidated(state);
 
   return (
@@ -232,9 +263,59 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, ru
         ) : null}
       </Card>
 
+      {/* De algemene vragen, één keer. Ze staan in élke categorie onder hetzelfde
+          id en met dezelfde tekst — een overlay mag herwegen maar niet
+          herschrijven — dus ze vier keer voorleggen vraagt vier keer hetzelfde
+          oordeel. Wie dat moet doen leest de vierde keer niet meer. */}
+      {base.length > 0 ? (
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setOpenSet(openSet === BASE ? undefined : BASE)}
+              className="flex min-w-0 flex-1 items-center gap-3 text-left"
+            >
+              <span className="text-muted">{openSet === BASE ? '▾' : '▸'}</span>
+              <span className="min-w-0">
+                <span className="block truncate font-medium">{s.questions.baseHeading}</span>
+                <span className="text-xs text-muted">
+                  <span className="tnum">{base.length}</span> {s.questions.baseCount}
+                </span>
+              </span>
+            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              {state.baseValidated ? <Badge tone="ok">✓ {s.questions.validated}</Badge> : null}
+              <Button
+                variant={state.baseValidated ? 'quiet' : 'secondary'}
+                onClick={() => onChange(toggleBaseValidated(state))}
+              >
+                {state.baseValidated ? s.questions.unvalidate : s.questions.baseValidate}
+              </Button>
+            </div>
+          </div>
+          {openSet === BASE ? (
+            <ul className="mt-3">
+              {base.map(({ question, reweighted }) => (
+                <QuestionRow
+                  key={question.id}
+                  s={s} locale={locale} setId={state.sets[0]?.id ?? ''} question={question}
+                  state={state} onChange={onChange} shared
+                  note={reweighted.length > 0
+                    ? `${s.questions.reweighted}: ${reweighted
+                      .map((r) => `${r.category} — ${s.questions.importance[r.importance]}`)
+                      .join(' · ')}`
+                    : undefined}
+                />
+              ))}
+            </ul>
+          ) : null}
+        </Card>
+      ) : null}
+
       {state.sets.map((set) => {
         const open = openSet === set.id;
-        const active = set.questions.filter((q) => !q.disabled).length;
+        const own = set.questions.filter((q) => q.layer === 'category');
+        const active = own.filter((q) => !q.disabled).length;
         return (
           <Card key={set.id}>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -248,9 +329,9 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, ru
                   <span className="block truncate font-medium">{set.label[locale]}</span>
                   <span className="text-xs text-muted">
                     <span className="tnum">{set.productCount ?? 0}</span> {s.questions.productsInCategory} ·{' '}
-                    <span className="tnum">{active}</span> {locale === 'nl' ? 'vragen' : 'questions'} ·{' '}
-                    {s.questions.basedOn}: {set.bankId}
-                    {set.bankVersion ? ` ${set.bankVersion}` : ''}
+                    {own.length > 0
+                      ? <><span className="tnum">{active}</span> {s.questions.ownCount}</>
+                      : s.questions.noOwn}
                   </span>
                 </span>
               </button>
@@ -263,27 +344,35 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, ru
                 {set.bankStatus && set.bankStatus !== 'frozen' ? (
                   <Badge tone="warn">{s.bank.status[set.bankStatus]}</Badge>
                 ) : null}
-                {set.validated ? <Badge tone="ok">✓ {s.questions.validated}</Badge> : null}
-                <Button
-                  variant={set.validated ? 'quiet' : 'secondary'}
-                  onClick={() => onChange(toggleValidated(state, set.id))}
-                >
-                  {set.validated ? s.questions.unvalidate : s.questions.validate}
-                </Button>
+                {hasOwnQuestions(set) ? (
+                  <>
+                    {set.validated ? <Badge tone="ok">✓ {s.questions.validated}</Badge> : null}
+                    <Button
+                      variant={set.validated ? 'quiet' : 'secondary'}
+                      onClick={() => onChange(toggleValidated(state, set.id))}
+                    >
+                      {set.validated ? s.questions.unvalidate : s.questions.validate}
+                    </Button>
+                  </>
+                ) : null}
               </div>
             </div>
 
             {open ? (
               <>
-                <ul className="mt-3">
-                  {set.questions.map((question) => (
-                    <QuestionRow
-                      key={question.id}
-                      s={s} locale={locale} setId={set.id} question={question}
-                      state={state} onChange={onChange}
-                    />
-                  ))}
-                </ul>
+                {own.length === 0 ? (
+                  <p className="mt-3 text-sm text-muted">{s.questions.noOwnExplain}</p>
+                ) : (
+                  <ul className="mt-3">
+                    {own.map((question) => (
+                      <QuestionRow
+                        key={question.id}
+                        s={s} locale={locale} setId={set.id} question={question}
+                        state={state} onChange={onChange}
+                      />
+                    ))}
+                  </ul>
+                )}
 
                 <div className="mt-4 flex flex-wrap items-end gap-2 rounded-lg bg-surface-2 p-3">
                   <label className="min-w-0 flex-1 text-xs text-muted">

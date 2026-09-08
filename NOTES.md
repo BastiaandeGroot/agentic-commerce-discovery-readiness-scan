@@ -1,7 +1,7 @@
 # Werknotities
 
 Sessiestand: wat er staat, wat er besloten is, wat er open is.
-Laatst bijgewerkt: 2026-09-07 (tweede sessie).
+Laatst bijgewerkt: 2026-09-08.
 
 Structurele regels die altijd gelden staan **niet** hier maar in `CLAUDE.md`.
 
@@ -216,6 +216,63 @@ is waarop een cijfer omhoog kruipt zonder dat er een vraag meer beantwoord wordt
 *De sleutel staat in `.env.local` (gitignored) en op Render als `sync: false`.
 Een sleutel zonder workspace moet `ANTHROPIC_WORKSPACE_ID` als header meesturen;
 de route doet dat als de variabele er is.*
+
+**Het aggregatieniveau volgt de vragen, niet de categorieboom.** Een rij
+`Gordijnstoffen › Effen` die exact dezelfde 56 vragen meet als `Gordijnstoffen`
+is geen tweede meting maar dezelfde meting op minder producten, en suggereert
+een onderscheid dat de vragenlijst niet maakt. Een subcategorie krijgt daarom
+alleen een eigen niveau als `overlayFor` er een ándere vragenset voor vindt
+(`QuestionSet.distinguishes`). Heeft de catalogus wél subcategorieën en de lijst
+niet, dan staat dat als zin onder de kaart — anders lijkt een ontbrekend niveau
+een gebrek in de app in plaats van een eigenschap van de lijst. De toepassings-
+profielen (`critical_in_profiles`: verduisterend, kamerhoog, banengordijn) zijn
+de plek waar dat niveau vandaan komt zodra we per profiel gaan meten.
+
+**Algemene vragen worden één keer bevestigd, categorie-eigen per categorie.**
+Vier keer dezelfde 34 vragen voorleggen levert vier keer hetzelfde oordeel op, en
+wie dat moet doen leest de vierde keer niet meer. `baseValidated` staat naast
+`QuestionSet.validated`; een categorie zonder eigen vragen vraagt niet om een
+tweede bevestiging. Een algemene vraag bewerken of uitzetten werkt meteen op élke
+categorie — anders meten twee categorieën verschillende dingen onder hetzelfde
+id. Herwegingen verdwijnen niet: ze staan als aantekening onder de ene rij
+("weegt zwaarder in Gordijnstoffen").
+
+**De koppeling wordt bewaard bij de vragenlijst.** `StoredBank.mapping` en
+`StoredBank.categories`, bij elke wijziging weggeschreven. Alleen namen —
+kenmerksleutel, kolomnaam, categorienaam — dus de belofte dat de catalogus het
+apparaat niet verlaat blijft overeind. Een nieuwe lijst wist de categoriekeuzes
+(die wijzen naar sets die er niet meer zijn) en houdt de kenmerkkoppeling (die
+hangt aan kolomnamen, en die zijn niet veranderd).
+
+**Categoriekoppeling gebeurt vanzelf, niet na een klik.** Stond hij achter de
+knop, dan kreeg elke categorie stilzwijgend alleen de algemene vragen zodra
+iemand die knop niet indrukte — en dan valt het cijfer te gunstig uit. Claude
+legt de vier categorieën van de testmerchant goed; het browsermodel haalt er 2
+van de 4 (Decoratiestoffen en Outdoorstoffen, waar een verwant woord bestaat) en
+laat de rest los in plaats van te gokken.
+
+**Wat het model kost en duurt, gemeten op de echte catalogus.** Het lokale werk
+is verwaarloosbaar: 182 ms voor intake plus vragensets over 3.552 producten, 0 ms
+voor het samenstellen van de opdracht. Die opdracht is 78 kenmerknamen tegen 56
+kolomnamen en groeit niet mee met het aantal producten — een merchant met
+350.000 producten stuurt exact evenveel als een met 60.
+
+| | tijd |
+|---|---|
+| Claude via `/api/mapping` | 2,6 s |
+| Browsermodel, gecachet | 0,5 s laden + 2,2 s rekenen |
+| Browsermodel, eerste keer | 113 MB downloaden |
+
+Kosten: 4.563 invoertokens, ~100 uitvoertokens, ~$0,005 per aanroep. Twee
+aanroepen per keer (categorieën, dan kenmerken) is **ongeveer een dollarcent per
+scan**, of $10 per duizend scans. Ter vergelijking: de afgewezen richting — een
+model per SKU — was $450 per catalogus.
+
+*Twee dingen die daarbij bleken. De strenge opdracht ("laat weg wat je niet zeker
+weet") maakt hem vier keer sneller én vijf keer goedkoper dan een slappe: 100
+uitvoertokens tegen 1.162. En meer rekenkernen aanzetten voor het browsermodel
+levert niets op — het rekenen is 2,2 van de 60 seconden, en het zou wel kosten
+dat twee machines een ander voorstel geven.*
 
 **Een taalmodel in de browser, en wat het echt oplevert.** Op 7 september is
 `src/semantic/` erbij gekomen: een embeddingmodel (`Xenova/multilingual-e5-small`,

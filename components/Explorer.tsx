@@ -60,7 +60,8 @@ function CategoryTable({ s, report, locale }: {
                     {row.topGaps.map((gap) => (
                       <Badge
                         key={gap.field}
-                        tone={gap.cause === 'unfilled' ? 'accent' : gap.cause === 'no-source' ? 'danger' : 'warn'}
+                        tone={gap.cause === 'unfilled' ? 'ok' : gap.cause === 'no-source' ? 'danger' : 'warn'}
+                    title={`${s.report.causeMeaning[gap.cause]} · ${s.report.causeEffort[gap.cause]}`}
                       >
                         {gap.label[locale]}
                       </Badge>
@@ -180,7 +181,8 @@ function ProductRow({ s, product, locale }: {
               {product.gaps.slice(0, 12).map((gap) => (
                 <li key={`${gap.field}-${gap.cause}`} className="flex flex-wrap items-baseline gap-1.5">
                   <Badge
-                    tone={gap.cause === 'unfilled' ? 'accent' : gap.cause === 'no-source' ? 'danger' : 'warn'}
+                    tone={gap.cause === 'unfilled' ? 'ok' : gap.cause === 'no-source' ? 'danger' : 'warn'}
+                    title={`${s.report.causeMeaning[gap.cause]} · ${s.report.causeEffort[gap.cause]}`}
                   >
                     {s.report.causes[gap.cause]}
                   </Badge>

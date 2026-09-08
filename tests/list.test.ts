@@ -11,7 +11,12 @@ import assert from 'node:assert/strict';
 import { importQuestionCsv, importQuestionList, looksLikeQuestionList } from '../src/questions/list';
 import { composeSet, overlayFor } from '../src/questions/compose';
 import { applyMapping } from '../src/questions/mapping';
+import {
+  allValidated, baseQuestions, editBaseQuestion, hasOwnQuestions, toggleBaseValidated, toggleValidated,
+} from '../src/questions/mutate';
+import type { QuestionSetState } from '../src/domain/types';
 import { ingest } from '../src/intake/index';
+import { generateQuestionSets } from '../src/questions/generate';
 import { catalogKnows, fieldState } from '../src/engine/evaluate';
 import { buildMappingRequest, parseMappingAnswer, renderMappingRequest } from '../src/spec/mapping';
 
@@ -467,4 +472,112 @@ test('wat al gekoppeld is, wordt niet opnieuw gevraagd', () => {
     ['rol_breedte'],
   );
   assert.deepEqual(request.columns, ['material', 'weight']);
+});
+
+// --- Algemene vragen en categorie-eigen vragen ------------------------------
+
+test('elke vraag draagt of hij algemeen is of bij de categorie hoort', () => {
+  // Dit onderscheid is het hele punt van de laagopzet. Raakt het kwijt, dan
+  // leest een set als één hoop en kan een merchant niet zien of zijn
+  // categoriespecifieke vragen überhaupt zijn aangekomen.
+  const { bank } = lees(LIJST);
+  const set = composeSet(bank!, { id: 'meubelstoffen', name: 'Meubelstoffen', count: 5 });
+  const lagen = Object.fromEntries(set.questions.map((q) => [q.id, q.layer]));
+  assert.equal(lagen['BAS-H01'], 'base');
+  assert.equal(lagen['MEU-A01'], 'category');
+});
+
+test('de merchant mag zelf aanwijzen welke vragenset bij zijn categorie hoort', () => {
+  // De regex faalt zodra de lijst zijn categorieën anders noemt dan de
+  // catalogus — een Engelse lijst op een Nederlandse boom is het normale geval.
+  // Dan krijgt elke categorie dezelfde basisvragen en valt het cijfer te gunstig
+  // uit, want juist de kritieke vragen van die categorie ontbreken.
+  const { bank } = lees(LIJST);
+  const eigen = (chosen?: string | null) =>
+    composeSet(bank!, { id: 'x', name: 'Bekledingsstof', count: 5 }, chosen)
+      .questions.filter((q) => q.layer === 'category').map((q) => q.id);
+
+  // Zonder keuze slaat de regex niet aan op deze naam.
+  assert.deepEqual(eigen(), []);
+  // Met keuze landen de categoriespecifieke vragen alsnog.
+  assert.deepEqual(eigen('meubelstoffen'), ['MEU-A01']);
+  // En `null` betekent uitdrukkelijk: alleen de algemene vragen.
+  assert.deepEqual(eigen(null), []);
+});
+
+test('de algemene vragen worden één keer bevestigd, de eigen vragen per categorie', () => {
+  // Vier keer dezelfde 34 vragen voorleggen levert vier keer hetzelfde oordeel
+  // op, en wie dat moet doen leest de vierde keer niet meer.
+  const { bank } = lees(LIJST);
+  const set = (naam: string, chosen?: string | null) =>
+    composeSet(bank!, { id: naam.toLowerCase(), name: naam, count: 10 }, chosen);
+  const state: QuestionSetState = {
+    version: 1,
+    sets: [set('Meubelstoffen', 'meubelstoffen'), set('Overig', null)],
+    changeLog: [],
+    banks: [],
+    blindAttributes: [],
+    attributeMatches: [],
+    overlays: [],
+    categoriesWithoutOverlay: [],
+  };
+
+  // De algemene vragen staan er één keer in, niet één keer per categorie.
+  assert.deepEqual(baseQuestions(state).map((entry) => entry.question.id), ['BAS-H01']);
+
+  // Zolang de algemene vragen niet bevestigd zijn is niets af.
+  assert.equal(allValidated(state), false);
+
+  // Een categorie zonder eigen vragen hoeft niet apart bevestigd te worden:
+  // die bestaat helemaal uit de basislaag en is met die ene klik al gezien.
+  assert.equal(hasOwnQuestions(state.sets[1]), false);
+  const alleenBasis = { ...toggleBaseValidated(state) };
+  assert.equal(allValidated(alleenBasis), false, 'Meubelstoffen heeft wél eigen vragen');
+
+  const compleet = toggleValidated(alleenBasis, 'meubelstoffen');
+  assert.equal(allValidated(compleet), true);
+});
+
+test('een algemene vraag bewerken raakt élke categorie', () => {
+  // Anders meten twee categorieën verschillende dingen onder hetzelfde id.
+  const { bank } = lees(LIJST);
+  const state: QuestionSetState = {
+    version: 1,
+    sets: [
+      composeSet(bank!, { id: 'a', name: 'Meubelstoffen', count: 10 }, 'meubelstoffen'),
+      composeSet(bank!, { id: 'b', name: 'Gordijnstoffen', count: 10 }, null),
+    ],
+    changeLog: [],
+    banks: [],
+    blindAttributes: [],
+    attributeMatches: [],
+    overlays: [],
+    categoriesWithoutOverlay: [],
+  };
+  const na = editBaseQuestion(state, '2026-01-01T00:00:00Z', 'BAS-H01', {
+    nl: 'Hoe breed is de baan?', en: 'How wide is the roll?',
+  });
+  for (const set of na.sets) {
+    assert.equal(set.questions.find((q) => q.id === 'BAS-H01')?.label.nl, 'Hoe breed is de baan?');
+  }
+});
+
+test('een subcategorie krijgt alleen een eigen niveau als de lijst hem kent', () => {
+  // Anders is het dezelfde meting op minder producten, en suggereert de rij een
+  // onderscheid dat de vragenlijst niet maakt. Het aggregatieniveau volgt de
+  // vragen, niet de categorieboom.
+  const { bank } = lees(LIJST);
+  const catalogus = ingest('c.csv', [
+    'sku;title;main_category',
+    // Effen kent de lijst niet; naaigarens wél, als eigen categorie.
+    '1;A;Meubelstoffen > Effen',
+    '2;B;Meubelstoffen > Effen',
+    '3;C;Meubelstoffen > Naaigarens',
+    '4;D;Meubelstoffen > Naaigarens',
+  ].join('\n'));
+
+  const state = generateQuestionSets(catalogus, [bank!], {}, { Meubelstoffen: 'meubelstoffen' });
+  const set = state.sets.find((entry) => entry.category === 'Meubelstoffen');
+  assert.deepEqual(set?.distinguishes, ['Naaigarens']);
+  assert.equal(set?.distinguishes?.includes('Effen'), false);
 });

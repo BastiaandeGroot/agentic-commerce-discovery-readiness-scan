@@ -7,16 +7,28 @@ import type { ReactNode } from 'react';
  * paneel: twee open tooltips in dezelfde kaart gingen over elkaar heen, en een
  * paneel dat alleen op hover verschijnt bestaat niet op een telefoon. Inline
  * schuift de kaart een stukje op en blijft alles leesbaar.
+ *
+ * Hij opent op hover én op focus én op klik. Alleen hover zou hem op een
+ * telefoon en met een toetsenbord onbereikbaar maken; alleen klik vraagt een
+ * handeling voor iets wat je even wilt nalezen. Alle drie kost niets en sluit
+ * niemand uit.
  */
-export function InfoButton({ label, open, onToggle }: {
+export function InfoButton({ label, open, onToggle, onOpen, onClose }: {
   label: string;
   open: boolean;
   onToggle: () => void;
+  /** Aanwijzen of focussen opent; laat weg om alleen op klik te openen. */
+  onOpen?: () => void;
+  onClose?: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onToggle}
+      onMouseEnter={onOpen}
+      onMouseLeave={onClose}
+      onFocus={onOpen}
+      onBlur={onClose}
       aria-expanded={open}
       aria-label={label}
       title={label}
