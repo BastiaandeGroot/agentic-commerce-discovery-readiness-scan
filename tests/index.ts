@@ -11,3 +11,4 @@ import './list.test';
 import './match.test';
 import './semantic.test';
 import './request.test';
+import './inventory.test';
