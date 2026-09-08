@@ -588,6 +588,55 @@ export const STRINGS = {
       allRecords: 'Alle',
     },
 
+    auth: {
+      signInTitle: 'Inloggen',
+      signInIntro: 'Log in om je bewaarde scans en je koppeling terug te vinden.',
+      signUpTitle: 'Account aanmaken',
+      signUpIntro:
+        'Een account bewaart je scans en de koppeling die je maakte, zodat je een volgende keer niet opnieuw begint. Je catalogus zelf gaat er niet in — die blijft op je eigen apparaat.',
+      email: 'E-mailadres',
+      password: 'Wachtwoord',
+      passwordHint: 'Minstens 8 tekens.',
+      newPassword: 'Nieuw wachtwoord',
+      signIn: 'Inloggen',
+      signUp: 'Account aanmaken',
+      signOut: 'Uitloggen',
+      noAccount: 'Nog geen account?',
+      hasAccount: 'Heb je al een account?',
+      forgotLink: 'Wachtwoord vergeten?',
+      forgotTitle: 'Wachtwoord vergeten',
+      forgotIntro: 'Vul je e-mailadres in, dan sturen we een link waarmee je een nieuw wachtwoord instelt.',
+      forgotSubmit: 'Stuur me een link',
+      forgotSentTitle: 'Kijk in je mail',
+      forgotSentBody:
+        'Staat er een account op dit adres, dan ligt er nu een link in je inbox. Die is een uur geldig. Zie je niets, kijk dan in je spam.',
+      resetTitle: 'Nieuw wachtwoord instellen',
+      resetIntro: 'Kies een nieuw wachtwoord. Daarna ben je meteen ingelogd.',
+      resetSubmit: 'Wachtwoord opslaan',
+      confirmTitle: 'Bevestig je e-mailadres',
+      confirmBody:
+        'We hebben een bevestigingslink gestuurd. Klik erop en je kunt inloggen. Zie je niets, kijk dan in je spam.',
+      checking: 'Even kijken of je al ingelogd bent…',
+      signedInAs: 'Ingelogd als',
+      // Vier fouten die een mens anders zelf moet raden. Elke tekst zegt wat er
+      // mis is én wat er nu te doen valt; een melding zonder uitweg is een
+      // doodlopende weg.
+      errorCredentials: 'Dit e-mailadres en wachtwoord horen niet bij elkaar',
+      errorCredentialsNext:
+        'Controleer of er geen typefout in zit. Weet je het wachtwoord niet meer, gebruik dan de link hieronder.',
+      errorEmailInUse: 'Op dit e-mailadres staat al een account',
+      errorEmailInUseNext: 'Log in met je bestaande wachtwoord, of vraag een nieuw wachtwoord aan.',
+      errorWeakPassword: 'Dit wachtwoord is te kort',
+      errorWeakPasswordNext: 'Kies er een van minstens 8 tekens.',
+      errorEmailInvalid: 'Dit lijkt geen geldig e-mailadres',
+      errorEmailInvalidNext: 'Controleer of het apenstaartje en de puntjes er allemaal in staan.',
+      errorGeneric: 'Er ging iets mis bij het inloggen',
+      errorGenericNext: 'Probeer het zo nog eens. Blijft het misgaan, herlaad dan de pagina.',
+      notConfigured: 'Inloggen staat nog niet aan',
+      notConfiguredNext:
+        'Deze installatie heeft geen accountdienst ingesteld. De scan werkt gewoon — alleen bewaren en terugvinden nog niet.',
+    },
+
     errors: {
       noColumns: 'We herkennen geen enkele kolom in dit bestand',
       noColumnsNext:
@@ -1175,6 +1224,52 @@ export const STRINGS = {
       allRecords: 'All',
       openDetail: 'Show details',
       closeDetail: 'Hide details',
+    },
+
+    auth: {
+      signInTitle: 'Sign in',
+      signInIntro: 'Sign in to find your saved scans and your mapping again.',
+      signUpTitle: 'Create an account',
+      signUpIntro:
+        'An account keeps your scans and the mapping you made, so you do not start over next time. Your catalogue itself does not go in — that stays on your own device.',
+      email: 'Email address',
+      password: 'Password',
+      passwordHint: 'At least 8 characters.',
+      newPassword: 'New password',
+      signIn: 'Sign in',
+      signUp: 'Create account',
+      signOut: 'Sign out',
+      noAccount: 'No account yet?',
+      hasAccount: 'Already have an account?',
+      forgotLink: 'Forgotten your password?',
+      forgotTitle: 'Forgotten password',
+      forgotIntro: 'Enter your email address and we will send a link to set a new password.',
+      forgotSubmit: 'Send me a link',
+      forgotSentTitle: 'Check your email',
+      forgotSentBody:
+        'If there is an account on this address, a link is in your inbox now. It is valid for an hour. Nothing there? Check your spam folder.',
+      resetTitle: 'Set a new password',
+      resetIntro: 'Choose a new password. You will be signed in straight away.',
+      resetSubmit: 'Save password',
+      confirmTitle: 'Confirm your email address',
+      confirmBody:
+        'We have sent a confirmation link. Click it and you can sign in. Nothing there? Check your spam folder.',
+      checking: 'Checking whether you are already signed in…',
+      signedInAs: 'Signed in as',
+      errorCredentials: 'This email address and password do not match',
+      errorCredentialsNext:
+        'Check for a typo. If you cannot remember the password, use the link below.',
+      errorEmailInUse: 'There is already an account on this email address',
+      errorEmailInUseNext: 'Sign in with your existing password, or request a new one.',
+      errorWeakPassword: 'This password is too short',
+      errorWeakPasswordNext: 'Choose one of at least 8 characters.',
+      errorEmailInvalid: 'This does not look like a valid email address',
+      errorEmailInvalidNext: 'Check that the @ sign and the dots are all there.',
+      errorGeneric: 'Something went wrong while signing in',
+      errorGenericNext: 'Try again in a moment. If it keeps failing, reload the page.',
+      notConfigured: 'Signing in is not switched on yet',
+      notConfiguredNext:
+        'This installation has no account service configured. The scan works fine — only saving and finding things again does not.',
     },
 
     errors: {

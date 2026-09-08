@@ -2,15 +2,18 @@
 
 /** Tekstveld. Het label hoort erbij en niet erboven te zweven: een placeholder
  *  verdwijnt zodra iemand typt, en dan is niet meer te zien wat er gevraagd werd. */
-export function Input({ label, value, onChange, placeholder, type = 'text', id, hint, invalid }: {
+export function Input({ label, value, onChange, placeholder, type = 'text', id, hint, invalid, autoComplete }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  type?: 'text' | 'email' | 'search';
+  type?: 'text' | 'email' | 'search' | 'password';
   id: string;
   hint?: string;
   invalid?: string;
+  /** Wat de browser hier mag invullen. Zonder dit biedt een wachtwoordmanager
+   *  niets aan, en dan typt iemand zijn wachtwoord met de hand over. */
+  autoComplete?: string;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -21,6 +24,7 @@ export function Input({ label, value, onChange, placeholder, type = 'text', id, 
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        autoComplete={autoComplete}
         aria-invalid={invalid ? true : undefined}
         aria-describedby={invalid ? `${id}-error` : hint ? `${id}-hint` : undefined}
         className={`rounded-md border bg-surface px-3 py-2 text-sm text-ink transition placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/40 ${

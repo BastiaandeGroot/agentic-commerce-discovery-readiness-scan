@@ -23,6 +23,7 @@ const display = Fraunces({
 });
 import { LocaleProvider } from '../src/i18n/useLocale';
 import { ToastProvider } from '../components/ui';
+import { AuthProvider } from '../components/auth/AuthProvider';
 
 export const metadata: Metadata = {
   title: 'Agentic Commerce Discovery Readiness Scan',
@@ -36,7 +37,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="nl" className={`h-full antialiased ${sans.variable} ${display.variable}`}>
       <body className="min-h-full">
         <LocaleProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <AuthProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </AuthProvider>
         </LocaleProvider>
       </body>
     </html>

@@ -11,6 +11,7 @@ import { Menu, X } from 'lucide-react';
 import { STRINGS } from '../../src/i18n/strings';
 import { useLocale } from '../../src/i18n/useLocale';
 import { LanguageToggle } from '../LanguageToggle';
+import { useAuth } from '../auth/AuthProvider';
 
 const LINKS = [
   { href: '/scan', key: 'scan' },
@@ -22,6 +23,7 @@ const LINKS = [
 
 export function SiteHeader() {
   const [locale, setLocale] = useLocale();
+  const { user, configured, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const s = STRINGS[locale];
@@ -69,6 +71,24 @@ export function SiteHeader() {
 
         <div className="flex shrink-0 items-center gap-3">
           <LanguageToggle locale={locale} onChange={setLocale} label={s.language} />
+          {/* Alleen tonen als er een accountdienst is. Een inloglink die naar
+              een scherm wijst dat zegt dat inloggen niet aanstaat, is een
+              doodlopende weg in de navigatie. */}
+          {configured ? (
+            user ? (
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                className="rounded-md text-sm text-muted transition hover:text-ink"
+              >
+                {s.auth.signOut}
+              </button>
+            ) : (
+              <Link href="/inloggen" className="rounded-md text-sm text-muted transition hover:text-ink">
+                {s.auth.signIn}
+              </Link>
+            )
+          ) : null}
         </div>
       </div>
     </header>
