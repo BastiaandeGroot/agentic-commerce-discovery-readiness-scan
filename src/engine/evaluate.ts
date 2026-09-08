@@ -18,7 +18,7 @@ import type {
 import { CUSTOM_IMPORTANCE, isScored, weightOf } from '../questions/compose';
 import { FIELD_BY_KEY } from '../spec/fields';
 import { isBlank, isPlaceholder, isValidGtin, str } from '../intake/normalize';
-import { mainCategory, subCategory } from './join';
+import { mainCategory, segmentLevel, subCategory } from './join';
 
 /**
  * Kwaliteitsdrempels. Aanwezigheid is niet hetzelfde als bruikbaarheid: een
@@ -166,8 +166,8 @@ function answerState(
  * dus daar matchen we ook op. Anders valt "Fietsbanden > Racefiets" buiten de
  * set die juist voor Fietsbanden is gemaakt.
  */
-export function pickSet(product: ProductRecord, sets: QuestionSet[]): QuestionSet | undefined {
-  const category = mainCategory(product);
+export function pickSet(product: ProductRecord, sets: QuestionSet[], level = 0): QuestionSet | undefined {
+  const category = mainCategory(product, level);
   if (!category) return undefined; // geen categorie -> geflagd en geteld, niet gescoord
 
   for (const set of sets) {
@@ -220,8 +220,10 @@ export function evaluateProduct(
   product: ProductRecord,
   sets: QuestionSet[],
   catalog: Dataset,
+  /** Op welk niveau van de categorieboom de segmenten zitten; zie segmentLevel. */
+  level = 0,
 ): ProductResult {
-  const set = pickSet(product, sets);
+  const set = pickSet(product, sets, level);
   const questions: QuestionOutcome[] = [];
   const gaps = new Map<string, Gap>();
 
@@ -273,8 +275,8 @@ export function evaluateProduct(
     key: product.key,
     title: str(product.values.title),
     image: str(product.values.image),
-    category: mainCategory(product),
-    subcategory: subCategory(product),
+    category: mainCategory(product, level),
+    subcategory: subCategory(product, level),
     setId: set?.id,
     unmatched: set === undefined,
     findable: set !== undefined && scored.length > 0 && scored.every((q) => q.answered),

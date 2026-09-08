@@ -26,7 +26,7 @@ import type { AttributeDef, QuestionBank } from './bank';
 import { bankFor, resolveBanks } from './banks';
 import { composeSet, overlayFor } from './compose';
 import { str } from '../intake/normalize';
-import { mainCategory, subCategory } from '../engine/join';
+import { mainCategory, segmentLevel, subCategory } from '../engine/join';
 import { catalogKnows } from '../engine/evaluate';
 import { matchAttributes, type AttributeMatch } from '../spec/match';
 import { applyMapping, requirementFor, type Mapping } from './mapping';
@@ -54,11 +54,14 @@ export interface CategoryStat {
  * markt — maar om te kunnen bepalen of de vragenlijst er iets over te zeggen
  * heeft.
  */
-export function deriveSubcategories(catalog: Dataset): Map<string, string[]> {
+export function deriveSubcategories(catalog: Dataset, segments: string[] = []): Map<string, string[]> {
   const out = new Map<string, Set<string>>();
+  // Hetzelfde niveau als de scan gebruikt; anders bouwt de generator sets op een
+  // andere laag dan er gemeten wordt en matcht er niets.
+  const level = segmentLevel(catalog.products, segments);
   for (const product of catalog.products) {
-    const main = mainCategory(product);
-    const sub = subCategory(product);
+    const main = mainCategory(product, level);
+    const sub = subCategory(product, level);
     if (!main || !sub) continue;
     const set = out.get(main) ?? new Set<string>();
     set.add(sub);
@@ -67,10 +70,11 @@ export function deriveSubcategories(catalog: Dataset): Map<string, string[]> {
   return new Map([...out.entries()].map(([main, subs]) => [main, [...subs].sort()]));
 }
 
-export function deriveCategories(catalog: Dataset): CategoryStat[] {
+export function deriveCategories(catalog: Dataset, segments: string[] = []): CategoryStat[] {
   const counts = new Map<string, number>();
+  const level = segmentLevel(catalog.products, segments);
   for (const product of catalog.products) {
-    const category = mainCategory(product);
+    const category = mainCategory(product, level);
     if (!category) continue;
     counts.set(category, (counts.get(category) ?? 0) + 1);
   }
@@ -183,14 +187,22 @@ export function generateQuestionSets(
     mapped.set(bank.meta.vertical, result.matches);
     return result.bank;
   });
-  const categories = deriveCategories(catalog);
+  // De namen die de vragenlijst kent, zodat het aggregatieniveau de vrágen volgt
+  // en niet de vorm van de boom. Een winkel die maar één segment verkoopt hoort
+  // de vragen van dat segment te krijgen, niet die van een laag dieper.
+  const segments = banks.flatMap((bank) => [
+    ...bank.overlays.map((overlay) => overlay.label.nl),
+    ...bank.overlays.map((overlay) => overlay.label.en),
+    ...bank.overlays.map((overlay) => overlay.id),
+  ]);
+  const categories = deriveCategories(catalog, segments);
   // Vragen die in deze catalogus niets te vragen hebben, laten we weg in plaats
   // van ze als permanent gat te laten staan.
   const askCondition = sellsNonNew(catalog);
   const applicable = (question: Question) =>
     askCondition || !question.requires.includes('condition');
 
-  const subcategories = deriveSubcategories(catalog);
+  const subcategories = deriveSubcategories(catalog, segments);
   const named = categories.slice(0, MAX_SETS);
   const tail = categories.slice(MAX_SETS);
   const used = new Map<string, QuestionBank>();
