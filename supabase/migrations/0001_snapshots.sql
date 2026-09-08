@@ -12,6 +12,11 @@
 --    en veldnamen — niet de catalogus zelf. Wat een merchant aanlevert blijft
 --    daarmee ook na het bewaren op zijn eigen apparaat.
 
+-- Opnieuw draaien mag. Elke policy wordt eerst weggehaald als hij er al is:
+-- `create policy` kent geen `if not exists`, en zonder deze regel breekt een
+-- tweede uitvoering af op de eerste policy die al bestaat. Een migratie die je
+-- niet nog eens durft te draaien, is een migratie die je bij twijfel overslaat.
+
 create table if not exists accounts (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -57,26 +62,31 @@ alter table accounts enable row level security;
 alter table account_members enable row level security;
 alter table scan_snapshots enable row level security;
 
+drop policy if exists account_members_self on account_members;
 create policy account_members_self on account_members
   for select using (user_id = auth.uid());
 
+drop policy if exists accounts_visible_to_members on accounts;
 create policy accounts_visible_to_members on accounts
   for select using (
     exists (select 1 from account_members m where m.account_id = accounts.id and m.user_id = auth.uid())
   );
 
+drop policy if exists snapshots_read on scan_snapshots;
 create policy snapshots_read on scan_snapshots
   for select using (
     exists (select 1 from account_members m
             where m.account_id = scan_snapshots.account_id and m.user_id = auth.uid())
   );
 
+drop policy if exists snapshots_write on scan_snapshots;
 create policy snapshots_write on scan_snapshots
   for insert with check (
     exists (select 1 from account_members m
             where m.account_id = scan_snapshots.account_id and m.user_id = auth.uid())
   );
 
+drop policy if exists snapshots_delete on scan_snapshots;
 create policy snapshots_delete on scan_snapshots
   for delete using (
     exists (select 1 from account_members m
