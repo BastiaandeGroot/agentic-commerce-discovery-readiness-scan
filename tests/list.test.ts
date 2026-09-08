@@ -581,3 +581,32 @@ test('een subcategorie krijgt alleen een eigen niveau als de lijst hem kent', ()
   assert.deepEqual(set?.distinguishes, ['Naaigarens']);
   assert.equal(set?.distinguishes?.includes('Effen'), false);
 });
+
+test('een lijst mag beide talen dragen, in één bestand', () => {
+  // Eén rij per vraag en niet twee bestanden: dan meten twee talen
+  // gegarandeerd hetzelfde. Twee lijsten naast elkaar lopen uit de pas zodra
+  // iemand er één bewerkt, en dan staat er onder hetzelfde id een andere vraag.
+  const csv = [
+    'id;category;layer;question_nl;question_en;importance;required_attributes',
+    'BAS-01;interieurstoffen;base;Hoe breed is deze stof?;How wide is this fabric?;kritiek;rolbreedte_cm',
+  ].join('\n');
+  const result = importQuestionList([{ name: 'tweetalig.csv', text: csv }]);
+  assert.deepEqual(result.errors, []);
+  const question = result.bank?.questions[0];
+  assert.equal(question?.label.nl, 'Hoe breed is deze stof?');
+  assert.equal(question?.label.en, 'How wide is this fabric?');
+});
+
+test('één taal blijft één taal, zichtbaar in allebei', () => {
+  // Een lijst met alleen `vraag` vult beide kanten met dezelfde tekst. Zichtbaar
+  // dezelfde woorden is eerlijker dan een lege regel in het andere rapport.
+  const csv = [
+    'id;layer;question;importance;required_attributes',
+    'BAS-01;base;How wide is this fabric?;critical;rolbreedte_cm',
+  ].join('\n');
+  const result = importQuestionList([{ name: 'een-taal.csv', text: csv }]);
+  assert.deepEqual(result.errors, []);
+  const question = result.bank?.questions[0];
+  assert.equal(question?.label.nl, 'How wide is this fabric?');
+  assert.equal(question?.label.en, 'How wide is this fabric?');
+});

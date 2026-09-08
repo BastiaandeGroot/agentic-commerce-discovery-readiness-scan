@@ -50,6 +50,19 @@ import {
 const COLUMNS = {
   id: ['id', 'vraag_id', 'question_id', 'nummer'],
   question: ['vraag', 'question', 'label', 'klantvraag'],
+  /**
+   * Dezelfde vraag in de andere taal, als de lijst hem draagt.
+   *
+   * Eén lijst met twee talen en niet twee lijsten: dan meten twee talen
+   * gegarandeerd hetzelfde, want er is maar één rij per vraag. Twee bestanden
+   * naast elkaar lopen uit de pas zodra iemand er één bewerkt.
+   *
+   * `question` blijft de hoofdkolom; deze twee vullen aan. Draagt een lijst
+   * alleen `question`, dan staat die tekst in beide talen — zichtbaar dezelfde
+   * woorden is eerlijker dan een lege kolom.
+   */
+  questionNl: ['vraag_nl', 'question_nl', 'nl', 'klantvraag_nl'],
+  questionEn: ['vraag_en', 'question_en', 'en', 'klantvraag_en'],
   category: ['categorie', 'category', 'groep'],
   layer: ['laag', 'layer', 'niveau'],
   appliesTo: ['geldt_voor', 'applies_to', 'van_toepassing_op'],
@@ -280,7 +293,13 @@ export function looksLikeQuestionList(text: string): boolean {
   if (line.trim() === '') return false;
   const { char } = detectDelimiter(text);
   const columns = resolveColumns(line.split(char));
-  return columns.id !== undefined && columns.question !== undefined;
+  // Eén van de drie vraagkolommen volstaat. Een tweetalige lijst draagt vaak
+  // alleen `vraag_nl` en `vraag_en` en geen algemene kolom; die eisen zou een
+  // geldige lijst weigeren met de melding dat het geen vragenlijst is.
+  const hasQuestion = columns.question !== undefined
+    || columns.questionNl !== undefined
+    || columns.questionEn !== undefined;
+  return columns.id !== undefined && hasQuestion;
 }
 
 interface Group {
@@ -315,9 +334,14 @@ export function importQuestionCsv(files: BankFile[]): ImportResult {
       continue;
     }
     const own = resolveColumns(Object.keys(parsed[0]));
-    if (own.id === undefined || own.question === undefined) {
+    // Eén van de drie vraagkolommen volstaat; een tweetalige lijst draagt vaak
+    // alleen `vraag_nl` en `vraag_en`.
+    const hasQuestion = own.question !== undefined
+      || own.questionNl !== undefined
+      || own.questionEn !== undefined;
+    if (own.id === undefined || !hasQuestion) {
       const found = Object.keys(parsed[0]).slice(0, 12).join(', ');
-      errors.push(`${file.name} heeft geen kolom met de vraag en/of een id. Gevonden kolommen: ${found}. Verwacht in elk geval \`id\` en \`vraag\`.`);
+      errors.push(`${file.name} heeft geen kolom met de vraag en/of een id. Gevonden kolommen: ${found}. Verwacht in elk geval \`id\` en \`vraag\` (of \`vraag_nl\` en \`vraag_en\`).`);
       continue;
     }
     if (headers.length === 0) { columns = own; headers = Object.keys(parsed[0]); }
@@ -352,7 +376,10 @@ export function importQuestionCsv(files: BankFile[]): ImportResult {
 
   for (const row of rows) {
     const id = cell(row, columns, 'id');
-    const question = cell(row, columns, 'question');
+    // De vraag mag in elk van de drie kolommen staan; één ervan volstaat.
+    const question = cell(row, columns, 'question')
+      || cell(row, columns, 'questionNl')
+      || cell(row, columns, 'questionEn');
     if (id === '' || question === '') { missingId++; continue; }
     if (seen.has(id)) { duplicates++; continue; }
     seen.add(id);
@@ -536,7 +563,16 @@ function modeOf(row: Row, columns: ColumnMap): 'any' | 'all' {
 
 /** Eén rij als bankvraag. */
 function toQuestion(row: Row, id: string, columns: ColumnMap, warnings: string[]): BankQuestion {
-  const label = cell(row, columns, 'question');
+  // Drie kolommen die dezelfde vraag kunnen dragen. Een lijst die alleen de
+  // twee taalkolommen heeft is geen lijst zonder vragen, dus de terugval loopt
+  // beide kanten op: mist er één taal, dan staat de andere er — zichtbaar
+  // dezelfde woorden is eerlijker dan een lege regel in het rapport.
+  const generic = cell(row, columns, 'question');
+  const nl = cell(row, columns, 'questionNl');
+  const en = cell(row, columns, 'questionEn');
+  const label = generic || nl || en;
+  const labelNl = nl || generic || en;
+  const labelEn = en || generic || nl;
   const rawImportance = cell(row, columns, 'importance').toLowerCase();
   const importance = IMPORTANCE[rawImportance];
   if (!importance) {
@@ -574,7 +610,7 @@ function toQuestion(row: Row, id: string, columns: ColumnMap, warnings: string[]
 
   return {
     id,
-    label: same(label),
+    label: { nl: labelNl, en: labelEn },
     intent: INTENT[cell(row, columns, 'intent').toLowerCase()] ?? 'fit',
     importance: importance ?? 'medium',
     coverage,
