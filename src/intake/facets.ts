@@ -36,12 +36,29 @@ export interface SiteEvidence {
 
 export type PathKind = 'category' | 'facet' | 'unclear';
 
+/**
+ * Waaróm, als code en niet als zin.
+ *
+ * De tekst hoort in `src/i18n/`, in beide talen. Een zin hier zou de motor
+ * eentalig maken en zou hem bovendien laten bepalen hoe iets aan een merchant
+ * uitgelegd wordt — dat is een keuze van het scherm.
+ */
+export type PathReason =
+  | 'in-filters'
+  | 'in-both'
+  | 'many-parents'
+  | 'top-level'
+  | 'in-nav-only'
+  | 'not-on-site'
+  | 'no-site'
+  | 'merchant';
+
 export interface ClassifiedPath {
   segments: string[];
   productCount: number;
   kind: PathKind;
-  /** Waarom, in één zin, zodat een merchant het kan tegenspreken. */
-  reason: string;
+  /** Waarop het oordeel steunt, zodat een merchant het kan tegenspreken. */
+  reason: PathReason;
 }
 
 /** Namen vergelijkbaar maken: hoofdletters, accenten en tekens weg. */
@@ -89,8 +106,7 @@ export function classifyPaths(
   const inFilters = new Set((site?.filters ?? []).map(normalizeName));
 
   return paths.map((path) => {
-    const leaf = path.segments[path.segments.length - 1];
-    const key = normalizeName(leaf);
+    const key = normalizeName(path.segments[path.segments.length - 1]);
     const parents = parentsByLeaf.get(key)?.size ?? 0;
 
     // Het filterpaneel wint van het menu, ook als de naam in allebei staat.
@@ -105,10 +121,7 @@ export function classifyPaths(
     // Het menu alleen is te zwak gebleken: dezelfde merchant zet "Effen",
     // "Premium" en "Gedessineerd" gewoon in zijn hoofdmenu naast "Banken".
     if (inFilters.has(key)) {
-      return { ...path, kind: 'facet' as const,
-        reason: inNav.has(key)
-          ? `"${leaf}" is op de site zowel een filter als een categorie; als filter hoort het een kenmerk te zijn.`
-          : `"${leaf}" is op de site een filter, geen categorie.` };
+      return { ...path, kind: 'facet' as const, reason: inNav.has(key) ? 'in-both' : 'in-filters' };
     }
     // Staan in het menu maakt iets géén categorie.
     //
@@ -119,19 +132,13 @@ export function classifyPaths(
     // staat er niet" en "we hebben niet gekeken", en dat verschil staat in de
     // reden zodat een merchant weet wat hij bevestigt.
     if (parents >= MIN_PARENTS_FOR_FACET) {
-      return { ...path, kind: 'facet' as const,
-        reason: `"${leaf}" komt onder ${parents} verschillende categorieën voor; dat is een eigenschap, geen soort product.` };
+      return { ...path, kind: 'facet' as const, reason: 'many-parents' };
     }
     if (path.segments.length === 1) {
-      return { ...path, kind: 'category' as const,
-        reason: `"${leaf}" is een hoofdcategorie.` };
+      return { ...path, kind: 'category' as const, reason: 'top-level' };
     }
     return { ...path, kind: 'unclear' as const,
-      reason: site
-        ? inNav.has(key)
-          ? `"${leaf}" staat wel in het menu maar niet tussen de filters; een menu zegt niet of dit een productsoort is.`
-          : `"${leaf}" is op de site niet als categorie of filter teruggevonden.`
-        : `"${leaf}" komt maar op één plek voor; zonder de site is niet te zien of het een categorie is.` };
+      reason: site ? (inNav.has(key) ? 'in-nav-only' : 'not-on-site') : 'no-site' };
   });
 }
 
@@ -154,6 +161,36 @@ export function segmentsToResearch(classified: ClassifiedPath[]): string[] {
 }
 
 /**
+ * Eén ruwe categoriewaarde uit een export uit elkaar halen.
+ *
+ * Twee soorten scheidingsteken die niet hetzelfde betekenen, en dat verschil is
+ * hier de hele truc:
+ *
+ *   - `|` (en een nieuwe regel) scheidt **categorieën**. Een product hangt in
+ *     meer dan één, en een export zet die achter elkaar.
+ *   - `>` en `/` scheiden **niveaus** binnen één categorie.
+ *
+ * Gaat dat door elkaar, dan wordt "Meubelstoffen | Meubelstoffen/Banken" één
+ * categorienaam ter lengte van een alinea — precies wat er misging toen dit
+ * scherm de eerste keer op echte data draaide. De motor mag ze wél op één hoop
+ * gooien: `mainCategory` wil alleen het eerste stuk. Hier telt elk lidmaatschap.
+ *
+ * Segmenten die alleen uit cijfers bestaan vallen weg. Een export die een
+ * categorie-id als naam meelevert, levert anders een vragenset "235" op.
+ */
+export function splitMemberships(raw: string): string[][] {
+  return raw
+    .split(/\s*[|\n;]\s*/)
+    .map((one) => one.trim())
+    .filter((one) => one !== '')
+    .map((one) => one
+      .split(/\s*[>/›»]\s*/)
+      .map((part) => part.replace(/\s+/g, ' ').trim())
+      .filter((part) => part !== '' && !/^\d+$/.test(part)))
+    .filter((segments) => segments.length > 0);
+}
+
+/**
  * De categoriepaden van een catalogus, met hoeveel producten er per pad in
  * vallen.
  *
@@ -166,17 +203,36 @@ export function pathsFromProducts(
   /** Het pad van één product; de motor kent die functie al. */
   pathOf: (product: never) => string | undefined,
 ): CategoryPath[] {
-  const counts = new Map<string, number>();
+  const counts = new Map<string, string[]>();
   for (const product of products) {
-    const path = pathOf(product as never);
-    if (!path) continue;
-    counts.set(path, (counts.get(path) ?? 0) + 1);
+    const raw = pathOf(product as never);
+    if (!raw) continue;
+    // Eén product hangt vaak in meerdere categorieën; elk lidmaatschap telt voor
+    // zijn eigen pad. Dubbele binnen één product tellen één keer.
+    const seen = new Set<string>();
+    for (const segments of splitMemberships(raw)) {
+      const key = segments.join(' > ');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (!counts.has(key)) counts.set(key, segments);
+    }
   }
+
+  const totals = new Map<string, number>();
+  for (const product of products) {
+    const raw = pathOf(product as never);
+    if (!raw) continue;
+    const seen = new Set<string>();
+    for (const segments of splitMemberships(raw)) {
+      const key = segments.join(' > ');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      totals.set(key, (totals.get(key) ?? 0) + 1);
+    }
+  }
+
   const out: CategoryPath[] = [];
-  counts.forEach((productCount, path) => {
-    const segments = path.split('>').map((part) => part.trim()).filter(Boolean);
-    if (segments.length > 0) out.push({ segments, productCount });
-  });
+  counts.forEach((segments, key) => out.push({ segments, productCount: totals.get(key) ?? 0 }));
   return out.sort((a, b) => b.productCount - a.productCount);
 }
 
@@ -196,7 +252,7 @@ export function applyVerdicts(rows: ClassifiedPath[], verdicts: Verdicts): Class
   return rows.map((row) => {
     const own = verdicts[pathKey(row.segments)];
     if (!own || own === row.kind) return row;
-    return { ...row, kind: own, reason: 'De merchant heeft dit zelf aangewezen.' };
+    return { ...row, kind: own, reason: 'merchant' as const };
   });
 }
 

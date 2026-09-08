@@ -10,7 +10,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyPaths, facetDebt, normalizeName, segmentsToResearch } from '../src/intake/facets';
+import { classifyPaths, facetDebt, normalizeName, pathsFromProducts, segmentsToResearch, splitMemberships } from '../src/intake/facets';
 
 const path = (p: string, n = 10) => ({ segments: p.split('>').map((s) => s.trim()), productCount: n });
 const kindOf = (rows: ReturnType<typeof classifyPaths>, leaf: string) =>
@@ -45,7 +45,7 @@ test('het filterpaneel wijst een eigenschap aan; het menu wijst niets aan', () =
   // "Gedessineerd" gewoon naast "Banken" in datzelfde menu. Een menu is een
   // verkoopinstrument, geen datamodel, en zou hier een gat wegpoetsen.
   assert.equal(kindOf(rows, 'Banken'), 'unclear');
-  assert.match(rows.find((r) => r.segments.includes('Banken'))!.reason, /menu/);
+  assert.equal(rows.find((r) => r.segments.includes('Banken'))!.reason, 'in-nav-only');
 });
 
 test('in het menu én tussen de filters is een eigenschap, geen twijfelgeval', () => {
@@ -57,7 +57,7 @@ test('in het menu én tussen de filters is een eigenschap, geen twijfelgeval', (
     navigation: ['Vlekwerend'], filters: ['Vlekwerend'],
   });
   assert.equal(rows[0].kind, 'facet');
-  assert.match(rows[0].reason, /zowel een filter als een categorie/);
+  assert.equal(rows[0].reason, 'in-both');
 });
 
 test('een facet levert geen marktsegment op', () => {
@@ -67,6 +67,31 @@ test('een facet levert geen marktsegment op', () => {
   ]);
   assert.deepEqual(segmentsToResearch(rows), ['Meubelstoffen', 'Gordijnstoffen']);
   assert.equal(facetDebt(rows).facets, 2);
+});
+
+test('een categorielijst wordt niet één categorienaam', () => {
+  // De fout die dit voorkomt, en hij stond op het scherm: `|` scheidt
+  // categorieën, `/` en `>` scheiden niveaus. Door elkaar gehaald wordt
+  // "Meubelstoffen | Meubelstoffen/Banken" één naam ter lengte van een alinea.
+  assert.deepEqual(
+    splitMemberships('Meubelstoffen | Meubelstoffen/Banken | Meubelstoffen/Effen'),
+    [['Meubelstoffen'], ['Meubelstoffen', 'Banken'], ['Meubelstoffen', 'Effen']],
+  );
+  assert.deepEqual(splitMemberships('Outdoorstoffen > Gestreept'), [['Outdoorstoffen', 'Gestreept']]);
+  // Een id dat als naam is meegeleverd levert anders een vragenset "235" op.
+  assert.deepEqual(splitMemberships('Stoffen/235'), [['Stoffen']]);
+});
+
+test('elk lidmaatschap telt voor zijn eigen pad', () => {
+  const product = (raw: string) => ({ unmapped: { categories: raw }, values: {} });
+  const rows = pathsFromProducts(
+    [product('A | A/B'), product('A | A/B'), product('A | A/C')],
+    (p) => (p as unknown as { unmapped: Record<string, string> }).unmapped.categories,
+  );
+  const find = (key: string) => rows.find((r) => r.segments.join('>') === key)?.productCount;
+  assert.equal(find('A'), 3);
+  assert.equal(find('A>B'), 2);
+  assert.equal(find('A>C'), 1);
 });
 
 test('namen worden vergeleken zonder opmaak', () => {

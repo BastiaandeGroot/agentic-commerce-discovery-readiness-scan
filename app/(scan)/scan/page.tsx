@@ -207,7 +207,6 @@ export default function Home() {
         {step === 'segments' && catalog ? (
           <SegmentStep
             s={s}
-            locale={locale}
             paths={pathsFromProducts(catalog.products, categoryPath)}
             verdicts={verdicts}
             onChange={setVerdicts}

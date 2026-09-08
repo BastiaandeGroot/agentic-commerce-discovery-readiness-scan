@@ -13,13 +13,13 @@
 // structuur. Hij weet wat hij verkoopt; wij leiden af.
 
 import { useMemo, useState } from 'react';
-import { Globe, TriangleAlert } from 'lucide-react';
+import { Globe, HelpCircle, TriangleAlert } from 'lucide-react';
 import { Badge, Button, Card, CardTitle, EmptyState, ErrorState, Input, TableWrap, Td, Th } from './ui';
 import {
   applyVerdicts, classifyPaths, facetDebt, pathKey,
-  type CategoryPath, type PathKind, type SiteEvidence, type Verdicts,
+  type CategoryPath, type ClassifiedPath, type PathKind, type PathReason,
+  type SiteEvidence, type Verdicts,
 } from '../src/intake/facets';
-import type { Locale } from '../src/domain/types';
 import type { Strings } from '../src/i18n/strings';
 
 type SiteState =
@@ -32,9 +32,63 @@ const TONE: Record<PathKind, 'ok' | 'warn' | 'neutral'> = {
   category: 'ok', facet: 'warn', unclear: 'neutral',
 };
 
-export function SegmentStep({ s, locale, paths, verdicts, onChange, onContinue }: {
+/** Waarop het oordeel steunt, in de taal van de merchant. */
+function why(s: Strings, reason: PathReason): string {
+  switch (reason) {
+    case 'in-filters': return s.segments.whyFilter;
+    case 'in-both': return s.segments.whyBoth;
+    case 'many-parents': return s.segments.whyManyParents;
+    case 'top-level': return s.segments.whyTop;
+    case 'merchant': return s.segments.settledBody;
+    default: return s.segments.whyUnknown;
+  }
+}
+
+function Rows({ s, rows, onDecide }: {
   s: Strings;
-  locale: Locale;
+  rows: ClassifiedPath[];
+  onDecide: (path: CategoryPath, kind: PathKind) => void;
+}) {
+  return (
+    <TableWrap>
+      <thead>
+        <tr>
+          <Th>{s.segments.heading}</Th>
+          <Th>{s.segments.products}</Th>
+          <Th>{s.segments.kinds.category}</Th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={pathKey(row.segments)} className="border-t border-line align-top">
+            <Td>
+              <span className="block">{row.segments.join(' \u203a ')}</span>
+              <span className="mt-0.5 block text-xs leading-relaxed text-muted">{why(s, row.reason)}</span>
+            </Td>
+            <Td>{row.productCount}</Td>
+            <Td>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge tone={TONE[row.kind]}>{s.segments.kinds[row.kind]}</Badge>
+                {/* De keuze staat naast het oordeel en niet in de plaats ervan:
+                    zo blijft zichtbaar waar de app op uitkwam. */}
+                {(['category', 'facet'] as const)
+                  .filter((kind) => kind !== row.kind)
+                  .map((kind) => (
+                    <Button key={kind} variant="quiet" onClick={() => onDecide(row, kind)}>
+                      {s.segments.kinds[kind]}
+                    </Button>
+                  ))}
+              </div>
+            </Td>
+          </tr>
+        ))}
+      </tbody>
+    </TableWrap>
+  );
+}
+
+export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
+  s: Strings;
   paths: CategoryPath[];
   verdicts: Verdicts;
   onChange: (next: Verdicts) => void;
@@ -146,42 +200,29 @@ export function SegmentStep({ s, locale, paths, verdicts, onChange, onContinue }
         </Card>
       ) : null}
 
-      <Card>
-        <TableWrap>
-          <thead>
-            <tr>
-              <Th>{s.segments.heading}</Th>
-              <Th>{s.segments.products}</Th>
-              <Th>{s.segments.kinds.category}</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={pathKey(row.segments)} className="border-t border-line align-top">
-                <Td>
-                  <span className="block">{row.segments.join(' › ')}</span>
-                  <span className="mt-0.5 block text-xs leading-relaxed text-muted">{row.reason}</span>
-                </Td>
-                <Td>{row.productCount}</Td>
-                <Td>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge tone={TONE[row.kind]}>{s.segments.kinds[row.kind]}</Badge>
-                    {/* De keuze staat naast het oordeel en niet in de plaats
-                        ervan: zo blijft zichtbaar waar de app op uitkwam. */}
-                    {(['category', 'facet'] as const)
-                      .filter((kind) => kind !== row.kind)
-                      .map((kind) => (
-                        <Button key={kind} variant="quiet" onClick={() => decide(row, kind)}>
-                          {s.segments.kinds[kind]}
-                        </Button>
-                      ))}
-                  </div>
-                </Td>
-              </tr>
-            ))}
-          </tbody>
-        </TableWrap>
-      </Card>
+      {/* Wat we niet zeker weten is een vraag; de rest is een uitkomst. Alles
+          op één hoop zetten maakt van tien mededelingen vierentwintig vragen, en
+          dan legt het scherm zijn werk bij de merchant neer. */}
+      {rows.some((row) => row.kind === 'unclear') ? (
+        <Card>
+          <CardTitle sub={s.segments.askBody}>{s.segments.askHeading}</CardTitle>
+          <div className="mb-4 rounded-lg bg-surface-2 p-3">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <HelpCircle className="size-4 shrink-0 text-accent" aria-hidden />
+              {s.segments.rule}
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-muted">{s.segments.ruleBody}</p>
+          </div>
+          <Rows s={s} rows={rows.filter((row) => row.kind === 'unclear')} onDecide={decide} />
+        </Card>
+      ) : null}
+
+      {rows.some((row) => row.kind !== 'unclear') ? (
+        <Card>
+          <CardTitle sub={s.segments.settledBody}>{s.segments.settled}</CardTitle>
+          <Rows s={s} rows={rows.filter((row) => row.kind !== 'unclear')} onDecide={decide} />
+        </Card>
+      ) : null}
 
       <Button onClick={onContinue}>{s.segments.continue}</Button>
     </div>

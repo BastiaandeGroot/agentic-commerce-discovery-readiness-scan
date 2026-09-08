@@ -594,7 +594,19 @@ export const STRINGS = {
     segments: {
       heading: 'Categorie of kenmerk?',
       intro:
-        'Sommige paden in je catalogus zijn geen productsoort maar een eigenschap: "Effen" en "Vlekwerend" zijn iets wat een stof ís, geen soort stof. Ze horen een kenmerk te zijn waarop een koper filtert. Elk pad dat hier als kenmerk staat, is een attribuut dat je catalogus mist.',
+        'Een deel van je categorieën is eigenlijk een eigenschap. Dat is geen slordigheid — het gebeurt overal — maar elk geval is een filter dat je koper wil gebruiken en dat je data niet vastlegt.',
+      rule: 'Kun je zeggen "ik zoek een …"?',
+      ruleBody:
+        '"Ik zoek een lampenkapstof" loopt — dat is een categorie, het ding dat je verkoopt. "Ik zoek een effen" loopt niet; je zegt "ik zoek een effen meubelstof". Dan is het een kenmerk. Anders gezegd: waar begint je klant, en waarmee verfijnt hij?',
+      askHeading: 'Deze weten we niet zeker',
+      askBody: 'De rest hebben we kunnen bepalen; die staat eronder. Kom je er bij eentje niet uit, laat hem dan staan — onbeslist is een eerlijker antwoord dan een gok.',
+      settled: 'Al bepaald',
+      settledBody: 'Klopt er iets niet? Zet het om; jouw oordeel wint.',
+      whyFilter: 'Dit woord staat ook in het filterpaneel van je site.',
+      whyBoth: 'Dit staat op je site zowel tussen de filters als tussen de categorieën.',
+      whyManyParents: 'Dit hangt onder meerdere categorieën tegelijk, zoals een eigenschap doet.',
+      whyTop: 'Dit is een hoofdcategorie.',
+      whyUnknown: 'Hier vonden we op je site geen uitsluitsel over.',
       siteLabel: 'Adres van je webshop',
       siteHint: 'We lezen alleen je categoriepagina\u2019s en houden ons aan je robots.txt. Er gaat geen productdata heen.',
       siteRead: 'Site lezen',
@@ -1258,7 +1270,19 @@ export const STRINGS = {
     segments: {
       heading: 'Category or characteristic?',
       intro:
-        'Some paths in your catalogue are not a kind of product but a property: "Plain" and "Stain resistant" are something a fabric is, not a kind of fabric. They belong as a characteristic a buyer filters on. Every path listed here as a characteristic is an attribute your catalogue is missing.',
+        'Part of your categories are really a property. That is not sloppiness — it happens everywhere — but each case is a filter your buyer wants and your data does not record.',
+      rule: 'Can you say "I am looking for a …"?',
+      ruleBody:
+        '"I am looking for a lampshade fabric" works — that is a category, the thing you sell. "I am looking for a plain" does not; you would say "a plain upholstery fabric". Then it is a characteristic. Put differently: where does your customer start, and what do they narrow down with?',
+      askHeading: 'We are not sure about these',
+      askBody: 'The rest we could determine; it is listed below. If one of these stumps you, leave it — undecided is a more honest answer than a guess.',
+      settled: 'Already determined',
+      settledBody: 'Something wrong? Switch it; your judgement wins.',
+      whyFilter: 'This word also appears in the filter panel on your site.',
+      whyBoth: 'On your site this appears both among the filters and among the categories.',
+      whyManyParents: 'This sits under several categories at once, the way a property does.',
+      whyTop: 'This is a main category.',
+      whyUnknown: 'We found nothing conclusive about this on your site.',
       siteLabel: 'Address of your shop',
       siteHint: 'We only read your category pages and respect your robots.txt. No product data is sent.',
       siteRead: 'Read the site',
