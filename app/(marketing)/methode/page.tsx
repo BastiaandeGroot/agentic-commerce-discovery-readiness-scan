@@ -128,7 +128,7 @@ export default function MethodePage() {
             ] as const).map(([cause, body]) => (
               <div key={cause} className="rounded-lg bg-surface-2 p-3">
                 <div className="flex flex-wrap items-baseline gap-2">
-                  <Badge tone={cause === 'unfilled' ? 'accent' : cause === 'no-source' ? 'danger' : 'warn'}>
+                  <Badge tone={cause === 'unfilled' ? 'ok' : cause === 'no-source' ? 'danger' : 'warn'}>
                     {s.report.causes[cause]}
                   </Badge>
                   <span className="text-xs text-muted">{s.report.causeEffort[cause]}</span>

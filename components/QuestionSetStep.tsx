@@ -43,7 +43,7 @@ interface Props {
  * betekenis nooit alleen dragen.
  */
 const IMPORTANCE_TONE = {
-  critical: 'danger', high: 'accent', medium: 'neutral', low: 'neutral',
+  critical: 'danger', high: 'warn', medium: 'neutral', low: 'neutral',
 } as const;
 
 function QuestionRow({
@@ -97,9 +97,11 @@ function QuestionRow({
                   categorie-eigen gaat over wat in déze categorie misgaat. Zonder
                   dat verschil leest een set als één hoop en kan niemand zien of
                   de categoriespecifieke vragen überhaupt zijn aangekomen. */}
+              {/* Een label en geen status: de vorm van de badge onderscheidt,
+                  de kleur oordeelt niet. */}
               {question.layer === 'category' ? (
-                <span className="mr-2 align-middle text-xs font-medium uppercase tracking-wide text-accent">
-                  {s.questions.layerCategory}
+                <span className="mr-2 align-middle">
+                  <Badge tone="neutral">{s.questions.layerCategory}</Badge>
                 </span>
               ) : null}
               {question.label[locale]}
@@ -169,7 +171,8 @@ function QuestionRow({
           ) : (
             <Badge tone="neutral">{s.questions.notScored}</Badge>
           )}
-          <Badge tone={question.origin === 'custom' ? 'accent' : 'neutral'}>
+          {/* Herkomst is een label en geen handeling; het woord doet het werk. */}
+          <Badge tone="neutral">
             {question.origin === 'custom' ? s.questions.fromData : s.questions.fromArchetype}
           </Badge>
           <Button variant="quiet" onClick={() => setEditing(true)}>{s.questions.edit}</Button>
@@ -218,7 +221,7 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, ru
       <Card>
         <CardTitle sub={s.questions.intro}>{s.questions.heading}</CardTitle>
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          <Badge tone="accent">
+          <Badge tone="neutral">
             {state.sets.length} {s.questions.categoriesFound}
           </Badge>
           <Badge>{s.questions.version} {state.version}</Badge>

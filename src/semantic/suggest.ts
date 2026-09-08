@@ -45,6 +45,22 @@ export interface Suggestion {
 export const MIN_MARGIN = 0.01;
 
 /**
+ * Dezelfde grens, maar voor categorieën, en veel strenger.
+ *
+ * Een verkeerd gekoppeld kenmerk kost één klik om te herstellen. Een verkeerd
+ * gekoppelde categorie zet de verkeerde vragenset op een hele categorie — dan
+ * krijgt "Motieven" de vragen over naaigaren, en meet de scan iets anders dan er
+ * verkocht wordt. Dat weegt zwaarder, dus de drempel ligt hoger.
+ *
+ * Gemeten op de vier categorieën van de testmerchant: de twee juiste hadden een
+ * marge van 0,248 en 0,442, de twee onjuiste 0,024 en 0,087. Alles onder 0,15
+ * was fout, alles erboven goed. Vier punten is weinig om op te ijken — maar de
+ * kant waarop je fout mag zitten is duidelijk: liever niets voorstellen dan een
+ * categorie de verkeerde vragen geven.
+ */
+export const MIN_MARGIN_CATEGORIES = 0.15;
+
+/**
  * Haal de gemeenschappelijke richting uit een verzameling vectoren.
  *
  * Zonder dit is de uitkomst onbruikbaar. Alle namen in een stoffencatalogus

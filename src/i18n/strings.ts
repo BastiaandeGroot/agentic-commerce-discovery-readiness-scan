@@ -275,6 +275,7 @@ export const STRINGS = {
       agentNote:
         'Een AI-agent die je catalogus leest, snapt zelf wel dat `rol_breedte` de baanbreedte is. Hieronder doet een taalmodel in je browser hetzelfde, zodat we meten wat zo\'n agent bij jou zou vinden. De scan zelf rekent er niet mee: jij bevestigt de koppeling, en daarna is de uitkomst weer gewoon reproduceerbaar. Geen kolom is ook een antwoord — dan legt je catalogus dit kenmerk niet vast.',
       suggest: 'Laat de rest herkennen',
+      suggestAgain: 'Opnieuw proberen',
       suggestBusy: {
         remote: 'Kenmerken herkennen…',
         library: 'Model laden…',
@@ -296,7 +297,7 @@ export const STRINGS = {
       setsNote:
         'Elke categorie krijgt de algemene vragen. Kies hier welke categoriespecifieke vragen daar bovenop komen — juist daar zitten de vragen die de onomkeerbare fout voorkomen.',
       setsMatching: 'Bezig met koppelen…',
-      setsMatched: 'Automatisch gekoppeld — loop het na. Voorgesteld door',
+      setsMatched: 'Automatisch gekoppeld — loop het na.',
       setQuestions: 'vragen',
       setBaseOnly: 'alleen algemene vragen',
       setNone: '— alleen de algemene vragen —',
@@ -865,6 +866,7 @@ export const STRINGS = {
       agentNote:
         'An AI agent reading your catalogue works out for itself that `rol_breedte` is the roll width. Below, a language model in your browser does the same, so we measure what such an agent would find in your data. The scan itself does not use it: you confirm the mapping, and from there the outcome is reproducible again. No column is an answer too — your catalogue simply does not record it.',
       suggest: 'Recognise the rest',
+      suggestAgain: 'Try again',
       suggestBusy: {
         remote: 'Recognising characteristics…',
         library: 'Loading the model…',
@@ -886,7 +888,7 @@ export const STRINGS = {
       setsNote:
         'Every category gets the general questions. Choose which category-specific questions come on top — that is where the questions live that prevent the mistake your buyer cannot undo.',
       setsMatching: 'Matching…',
-      setsMatched: 'Linked automatically — check it. Proposed by',
+      setsMatched: 'Linked automatically — check it.',
       setQuestions: 'questions',
       setBaseOnly: 'general questions only',
       setNone: '— general questions only —',

@@ -20,7 +20,7 @@ import { Sparkles } from 'lucide-react';
 import type { Dataset, Locale, QuestionSetState } from '../src/domain/types';
 import { attributeInventory, type Mapping } from '../src/questions/mapping';
 import { describeAttribute, describeColumn } from '../src/semantic/describe';
-import { suggestMappings } from '../src/semantic/suggest';
+import { MIN_MARGIN_CATEGORIES, suggestMappings } from '../src/semantic/suggest';
 import { embed, ModelUnavailable, type LoadProgress } from '../src/semantic/model';
 import { MappingNotConfigured, requestMapping } from '../src/semantic/remote';
 import type { Strings } from '../src/i18n/strings';
@@ -111,6 +111,8 @@ export function MappingStep({
       const found = suggestMappings(
         namen.map((n, i) => ({ key: n.key, vector: vectors[i] })),
         eigen.map((e, i) => ({ key: e.key, vector: vectors[namen.length + i] })),
+        [],
+        { minMargin: MIN_MARGIN_CATEGORIES },
       );
       toepassen(found.map((f) => ({ key: f.key, columns: [f.column] })), 'browser');
     } catch {
@@ -118,28 +120,67 @@ export function MappingStep({
     }
   }
 
-  // Eén keer per scherm, en alleen als er iets te koppelen valt.
-  const tried = useRef(false);
+  /**
+   * Koppel wat er te koppelen valt, zodra het scherm er is.
+   *
+   * Zonder klik, en dat is de hele bedoeling: een merchant hoort niet te moeten
+   * weten dat er een knop bestaat voordat zijn scan klopt. Wie het scherm
+   * openslaat en meteen doorklikt kreeg anders een cijfer dat te laag is —
+   * tientallen kenmerken ongekoppeld terwijl het antwoord in zijn data staat.
+   *
+   * In twee fases en niet tegelijk. Dat is een afhankelijkheid en geen
+   * voorkeur: een andere vragenset betekent andere kenmerken. Lieten we ze
+   * tegelijk lopen, dan schrijven twee stromen allebei hun eigen kijk op de
+   * staat terug en wint de laatste — gemeten gedrag, niet theorie: de
+   * categoriekoppeling verdween dan zonder spoor.
+   */
+  const [phase, setPhase] = useState<'sets' | 'attributes' | 'done'>('sets');
+  /**
+   * Grendels die synchroon dichtgaan, en dat is het hele punt.
+   *
+   * Een fase omzetten kan pas ná het async werk, en intussen levert elke
+   * toepassing een nieuwe staat en dus een nieuwe render op. Zonder deze
+   * grendel ziet het effect dan nog steeds de oude fase en begint het opnieuw:
+   * gemeten negen modelaanroepen waar er twee horen te zijn.
+   */
+  const startedSets = useRef(false);
+  const startedAttributes = useRef(false);
+
   useEffect(() => {
-    if (tried.current) return;
-    const open = state.sets.filter(
+    if (phase !== 'sets' || startedSets.current) return;
+    startedSets.current = true;
+    const openSets = state.sets.filter(
       (set) => set.category !== undefined && set.overlayId === undefined,
     );
-    if (open.length === 0 || state.overlays.length === 0) return;
-    tried.current = true;
-    // Buiten de effect-body zetten: React waarschuwt terecht dat een setState
-    // in het lichaam van een effect een extra render uitlokt, en de vlag is toch
-    // pas interessant zodra het koppelen echt begint.
     void (async () => {
-      setMatchingSets(true);
-      try {
-        await matchCategories(open);
-      } finally {
-        setMatchingSets(false);
+      // De render eerst laten aflopen; een fase omzetten in het lichaam van een
+      // effect lokt een extra render uit voordat deze klaar is.
+      await Promise.resolve();
+      if (openSets.length > 0 && state.overlays.length > 0) {
+        setMatchingSets(true);
+        try {
+          await matchCategories(openSets);
+        } finally {
+          setMatchingSets(false);
+        }
       }
+      // Pas hierna: de volgende render draagt de nieuw samengestelde sets, en
+      // dus de kenmerken die er werkelijk gevraagd worden.
+      setPhase('attributes');
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.sets, state.overlays]);
+  }, [phase, state.sets, state.overlays]);
+
+  useEffect(() => {
+    if (phase !== 'attributes' || startedAttributes.current) return;
+    startedAttributes.current = true;
+    void (async () => {
+      await Promise.resolve();
+      setPhase('done');
+      if (open.length > 0) await suggest();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   /**
    * Wat de knop zegt terwijl hij bezig is.
@@ -245,15 +286,25 @@ export function MappingStep({
         </p>
         <p className="mt-2 text-sm leading-relaxed text-muted">{s.mapping.agentNote}</p>
 
-        {open.length > 0 ? (
+        {/* Bezig, of opnieuw kunnen proberen. Geen knop om het te stárten: dat
+            gebeurt vanzelf zodra dit scherm er is. Wél een knop om het over te
+            doen — een mislukte download of een korte storing mag geen reden zijn
+            om de rest met de hand te moeten koppelen. */}
+        {busy ? (
+          <p className="mt-3 flex items-center gap-2 text-sm text-muted">
+            <Sparkles className="size-4 animate-pulse" aria-hidden />
+            {label(busy)}
+          </p>
+        ) : open.length > 0 && phase === 'done' ? (
           <div className="mt-3">
-            <Button onClick={() => void suggest()} loading={busy !== undefined}>
+            <Button variant="secondary" onClick={() => void suggest()}>
               <Sparkles className="size-4" aria-hidden />
-              {busy ? label(busy) : s.mapping.suggest}
+              {s.mapping.suggestAgain}
             </Button>
-            <p className="mt-2 text-xs leading-relaxed text-muted">{s.mapping.suggestNote}</p>
           </div>
         ) : null}
+
+        <p className="mt-2 text-xs leading-relaxed text-muted">{s.mapping.suggestNote}</p>
 
         {failed ? (
           <div className="mt-3">
@@ -296,7 +347,7 @@ export function MappingStep({
             <p className="mt-1.5 text-xs text-muted">
               {s.mapping.setsMatched}{' '}
               <span className="text-ink">
-                {setsBy === 'browser' ? s.mapping.bySelf : s.mapping.byModel}
+                {setsBy === 'browser' ? s.mapping.bySelf : `${s.mapping.byModel} ${setsBy}.`}
               </span>
             </p>
           ) : null}

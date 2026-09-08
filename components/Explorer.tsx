@@ -138,7 +138,7 @@ function ProductRow({ s, product, locale }: {
               <Badge tone={product.qualified ? 'ok' : 'warn'}>
                 {product.qualified ? s.explorer.qualifiedYes : s.explorer.qualifiedNo}
               </Badge>
-              <Badge tone={product.findable ? 'ok' : 'neutral'}>
+              <Badge tone={product.findable ? 'ok' : 'warn'}>
                 {product.findable ? s.explorer.findableYes : s.explorer.findableNo}
               </Badge>
             </>
