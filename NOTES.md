@@ -344,6 +344,16 @@ en niet per product, en de uitkomst is een tabel die de merchant bevestigt en
 geen oordeel. De opdracht gaat knip-en-plak de deur uit; er is geen serverroute
 en geen sleutel in de browser. De scan zelf blijft model-vrij en deterministisch.
 
+**Kleur heeft één betekenis, en die staat in `DESIGN.md`.** Elk scherm koos
+zijn eigen toon voor hetzelfde ding: basisgeschikt stond amber, een
+categorielabel accent, herkomst accent. Daar zit geen regel achter, alleen de
+vraag hoe belangrijk de bouwer dat onderdeel op dat moment vond. De regel is nu:
+`ok` is gehaald, `warn` is werk dat er ligt, `danger` blokkeert, `accent` is de
+handeling die je van iemand wilt, `neutral` oordeelt niet. Daaruit volgt dat
+basisgeschikt groen is *ook als het nul is* — het is een prestatie en geen
+waarschuwing, en de lengte van de balk zegt al hoe ver je bent. Amber zeggen
+omdat een getal laag is, maakt van de meting een mening.
+
 **Bevestigen van een vragenset is terugdraaibaar** en verhoogt de versie niet;
 het is een oordeel over de set, geen wijziging eraan.
 
@@ -426,6 +436,24 @@ als een `velden:`-lijst uit de YAML. Wat nog ontbreekt is **bewaren**: de
 koppeling leeft in de paginastatus en is bij een volgende sessie weg. Hij hoort
 naar `BankStore` (of een eigen store met `account_id`), want dan geldt hij voor
 elke volgende scan van deze merchant — en dat is het hele punt.*
+
+*Op 8 september begint het koppelen vanzelf, zodra het scherm er is. Een
+merchant hoorde niet te moeten weten dát er een knop bestond voordat zijn scan
+klopte: wie doorklikte kreeg een cijfer dat te laag was, met tientallen
+kenmerken ongekoppeld terwijl het antwoord in zijn data stond. Het loopt in twee
+fases en dat is een afhankelijkheid, geen voorkeur — eerst de categorieën, dan
+pas de kenmerken, want een andere vragenset vraagt andere kenmerken. Tegelijk
+laten lopen liet twee stromen allebei hun eigen kijk op de staat terugschrijven
+en won de laatste; de categoriekoppeling verdween dan zonder spoor. De knop
+blijft over als "opnieuw proberen", want een mislukte modeldownload mag geen
+reden zijn om de rest met de hand te koppelen.*
+
+*De marge voor categorievoorstellen staat sindsdien apart en strenger
+(`MIN_MARGIN_CATEGORIES`, 0,15). Gemeten op de vier categorieën van de
+testmerchant: de twee juiste hadden 0,248 en 0,442, de twee onjuiste 0,024 en
+0,087. Vier punten is weinig om op te ijken, maar de kant waarop je fout mag
+zitten is duidelijk — een verkeerd gekoppeld kenmerk kost één klik, een verkeerd
+gekoppelde categorie zet de verkeerde vragenset op alles wat eronder hangt.*
 
 **Prijzen** — de bedragen en de exacte bestandsgrens staan nog niet vast. De
 prijzenpagina draagt daar een zichtbare TODO in plaats van een verzonnen bedrag.

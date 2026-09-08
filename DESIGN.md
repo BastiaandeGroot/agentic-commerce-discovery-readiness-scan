@@ -50,6 +50,23 @@ geen `blue-500`, geen `rgb()`.
 De statuskleuren staan bewust los van `accent`: groen betekent hier "beantwoord",
 niet "klik hier". Zouden ze samenvallen, dan leest elke knop als een goedkeuring.
 
+### Wat elke toon betekent
+
+Eén regel per toon, en er zijn geen uitzonderingen. Twijfel je, kies dan de toon
+die past bij de vraag *"wat zegt dit een merchant over zijn data?"* — niet bij
+hoe belangrijk jij het onderdeel vindt.
+
+| Toon | Betekenis | Voorbeelden |
+|---|---|---|
+| `ok` | Gehaald. Beantwoord, bevestigd, ingelezen, doel bereikt. | beantwoorde vragen, basisgeschikt, volledig, invulwerk (het goedkoopste gat) |
+| `warn` | Nog te doen. Werk dat er ligt, of een aanname die je moet weten. | onbeantwoord, veld leeg, modelwerk, een voorlopige vragenbank |
+| `danger` | Blokkerend of onherstelbaar. | een kritieke vraag, een gat uit een systeem dat een catalogus niet draagt |
+| `accent` | De handeling die je wilt dat iemand doet. | knoppen, links, de gekozen filter, een voorstel dat nagelopen moet worden |
+| `neutral` | Een telling of een label zonder oordeel. | aantallen, veldnamen, herkomst van een vraag |
+
+Een cijfer dat een prestatie is, is dus groen — ook als het nul is. Amber zeggen
+omdat het getal laag is, maakt van de meting een mening.
+
 **Licht is de stand, donker is opt-in.** De app volgt de systeeminstelling
 bewust *niet*: dit is gereedschap voor iemand die zijn productdata niet dagelijks
 in handen heeft, en warm papier nodigt uit waar een bijna-zwart hoogcontrastvlak

@@ -35,7 +35,10 @@ function FunnelCard({ s, report }: { s: Strings; report: ScanReport }) {
   const rows = [
     { label: s.report.total, value: funnel.total, tone: 'neutral' as const, explain: undefined, info: undefined },
     {
-      label: s.report.qualified, value: funnel.qualified, tone: 'warn' as const,
+      // Groen, ook als het nul is: basisgeschikt is een prestatie en geen
+      // waarschuwing. Amber zeggen omdat het getal laag is maakt van de meting
+      // een mening; de lengte van de balk zegt al hoe ver je bent.
+      label: s.report.qualified, value: funnel.qualified, tone: 'ok' as const,
       explain: hasCritical ? s.report.qualifiedExplain : s.report.qualifiedNoCritical,
       info: s.report.qualifiedInfo,
     },
@@ -394,9 +397,7 @@ function QuestionCoverageCard({ s, report, locale }: {
                     <Badge tone="danger">{s.questions.importance.critical}</Badge>
                   ) : null}
                   {row.layer === 'category' ? (
-                    <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-accent">
-                      {s.questions.layerCategory}
-                    </span>
+                    <Badge tone="neutral">{s.questions.layerCategory}</Badge>
                   ) : null}
                   <span className="min-w-0">{row.label[locale]}</span>
                 </span>
