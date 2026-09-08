@@ -14,3 +14,4 @@ import './request.test';
 import './inventory.test';
 import './quality.test';
 import './facets.test';
+import './sitescan.test';

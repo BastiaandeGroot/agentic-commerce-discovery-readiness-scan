@@ -34,13 +34,18 @@ test('bij twijfel gokt hij niet', () => {
   assert.deepEqual(rows.map((r) => r.kind), ['unclear', 'unclear']);
 });
 
-test('de site wint van de structuur', () => {
+test('het filterpaneel wijst een eigenschap aan; het menu wijst niets aan', () => {
   const rows = classifyPaths(
     [path('Meubelstoffen > Effen'), path('Meubelstoffen > Banken')],
     { navigation: ['Banken'], filters: ['Effen'] },
   );
   assert.equal(kindOf(rows, 'Effen'), 'facet');
-  assert.equal(kindOf(rows, 'Banken'), 'category');
+  // "Banken" staat in het menu en blijft toch onbeslist. Dat is geen slordigheid
+  // maar een meting: op de eerste echte winkel stonden "Effen", "Premium" en
+  // "Gedessineerd" gewoon naast "Banken" in datzelfde menu. Een menu is een
+  // verkoopinstrument, geen datamodel, en zou hier een gat wegpoetsen.
+  assert.equal(kindOf(rows, 'Banken'), 'unclear');
+  assert.match(rows.find((r) => r.segments.includes('Banken'))!.reason, /menu/);
 });
 
 test('in het menu én tussen de filters is een eigenschap, geen twijfelgeval', () => {

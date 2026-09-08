@@ -110,10 +110,14 @@ export function classifyPaths(
           ? `"${leaf}" is op de site zowel een filter als een categorie; als filter hoort het een kenmerk te zijn.`
           : `"${leaf}" is op de site een filter, geen categorie.` };
     }
-    if (inNav.has(key)) {
-      return { ...path, kind: 'category' as const,
-        reason: `"${leaf}" staat in de navigatie en niet tussen de filters.` };
-    }
+    // Staan in het menu maakt iets géén categorie.
+    //
+    // Dat leek de voor de hand liggende regel en hij is op de eerste echte site
+    // gesneuveld: die zet "Effen", "Premium" en "Gedessineerd" gewoon naast
+    // "Banken" in het hoofdmenu. Een menu is een verkoopinstrument, geen
+    // datamodel. Het blijft wel het verschil tussen "we hebben gekeken en het
+    // staat er niet" en "we hebben niet gekeken", en dat verschil staat in de
+    // reden zodat een merchant weet wat hij bevestigt.
     if (parents >= MIN_PARENTS_FOR_FACET) {
       return { ...path, kind: 'facet' as const,
         reason: `"${leaf}" komt onder ${parents} verschillende categorieën voor; dat is een eigenschap, geen soort product.` };
@@ -124,7 +128,9 @@ export function classifyPaths(
     }
     return { ...path, kind: 'unclear' as const,
       reason: site
-        ? `"${leaf}" staat niet op de site en komt maar op één plek in de boom voor.`
+        ? inNav.has(key)
+          ? `"${leaf}" staat wel in het menu maar niet tussen de filters; een menu zegt niet of dit een productsoort is.`
+          : `"${leaf}" is op de site niet als categorie of filter teruggevonden.`
         : `"${leaf}" komt maar op één plek voor; zonder de site is niet te zien of het een categorie is.` };
   });
 }
