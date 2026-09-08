@@ -56,6 +56,7 @@ browsermodel, met dat verschil in beeld.
 | `app/` | routes |
 | `scripts/` | headless testharnas, geen productiecode |
 | `kennis/_methode/` | de methode en de promptreeks; documentatie, geen code |
+| `plugin/vragenbank/` | de Cowork-plugin die banken maakt, controleert en voorlegt; de naslag erin is een kopie uit `kennis/_methode/` en moet meeveranderen |
 
 ## Design
 
