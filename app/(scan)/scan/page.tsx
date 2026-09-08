@@ -25,6 +25,8 @@ import { pathsFromProducts, type Verdicts } from '../../../src/intake/facets';
 // intake niet van de engine hoeft af te hangen.
 import { categoryPath } from '../../../src/engine/join';
 import { BankStep } from '../../../components/BankStep';
+import { WaitingStep } from '../../../components/WaitingStep';
+import { useAuth } from '../../../components/auth/AuthProvider';
 import { MappingStep } from '../../../components/MappingStep';
 import { QuestionSetStep } from '../../../components/QuestionSetStep';
 import { ReportView } from '../../../components/ReportView';
@@ -47,6 +49,7 @@ export default function Home() {
   const [categories, setCategories] = useState<Record<string, string | null>>({});
   /** Wat de merchant zelf over zijn categoriepaden zei; zie SegmentStep. */
   const [verdicts, setVerdicts] = useState<Verdicts>({});
+  const { user } = useAuth();
   const [report, setReport] = useState<ScanReport>();
   // De client houdt de worker vast; de datasets blijven daar zodat ze niet voor
   // elke scan opnieuw door de structured clone hoeven.
@@ -214,15 +217,27 @@ export default function Home() {
           />
         ) : null}
 
+        {/* Geen uploadscherm meer als eerste beeld. Een webshop-eigenaar weet
+            niet welke vragen zijn markt stelt — dat is wat hij komt halen — en
+            hem die laten aanleveren is de drempel die niemand neemt. Het inlezen
+            staat er nog, als beheerhandeling onder het wachtscherm. */}
         {step === 'bank' && questionState ? (
-          <BankStep
+          <WaitingStep
             s={s}
-            locale={locale}
-            stored={banks}
-            onImport={(entry) => void handleImport(entry)}
-            onRemove={(vertical) => void handleRemoveBank(vertical)}
+            status="queued"
+            email={user?.email}
+            hasList={banks.length > 0}
             onContinue={() => setStep('mapping')}
-          />
+          >
+            <BankStep
+              s={s}
+              locale={locale}
+              stored={banks}
+              onImport={(entry) => void handleImport(entry)}
+              onRemove={(vertical) => void handleRemoveBank(vertical)}
+              onContinue={() => setStep('mapping')}
+            />
+          </WaitingStep>
         ) : null}
 
         {step === 'mapping' && catalog && questionState ? (

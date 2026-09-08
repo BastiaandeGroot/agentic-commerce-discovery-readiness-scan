@@ -189,7 +189,7 @@ export const STRINGS = {
     steps: {
       segments: 'Categorieën',
       upload: 'Data aanleveren',
-      bank: 'Vragenlijst',
+      bank: 'Vragen verzamelen',
       mapping: 'Kenmerken koppelen',
       questions: 'Vragensets valideren',
       report: 'Rapport',
@@ -591,6 +591,32 @@ export const STRINGS = {
       allRecords: 'Alle',
     },
 
+    waiting: {
+      heading: 'We stellen de vragen voor jouw markt samen',
+      intro:
+        'De vragen komen niet uit je eigen kolommen maar uit onderzoek naar jouw markt: wat kopers vragen voordat ze bestellen, verzameld over meerdere webshops. Dat is werk dat één keer per markt gebeurt — en jij bent de eerste in de jouwe.',
+      what: 'Wat er nu gebeurt',
+      whatBody:
+        'We nemen vijf à acht webshops in jouw markt door: hun veelgestelde vragen, hun categorieteksten, hun productpagina\u2019s. Daaruit komt de vragenlijst waarmee we jouw data meten. Een vakspecialist kijkt hem na voordat hij in gebruik gaat.',
+      when: 'Hoe lang dit duurt',
+      whenBody:
+        'Reken op één tot twee werkdagen. Je hoeft niet te wachten: sluit dit venster gerust. Je krijgt een mail zodra je scan klaarstaat, en je gegevens blijven bewaard.',
+      why: 'Waarom niet meteen',
+      whyBody:
+        'We zouden je nu een uitkomst kunnen geven op algemene vragen. Die zou er goed uitzien en niets waard zijn: zonder de vragen die in jouw markt écht gesteld worden, meten we of je data compleet is in plaats van of hij antwoord geeft.',
+      status: { queued: 'In de wachtrij', running: 'Wordt samengesteld', review: 'Wordt nagekeken', ready: 'Klaar', failed: 'Er ging iets mis' },
+      queuedSince: 'Aangevraagd op',
+      notifyTo: 'We sturen bericht naar',
+      notifyAnon: 'Log in als je bericht wilt krijgen zodra je scan klaarstaat.',
+      failedNext: 'We pakken dit zelf op. Duurt het langer dan twee werkdagen, laat het dan weten.',
+      manageHeading: 'Zelf een vragenlijst inlezen',
+      manageBody:
+        'Voor beheer: heb je al een vragenlijst voor deze markt, lees hem dan hier in. Dit hoeft een merchant nooit te doen.',
+      manageOpen: 'Lijst inlezen',
+      manageClose: 'Sluiten',
+      continueAnyway: 'Doorgaan met de lijst die er is',
+    },
+
     segments: {
       heading: 'Categorie of kenmerk?',
       intro:
@@ -870,7 +896,7 @@ export const STRINGS = {
     steps: {
       segments: 'Categories',
       upload: 'Supply data',
-      bank: 'Question list',
+      bank: 'Gathering questions',
       mapping: 'Link characteristics',
       questions: 'Validate question sets',
       report: 'Report',
@@ -1265,6 +1291,32 @@ export const STRINGS = {
       allRecords: 'All',
       openDetail: 'Show details',
       closeDetail: 'Hide details',
+    },
+
+    waiting: {
+      heading: 'We are putting together the questions for your market',
+      intro:
+        'The questions do not come from your own columns but from research into your market: what buyers ask before they order, gathered across several shops. That is work done once per market — and you are the first in yours.',
+      what: 'What is happening now',
+      whatBody:
+        'We are going through five to eight shops in your market: their FAQs, their category texts, their product pages. That produces the list of questions we measure your data against. A specialist reviews it before it goes into use.',
+      when: 'How long this takes',
+      whenBody:
+        'Expect one to two working days. You do not have to wait: feel free to close this window. You will get an email as soon as your scan is ready, and your details are kept.',
+      why: 'Why not straight away',
+      whyBody:
+        'We could give you an outcome on generic questions right now. It would look fine and be worth nothing: without the questions that are actually asked in your market, we would measure whether your data is complete instead of whether it answers.',
+      status: { queued: 'In the queue', running: 'Being put together', review: 'Being reviewed', ready: 'Ready', failed: 'Something went wrong' },
+      queuedSince: 'Requested on',
+      notifyTo: 'We will send word to',
+      notifyAnon: 'Sign in if you want to be told as soon as your scan is ready.',
+      failedNext: 'We are picking this up ourselves. If it takes longer than two working days, let us know.',
+      manageHeading: 'Load a question list yourself',
+      manageBody:
+        'For administrators: if you already have a list for this market, load it here. A merchant never needs to do this.',
+      manageOpen: 'Load a list',
+      manageClose: 'Close',
+      continueAnyway: 'Continue with the list that is there',
     },
 
     segments: {
