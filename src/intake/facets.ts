@@ -93,20 +93,26 @@ export function classifyPaths(
     const key = normalizeName(leaf);
     const parents = parentsByLeaf.get(key)?.size ?? 0;
 
-    // Volgorde is bewust: de site wint van de structuur, want de merchant weet
-    // zelf het beste wat hij als categorie verkoopt. Maar staat hij in allebei,
-    // dan is dat tegenspraak en geen uitspraak.
-    if (inNav.has(key) && inFilters.has(key)) {
-      return { ...path, kind: 'unclear' as const,
-        reason: `"${leaf}" staat op de site zowel in het menu als tussen de filters.` };
-    }
+    // Het filterpaneel wint van het menu, ook als de naam in allebei staat.
+    //
+    // Gemeten op de site van de testmerchant, en dat gaf de doorslag: "Vlekwerend"
+    // en "Gedessineerd" staan op dezelfde pagina én tussen de filters én tussen
+    // de categorieën. Dat is geen tegenspraak maar de bevinding zelf — een
+    // eigenschap die in de categorieboom belandde omdat er geen attribuut voor
+    // was. Zou dit `unclear` blijven, dan verdween precies het geval waar het om
+    // gaat in de twijfelhoek.
+    //
+    // Het menu alleen is te zwak gebleken: dezelfde merchant zet "Effen",
+    // "Premium" en "Gedessineerd" gewoon in zijn hoofdmenu naast "Banken".
     if (inFilters.has(key)) {
       return { ...path, kind: 'facet' as const,
-        reason: `"${leaf}" is op de site een filter, geen categorie.` };
+        reason: inNav.has(key)
+          ? `"${leaf}" is op de site zowel een filter als een categorie; als filter hoort het een kenmerk te zijn.`
+          : `"${leaf}" is op de site een filter, geen categorie.` };
     }
     if (inNav.has(key)) {
       return { ...path, kind: 'category' as const,
-        reason: `"${leaf}" staat in de navigatie van de site.` };
+        reason: `"${leaf}" staat in de navigatie en niet tussen de filters.` };
     }
     if (parents >= MIN_PARENTS_FOR_FACET) {
       return { ...path, kind: 'facet' as const,

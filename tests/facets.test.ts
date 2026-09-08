@@ -43,11 +43,16 @@ test('de site wint van de structuur', () => {
   assert.equal(kindOf(rows, 'Banken'), 'category');
 });
 
-test('in het menu én tussen de filters is tegenspraak, geen uitspraak', () => {
-  const rows = classifyPaths([path('Gordijnstoffen > Verduisterend')], {
-    navigation: ['Verduisterend'], filters: ['Verduisterend'],
+test('in het menu én tussen de filters is een eigenschap, geen twijfelgeval', () => {
+  // Gemeten op de site van de testmerchant: "Vlekwerend" en "Gedessineerd"
+  // staan op dezelfde pagina in allebei. Dat is de bevinding zelf — een kenmerk
+  // dat in de categorieboom belandde omdat er geen attribuut voor was — en dat
+  // mag niet in de twijfelhoek verdwijnen.
+  const rows = classifyPaths([path('Meubelstoffen > Vlekwerend')], {
+    navigation: ['Vlekwerend'], filters: ['Vlekwerend'],
   });
-  assert.equal(rows[0].kind, 'unclear');
+  assert.equal(rows[0].kind, 'facet');
+  assert.match(rows[0].reason, /zowel een filter als een categorie/);
 });
 
 test('een facet levert geen marktsegment op', () => {
