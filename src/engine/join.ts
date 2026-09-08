@@ -66,3 +66,18 @@ export function mainCategory(product: ProductRecord): string | undefined {
   if (first === '' || /^\d+$/.test(first)) return undefined;
   return first;
 }
+
+/**
+ * Het tweede segment van het categoriepad, als dat er is.
+ *
+ * Bewust géén eigen vragenset: de vragenlijst kent vragen per markt, niet per
+ * filter, en per volledig pad meten zou tientallen sets van drie producten
+ * opleveren. Wél bruikbaar om binnen één categorie te kijken waar het werk zit —
+ * "Outdoorstoffen > Gestreept" kan een heel ander gat hebben dan de rest.
+ */
+export function subCategory(product: ProductRecord): string | undefined {
+  const raw = categoryPath(product);
+  if (!raw) return undefined;
+  const second = raw.split(/\s*[>/|]\s*/)[1]?.replace(/\s+/g, ' ').trim();
+  return second === undefined || second === '' || /^\d+$/.test(second) ? undefined : second;
+}

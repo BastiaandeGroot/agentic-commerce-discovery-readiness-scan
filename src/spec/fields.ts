@@ -363,3 +363,25 @@ export function fieldsByOwner(): Map<FieldDef['owner'], FieldDef[]> {
   }
   return grouped;
 }
+
+/**
+ * Leesbare omschrijving van wat een vraag nodig heeft.
+ *
+ * Een `attr:`-patroon is een zoekpatroon en geen veldnaam; ruw tonen zet een
+ * regex voor de neus van een merchant. Hier wordt het weer iets wat je kunt
+ * lezen.
+ */
+export function requirementLabel(requirement: string, locale: 'nl' | 'en'): string {
+  if (requirement.startsWith('attr:')) {
+    // `.?` is het scheidingsteken uit het zoekpatroon en geen leesteken; laten
+    // staan zet een halve regex voor de neus van een merchant.
+    return requirement
+      .slice(5)
+      .replace(/[$^\\]/g, '')
+      .replace(/\.\?/g, ' ')
+      .replace(/\|/g, ' / ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  return FIELD_BY_KEY[requirement]?.label[locale] ?? requirement;
+}

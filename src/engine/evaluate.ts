@@ -18,7 +18,7 @@ import type {
 import { CUSTOM_IMPORTANCE, isScored, weightOf } from '../questions/compose';
 import { FIELD_BY_KEY } from '../spec/fields';
 import { isBlank, str } from '../intake/normalize';
-import { mainCategory } from './join';
+import { mainCategory, subCategory } from './join';
 
 /**
  * Kwaliteitsdrempels. Aanwezigheid is niet hetzelfde als bruikbaarheid: een
@@ -227,6 +227,16 @@ export function evaluateProduct(
         missing: outcome.missing,
         weight: weightOf(question),
         scored: isScored(question),
+        // Reist mee tot op het rapport: daar hoort te staan of een onbeantwoorde
+        // vraag voor élk product geldt of alleen voor deze categorie.
+        layer: question.layer,
+        // En waar hij zijn antwoord vandaan zou halen, zodat het rapport kan
+        // tonen wélk kenmerk hem blokkeert in plaats van alleen dát hij open staat.
+        evidence: evidenceGroups(question).map((group) => ({
+          attributeKey: group.attributeKey,
+          label: group.label,
+          fields: group.fields,
+        })),
         importance: question.importance ?? CUSTOM_IMPORTANCE,
       });
 
@@ -253,6 +263,7 @@ export function evaluateProduct(
     title: str(product.values.title),
     image: str(product.values.image),
     category: mainCategory(product),
+    subcategory: subCategory(product),
     setId: set?.id,
     unmatched: set === undefined,
     findable: set !== undefined && scored.length > 0 && scored.every((q) => q.answered),

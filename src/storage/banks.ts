@@ -23,6 +23,24 @@ export interface StoredBank {
   /** Bestandsnaam of bron, zodat herkomst navolgbaar blijft. */
   source: string;
   bank: QuestionBank;
+  /**
+   * Welke kolom welk kenmerk draagt, zoals de merchant het bevestigde.
+   *
+   * Bewaard bij de bank en niet los, want het hoort bij elkaar: dezelfde
+   * vragenlijst plus dezelfde koppeling geeft hetzelfde rapport. Zonder dit
+   * begint elke sessie opnieuw met tientallen ongekoppelde kenmerken, en dan is
+   * het koppelscherm eenmalig handwerk in plaats van een investering.
+   *
+   * Alleen namen — kenmerksleutel en kolomnaam. Geen waarde, geen product.
+   */
+  mapping?: Record<string, string[]>;
+  /**
+   * Welke vragenset uit de lijst bij welke eigen categorie hoort.
+   *
+   * Sleutel is de categorienaam van de merchant, waarde het overlay-id, of
+   * `null` voor "alleen de algemene vragen".
+   */
+  categories?: Record<string, string | null>;
 }
 
 export interface BankStore {

@@ -36,6 +36,10 @@ export default function Home() {
   // de vragenlijst, want de kolomnamen zijn van de merchant; hij wordt daarom op
   // de bank gelegd op het moment van samenstellen en niet erin bewaard.
   const [mapping, setMapping] = useState<Mapping>({});
+  // Welke vragenset uit de lijst bij welke eigen categorie hoort. Zonder deze
+  // keuze beslist alleen de regex, en die faalt zodra de lijst zijn categorieën
+  // anders noemt dan de catalogus.
+  const [categories, setCategories] = useState<Record<string, string | null>>({});
   const [report, setReport] = useState<ScanReport>();
   // De client houdt de worker vast; de datasets blijven daar zodat ze niet voor
   // elke scan opnieuw door de structured clone hoeven.
@@ -58,23 +62,58 @@ export default function Home() {
   // anders draait de eerste scan van een sessie op de terugval terwijl er allang
   // een onderzochte bank ligt.
   useEffect(() => {
-    void bankStore.list(LOCAL_ACCOUNT).then(setBanks);
+    void bankStore.list(LOCAL_ACCOUNT).then((stored) => {
+      setBanks(stored);
+      // De koppeling van de vorige keer hoort er meteen te zijn, anders begint
+      // elke sessie opnieuw met tientallen ongekoppelde kenmerken.
+      const saved = stored.find((entry) => entry.mapping || entry.categories);
+      if (saved?.mapping) setMapping(saved.mapping);
+      if (saved?.categories) setCategories(saved.categories);
+    });
   }, []);
 
   /** Stel de sets opnieuw samen; elke bank- of koppelwijziging verandert de vragen. */
-  function compose(nextBanks: StoredBank[], nextCatalog = catalog, nextMapping = mapping) {
+  function compose(
+    nextBanks: StoredBank[],
+    nextCatalog = catalog,
+    nextMapping = mapping,
+    nextCategories = categories,
+  ) {
     if (!nextCatalog) return;
     setQuestionState(generateQuestionSets(
       nextCatalog,
       nextBanks.map((entry) => entry.bank),
       nextMapping,
+      nextCategories,
     ));
   }
 
   /** Een gewijzigde koppeling verandert waar elk kenmerk op uitkomt. */
+  /**
+   * Bewaar de koppeling bij de vragenlijst waar hij bij hoort.
+   *
+   * Bij elke wijziging en niet pas aan het eind: wie halverwege wegklikt hoort
+   * zijn werk terug te vinden. Alleen namen gaan mee — kenmerksleutel, kolomnaam,
+   * categorienaam — dus de belofte dat de catalogus het apparaat niet verlaat
+   * blijft overeind.
+   */
+  function remember(nextMapping: Mapping, nextCategories: Record<string, string | null>) {
+    for (const entry of banks) {
+      void bankStore.save({ ...entry, mapping: nextMapping, categories: nextCategories });
+    }
+  }
+
   function handleMapping(next: Mapping) {
     setMapping(next);
     compose(banks, catalog, next);
+    remember(next, categories);
+  }
+
+  /** Een andere vragenset per categorie verandert wélke vragen er gesteld worden. */
+  function handleCategories(next: Record<string, string | null>) {
+    setCategories(next);
+    compose(banks, catalog, mapping, next);
+    remember(mapping, next);
   }
 
   function handleReady(nextClient: ScanClient, nextCatalog: Dataset) {
@@ -85,7 +124,13 @@ export default function Home() {
   }
 
   async function handleImport(entry: StoredBank) {
-    await bankStore.save(entry);
+    // Een nieuwe lijst brengt eigen categorieën mee, dus de oude keuzes wijzen
+    // naar sets die er misschien niet meer zijn. Ze meenemen zou stilzwijgend op
+    // "alleen de algemene vragen" uitkomen; leegmaken laat de koppeling opnieuw
+    // lopen. De kenmerkkoppeling blijft wél staan: die hangt aan kolomnamen, en
+    // die zijn niet veranderd.
+    setCategories({});
+    await bankStore.save({ ...entry, mapping, categories: {} });
     const next = await bankStore.list(LOCAL_ACCOUNT);
     setBanks(next);
     compose(next);
@@ -115,7 +160,7 @@ export default function Home() {
 
   function restart() {
     setCatalog(undefined);
-    setQuestionState(undefined); setReport(undefined); setMapping({});
+    setQuestionState(undefined); setReport(undefined); setMapping({}); setCategories({});
     client?.dispose(); setClient(undefined);
     setStep('upload');
   }
@@ -136,7 +181,7 @@ export default function Home() {
                 <span
                   className={
                     current ? 'font-medium text-ink'
-                      : done ? 'text-accent'
+                      : done ? 'text-ok'
                       : 'text-muted'
                   }
                 >
@@ -170,6 +215,8 @@ export default function Home() {
             state={questionState}
             mapping={mapping}
             onChange={handleMapping}
+            categories={categories}
+            onCategories={handleCategories}
             onContinue={() => setStep('questions')}
           />
         ) : null}

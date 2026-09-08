@@ -40,6 +40,13 @@ const LIMITS = {
 interface Payload {
   attributes: { key: string; text: string }[];
   columns: { key: string; text: string }[];
+  /**
+   * Twee soorten koppeling, dezelfde vorm. Kenmerken op kolommen, of de
+   * vragensets uit de lijst op de eigen categorieën van de merchant. Dat tweede
+   * is precies hetzelfde probleem — Engelse vaktaal tegen Nederlandse data — en
+   * het verdient geen tweede route, alleen een andere opdracht.
+   */
+  kind?: 'attributes' | 'categories';
 }
 
 /** Weiger wat niet klopt vóór het geld kost, en zeg waarom. */
@@ -55,13 +62,29 @@ function validate(body: unknown): Payload | string {
   if (attributes.length > LIMITS.attributes || columns.length > LIMITS.columns) {
     return `Te groot: hoogstens ${LIMITS.attributes} kenmerken en ${LIMITS.columns} kolommen per aanvraag.`;
   }
+  const kind = (body as Partial<Payload>).kind;
+  if (kind !== undefined && kind !== 'attributes' && kind !== 'categories') {
+    return 'Onbekend soort koppeling.';
+  }
   const clean = (list: { key: string; text: string }[]) => list.every((entry) =>
     entry
     && typeof entry.key === 'string' && entry.key.length > 0 && entry.key.length <= LIMITS.text
     && typeof entry.text === 'string' && entry.text.length <= LIMITS.text);
   if (!clean(attributes) || !clean(columns)) return 'Een naam of omschrijving is leeg of te lang.';
-  return { attributes, columns };
+  return { attributes, columns, kind: kind ?? 'attributes' };
 }
+
+const SYSTEM_CATEGORIES = [
+  'Je legt de categorieën van een vragenlijst op de categorieën van een productcatalogus.',
+  '',
+  'Regels:',
+  '- Koppel alleen wat je zeker weet. Een verkeerde koppeling zet de verkeerde vragen op een categorie, en dan meet de scan iets anders dan er verkocht wordt.',
+  '- Laat een categorie weg als er geen goede tegenhanger is. Die krijgt dan alleen de algemene vragen, en dat is een geldig antwoord.',
+  '- Gebruik uitsluitend namen die letterlijk in de lijst staan. Verzin er nooit een bij.',
+  '- De twee lijsten staan vaak in verschillende talen: "upholstery fabrics" en "Meubelstoffen" zijn hetzelfde, "curtain fabrics" en "Gordijnstoffen" ook.',
+  '',
+  'Antwoord met één regel per koppeling, in de vorm `vragenlijstcategorie: catalogus­categorie`. Geen inleiding, geen uitleg, geen opsommingstekens.',
+].join('\n');
 
 const SYSTEM = [
   'Je legt kenmerken uit een vragenlijst op kolommen uit een productcatalogus.',
@@ -77,12 +100,15 @@ const SYSTEM = [
   'Antwoord met één regel per koppeling, in de vorm `kenmerk: kolom`. Geen inleiding, geen uitleg, geen opsommingstekens.',
 ].join('\n');
 
-function prompt({ attributes, columns }: Payload): string {
+function prompt({ attributes, columns, kind }: Payload): string {
+  const [links, rechts] = kind === 'categories'
+    ? ['CATEGORIEËN UIT DE VRAGENLIJST:', 'CATEGORIEËN UIT DE CATALOGUS (met het aantal producten):']
+    : ['KENMERKEN (naam, en de vraag die erop leunt):', 'KOLOMMEN (naam, en een paar waarden die erin staan):'];
   return [
-    'KENMERKEN (naam, en de vraag die erop leunt):',
+    links,
     ...attributes.map((entry) => `- ${entry.key} — ${entry.text}`),
     '',
-    'KOLOMMEN (naam, en een paar waarden die erin staan):',
+    rechts,
     ...columns.map((entry) => `- ${entry.key} — ${entry.text}`),
   ].join('\n');
 }
@@ -118,7 +144,7 @@ export async function POST(request: Request) {
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      system: SYSTEM,
+      system: payload.kind === 'categories' ? SYSTEM_CATEGORIES : SYSTEM,
       messages: [{ role: 'user', content: prompt(payload) }],
     });
 

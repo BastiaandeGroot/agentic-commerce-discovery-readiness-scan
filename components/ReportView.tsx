@@ -7,10 +7,11 @@
 // hier gemeten wordt is één ding: kan de catalogus de vragen beantwoorden die
 // een koper in deze markt stelt.
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toSnapshot } from '../src/engine/snapshot';
 import { LOCAL_ACCOUNT, snapshotStore } from '../src/storage/snapshots';
 import type { Locale, ScanReport } from '../src/domain/types';
+import { requirementLabel } from '../src/spec/fields';
 import type { Strings } from '../src/i18n/strings';
 import { Badge, Bar, Button, Card, CardTitle, InfoButton, InfoPanel, Select, TrafficLight, statusOf } from './ui';
 import { Explorer } from './Explorer';
@@ -59,6 +60,8 @@ function FunnelCard({ s, report }: { s: Strings; report: ScanReport }) {
                     label={s.report.infoLabel}
                     open={openInfo === row.label}
                     onToggle={() => setOpenInfo(openInfo === row.label ? undefined : row.label)}
+                    onOpen={() => setOpenInfo(row.label)}
+                    onClose={() => setOpenInfo(undefined)}
                   />
                 ) : null}
               </span>
@@ -107,6 +110,138 @@ function FunnelCard({ s, report }: { s: Strings; report: ScanReport }) {
  * eerstvolgende stap oplevert — zonder de lat te verlagen, want vindbaar blijft
  * alle vragen beantwoord. Het is een richting, geen zachter cijfer.
  */
+/**
+ * Waar sta je per categorie, in drie gemiddelden met hun doel ernaast.
+ *
+ * Gemiddelden per product en geen percentages: "2 van de 7 kritieke vragen"
+ * zegt hoeveel werk er ligt, 30% niet. En het doel is nooit verzonnen — het is
+ * telkens "alles", omdat de twee treden van de trechter precies dat vragen.
+ */
+function CategoryScores({ s, report }: { s: Strings; report: ScanReport }) {
+  const [category, setCategory] = useState('all');
+
+  // Hoofdcategorieën eerst, hun subcategorieën eronder: dat is de volgorde
+  // waarin een merchant zijn eigen boom leest.
+  const options = useMemo(() => [
+    { value: 'all', label: s.report.scoreAllCategories },
+    ...report.categories.map((row) => ({
+      value: `${row.setId}|${row.subcategory ?? ''}`,
+      label: row.subcategory ? `   ${row.category} › ${row.subcategory}` : row.category,
+    })),
+  ], [report.categories, s.report.scoreAllCategories]);
+
+  const shown = useMemo(() => {
+    if (category === 'all') {
+      // Alles bij elkaar: alleen de hoofdcategorieën, anders tellen de
+      // subcategorieën hun producten een tweede keer mee.
+      const mains = report.categories.filter((row) => row.subcategory === undefined);
+      const total = mains.reduce((sum, row) => sum + row.total, 0);
+      const mix = (pick: (row: typeof mains[number]) => { answered: number; total: number }) => ({
+        answered: total === 0 ? 0
+          : mains.reduce((sum, row) => sum + pick(row).answered * row.total, 0) / total,
+        total: total === 0 ? 0
+          : mains.reduce((sum, row) => sum + pick(row).total * row.total, 0) / total,
+      });
+      return {
+        label: s.report.scoreAllCategories,
+        total,
+        critical: mix((row) => row.critical),
+        general: mix((row) => row.general),
+        all: mix((row) => row.all),
+      };
+    }
+    const [setId, sub] = category.split('|');
+    const row = report.categories.find(
+      (entry) => entry.setId === setId && (entry.subcategory ?? '') === sub,
+    );
+    if (!row) return undefined;
+    return {
+      label: row.subcategory ? `${row.category} › ${row.subcategory}` : row.category,
+      total: row.total,
+      critical: row.critical,
+      general: row.general,
+      all: row.all,
+    };
+  }, [category, report.categories, s.report.scoreAllCategories]);
+
+  if (report.categories.length === 0 || !shown) return null;
+
+  // Heeft deze catalogus subcategorieën, en maakt de vragenlijst er onderscheid
+  // in? Die twee zijn los: het eerste komt uit de data, het tweede uit de lijst.
+  const hasSubcategories = report.products.some((product) => product.subcategory !== undefined);
+  const hasLevels = report.categories.some((row) => row.subcategory !== undefined);
+
+  const bars: { label: string; goal: string; value: { answered: number; total: number } }[] = [
+    { label: s.report.scoreCritical, goal: s.report.scoreCriticalGoal, value: shown.critical },
+    { label: s.report.scoreGeneral, goal: s.report.scoreGeneralGoal, value: shown.general },
+    { label: s.report.scoreAll, goal: s.report.scoreAllGoal, value: shown.all },
+  ];
+
+  return (
+    <Card>
+      <CardTitle sub={s.report.scoreIntro}>{s.report.scoreHeading}</CardTitle>
+
+      {options.length > 2 ? (
+        <div className="mb-3">
+          <Select
+            label={s.report.filterCategory}
+            value={category}
+            onChange={setCategory}
+            options={options}
+          />
+        </div>
+      ) : null}
+
+      <div className="space-y-3">
+        {bars.map((bar) => {
+          const goal = Math.max(bar.value.total, 0);
+          const done = goal > 0 && bar.value.answered >= goal - 0.001;
+          const togo = Math.max(goal - bar.value.answered, 0);
+          // Alle drie met dezelfde precisie, anders telt 0,8 + 12,7 niet op tot
+          // 14 en lijkt het rapport zich te vergissen. Het doel is fractioneel
+          // zodra er categorieën met verschillende aantallen bij elkaar staan.
+          const fmt = (value: number) => value.toFixed(1);
+          return (
+            <div key={bar.label}>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="text-sm font-medium">{bar.label}</span>
+                <span className="text-sm">
+                  <span className="tnum font-semibold">{fmt(bar.value.answered)}</span>
+                  <span className="text-muted"> {s.report.scoreOf} </span>
+                  <span className="tnum font-semibold">{fmt(goal)}</span>
+                  {/* Wat er nog te halen valt, en niet alleen wat er staat. Een
+                      merchant stuurt op het verschil, niet op het getal. */}
+                  {done ? (
+                    <span className="ml-2 text-xs text-ok">✓ {s.report.scoreDone}</span>
+                  ) : (
+                    <span className="ml-2 text-xs text-muted">
+                      <span className="tnum">{fmt(togo)}</span> {s.report.scoreToGo}
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="mt-1">
+                <Bar value={bar.value.answered} total={goal} tone={done ? 'ok' : 'warn'} />
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-muted">{bar.goal}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="mt-3 text-xs text-muted">
+        <span className="tnum">{n(shown.total)}</span> {s.report.scoreProducts} · {shown.label}
+      </p>
+
+      {/* Zonder deze regel lijkt een ontbrekend niveau een gemis in de app,
+          terwijl het een eigenschap van de vragenlijst is. */}
+      {hasSubcategories && !hasLevels ? (
+        <p className="mt-1 text-xs leading-relaxed text-muted">{s.report.scoreLevelNote}</p>
+      ) : null}
+    </Card>
+  );
+}
+
 function NextStep({ s, report, locale }: {
   s: Strings; report: ScanReport; locale: Locale;
 }) {
@@ -187,7 +322,7 @@ function NextStep({ s, report, locale }: {
         {wouldBecome > 0 ? (
           <p className="mt-1 text-sm leading-relaxed">
             {s.report.startWinBody}{' '}
-            <span className="tnum font-semibold text-accent">{n(wouldBecome)}</span>{' '}
+            <span className="tnum font-semibold text-ok">{n(wouldBecome)}</span>{' '}
             {s.report.startWinProducts}
           </p>
         ) : (
@@ -202,6 +337,7 @@ function QuestionCoverageCard({ s, report, locale }: {
   s: Strings; report: ScanReport; locale: Locale;
 }) {
   const [setId, setSetId] = useState('all');
+  const [openRow, setOpenRow] = useState<string>();
   const categories = report.categories;
 
   // Toon de categorienaam van de merchant, niet onze interne set-id.
@@ -246,8 +382,10 @@ function QuestionCoverageCard({ s, report, locale }: {
         <p className="text-sm text-muted">{s.report.allAnswered}</p>
       ) : (
         <ul className="space-y-2.5">
-          {shown.map((row) => (
-            <li key={`${row.setId}-${row.questionId}`}>
+          {shown.map((row) => {
+            const rowKey = `${row.setId}-${row.questionId}`;
+            return (
+            <li key={rowKey}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-2 text-sm">
                   {/* Het gewicht staat vóór de vraag: het bepaalt of dit de
@@ -255,19 +393,29 @@ function QuestionCoverageCard({ s, report, locale }: {
                   {row.importance === 'critical' ? (
                     <Badge tone="danger">{s.questions.importance.critical}</Badge>
                   ) : null}
+                  {row.layer === 'category' ? (
+                    <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-accent">
+                      {s.questions.layerCategory}
+                    </span>
+                  ) : null}
                   <span className="min-w-0">{row.label[locale]}</span>
                 </span>
                 <span className="tnum text-xs text-muted">
                   {n(row.answered)}/{n(row.applicable)} {s.report.ofProducts}
                 </span>
               </div>
-              {/* Vier lagen: beantwoord, verborgen in het PIM, gevuld maar te
-                  mager, en deels aanwezig. Elke laag wijst naar ander werk —
-                  mappen, herschrijven of aanvullen — en op één hoop gooien levert
-                  een lijst op waar niemand mee verder kan. */}
+              {/* Vier lagen: beantwoord, veld leeg, gevuld maar te mager, en
+                  geen veld. Elke laag wijst naar ander werk — invullen,
+                  herschrijven of modelleren — en op één hoop gooien levert een
+                  lijst op waar niemand mee verder kan.
+
+                  Beantwoord is `ok` en niet `accent`. Statuskleuren staan los
+                  van de accentkleur: groen betekent hier "beantwoord" en niet
+                  "klik hier". Toen het accent terracotta werd, las een balk die
+                  voor 99% beantwoord was als alarm. */}
               <div className="mt-1 flex h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
                 <div
-                  className="h-full bg-accent"
+                  className="h-full bg-ok"
                   style={{ width: `${(row.answered / Math.max(row.applicable, 1)) * 100}%` }}
                 />
                 <div
@@ -282,7 +430,7 @@ function QuestionCoverageCard({ s, report, locale }: {
               <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted">
                 <span>{categoryName.get(row.setId) ?? row.setId}</span>
                 <span className="tnum">
-                  <span className="text-accent">{n(row.answered)}</span> {s.report.fromFeed}
+                  <span className="text-ok">{n(row.answered)}</span> {s.report.fromFeed}
                 </span>
                 {row.empty > 0 ? (
                   <span className="tnum" title={s.report.statesExplain.empty}>
@@ -302,13 +450,65 @@ function QuestionCoverageCard({ s, report, locale }: {
                 <span className="tnum" title={s.report.statesExplain.absent}>
                   {n(row.absent)} {s.report.neither}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => setOpenRow(rowKey === openRow ? undefined : rowKey)}
+                  className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                >
+                  {rowKey === openRow ? s.report.qDetailClose : s.report.qDetail}
+                </button>
               </p>
+
+              {/* Waaróp de vraag strandt, in de taal van de merchant: welk
+                  kenmerk hij nodig heeft, welke kolom daaraan hangt, en wat de
+                  goedkoopste handeling is. Zonder dit is een onbeantwoorde vraag
+                  een mededeling in plaats van een klus. */}
+              {rowKey === openRow ? (
+                <div className="mt-2 rounded-lg bg-surface-2 p-3 text-xs">
+                  <p className="font-medium text-muted">{s.report.qNeeds}</p>
+                  <ul className="mt-1 space-y-1">
+                    {(row.evidence ?? []).map((group) => (
+                      <li key={group.attributeKey} className="flex flex-wrap items-baseline gap-x-2">
+                        <span className="font-medium">{group.label[locale]}</span>
+                        <span aria-hidden className="text-muted">→</span>
+                        {group.fields.length === 0 ? (
+                          <span className="text-warn">{s.report.qNoColumn}</span>
+                        ) : (
+                          <span className="font-mono text-muted">
+                            {group.fields.map((field) => requirementLabel(field, locale)).join(', ')}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 font-medium text-muted">{s.report.qNext}</p>
+                  <p className="mt-0.5 leading-relaxed">{advice(row, s)}</p>
+                </div>
+              ) : null}
             </li>
-          ))}
+          );
+          })}
         </ul>
       )}
     </Card>
   );
+}
+
+/**
+ * Wat een merchant nu kan doen aan deze onbeantwoorde vraag.
+ *
+ * Op volgorde van goedkoopst: een ontbrekende koppeling kost een muisklik, een
+ * leeg veld invulwerk, een te mager veld herschrijven, en een ontbrekende kolom
+ * eerst een beslissing over het datamodel. Alleen "niet beantwoord" tonen laat
+ * die volgorde onzichtbaar, en dan begint iedereen bij het duurste.
+ */
+function advice(row: ScanReport['questionCoverage'][number], s: Strings): string {
+  const unlinked = (row.evidence ?? []).some((group) => group.fields.length === 0);
+  if (unlinked) return s.report.qNextUnlinked;
+  if (row.empty >= row.absent && row.empty > 0) return s.report.qNextEmpty;
+  if (row.absent > 0) return s.report.qNextAbsent;
+  if (row.unusable > 0 || row.incomplete > 0) return s.report.qNextWeak;
+  return s.report.qNextEmpty;
 }
 
 function GapTable({ s, report, locale }: { s: Strings; report: ScanReport; locale: Locale }) {
@@ -331,7 +531,11 @@ function GapTable({ s, report, locale }: { s: Strings; report: ScanReport; local
   const rows = [...merged.values()].sort((a, b) => b.affected - a.affected).slice(0, 25);
   if (rows.length === 0) return null;
 
-  const causeTone = { unfilled: 'accent', unmodelled: 'warn', 'no-source': 'danger' } as const;
+  // Op inspanning en niet op ernst: invulwerk is de goedkoopste winst die er is,
+  // modelwerk vraagt eerst een beslissing over je datamodel, en geen bron vraagt
+  // een koppeling die er niet is. De labels ernaast dragen de betekenis; de kleur
+  // helpt alleen de goedkope rijen eruit te pikken.
+  const causeTone = { unfilled: 'ok', unmodelled: 'warn', 'no-source': 'danger' } as const;
 
   const columns: { id: string; label: string; align?: string }[] = [
     { id: 'field', label: s.report.gapField },
@@ -366,6 +570,8 @@ function GapTable({ s, report, locale }: { s: Strings; report: ScanReport; local
                       label={s.report.infoLabel}
                       open={openInfo === column.id}
                       onToggle={() => setOpenInfo(openInfo === column.id ? undefined : column.id)}
+                      onOpen={() => setOpenInfo(column.id)}
+                      onClose={() => setOpenInfo(undefined)}
                     />
                   </span>
                 </th>
@@ -385,8 +591,11 @@ function GapTable({ s, report, locale }: { s: Strings; report: ScanReport; local
                   <Badge tone={causeTone[row.cause as keyof typeof causeTone]}>
                     {s.report.causes[row.cause]}
                   </Badge>
+                  {/* Het label alleen zegt een merchant niets: "Modelwerk" is
+                      ons woord. De betekenis en de inspanning eronder maken er
+                      een klus van die hij kan inplannen. */}
                   <span className="mt-0.5 block text-xs text-muted">
-                    {s.report.causeMeaning[row.cause]}
+                    {s.report.causeMeaning[row.cause]} · {s.report.causeEffort[row.cause]}
                   </span>
                 </td>
                 <td className="tnum py-2 text-right">{n(row.affected)}</td>
@@ -507,6 +716,7 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
       <div className="grid gap-4 lg:grid-cols-2">
         <FunnelCard s={s} report={report} />
         <NextStep s={s} report={report} locale={locale} />
+        <CategoryScores s={s} report={report} />
       </div>
 
       {report.unmatchedCount > 0 ? (

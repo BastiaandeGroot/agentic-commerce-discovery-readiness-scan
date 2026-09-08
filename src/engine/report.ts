@@ -10,7 +10,7 @@
 // werk is; pas de categorie zegt wáár, en pas het product zegt wat.
 
 import type {
-  CategoryReport, Dataset, Gap, ProductResult, QuestionCoverage,
+  Average, CategoryReport, Dataset, Gap, ProductResult, QuestionCoverage,
   QuestionSetState, ScanReport,
 } from '../domain/types';
 import { evaluateProduct } from './evaluate';
@@ -69,6 +69,59 @@ function answeredStats(results: ProductResult[]) {
   };
 }
 
+/**
+ * Het gemiddelde over één soort vraag: hoeveel er beantwoord zijn, van hoeveel.
+ *
+ * Per product en niet per vraag, want dat is de eenheid waarin een merchant
+ * denkt: "mijn gordijnstoffen beantwoorden gemiddeld 2 van de 7 kritieke
+ * vragen". Een percentage zou dat verhullen — 30% zegt niets over hoeveel werk
+ * er nog ligt, 2 van 7 wel.
+ */
+function averageOver(
+  results: ProductResult[],
+  keep: (question: ProductResult['questions'][number]) => boolean,
+): Average {
+  if (results.length === 0) return { answered: 0, total: 0 };
+  let answered = 0;
+  let total = 0;
+  for (const result of results) {
+    const questions = result.questions.filter((q) => q.scored && keep(q));
+    answered += questions.filter((q) => q.answered).length;
+    total += questions.length;
+  }
+  return { answered: answered / results.length, total: total / results.length };
+}
+
+function summarise(
+  setId: string,
+  category: string,
+  members: ProductResult[],
+  subcategory?: string,
+): CategoryReport {
+  return {
+    setId,
+    category,
+    subcategory,
+    total: members.length,
+    qualified: members.filter((m) => m.qualified).length,
+    findable: members.filter((m) => m.findable).length,
+    ...answeredStats(members),
+    critical: averageOver(members, (q) => q.importance === 'critical'),
+    general: averageOver(members, (q) => q.layer !== 'category'),
+    all: averageOver(members, () => true),
+    topGaps: aggregateGaps(members)
+      .slice(0, 4)
+      .map((g) => ({ field: g.field, label: g.label, cause: g.cause, affected: g.affected })),
+  };
+}
+
+/**
+ * Per categorie een rij, en per subcategorie die er is nog een.
+ *
+ * De subcategorierijen dragen hetzelfde `setId`: ze zijn een dóórsnede van
+ * dezelfde vragenset en geen eigen meting. Zou een subcategorie zijn eigen set
+ * krijgen, dan meet je je filters in plaats van je markt.
+ */
 function buildCategoryReports(
   results: ProductResult[],
   questionState: QuestionSetState,
@@ -81,22 +134,38 @@ function buildCategoryReports(
     grouped.set(result.setId, list);
   }
 
-  return [...grouped.entries()]
-    .map(([setId, members]) => {
-      const set = questionState.sets.find((s) => s.id === setId);
-      return {
-        setId,
-        category: set?.category ?? set?.label.nl ?? setId,
-        total: members.length,
-        qualified: members.filter((m) => m.qualified).length,
-        findable: members.filter((m) => m.findable).length,
-        ...answeredStats(members),
-        topGaps: aggregateGaps(members)
-          .slice(0, 4)
-          .map((g) => ({ field: g.field, label: g.label, cause: g.cause, affected: g.affected })),
-      };
-    })
-    .sort((a, b) => b.total - a.total);
+  const out: CategoryReport[] = [];
+  for (const [setId, members] of grouped) {
+    const set = questionState.sets.find((s) => s.id === setId);
+    const category = set?.category ?? set?.label.nl ?? setId;
+    out.push(summarise(setId, category, members));
+
+    // Alleen de subcategorieën waarover de vragenlijst iets eigens te zeggen
+    // heeft. Een subcategorie die dezelfde vragen krijgt is geen tweede meting
+    // maar dezelfde meting op minder producten; hem als eigen rij tonen zou een
+    // onderscheid suggereren dat de lijst niet maakt. Het aggregatieniveau volgt
+    // de vragen en niet de categorieboom.
+    const distinguished = new Set(set?.distinguishes ?? []);
+    if (distinguished.size === 0) continue;
+
+    const subs = new Map<string, ProductResult[]>();
+    for (const member of members) {
+      if (!member.subcategory || !distinguished.has(member.subcategory)) continue;
+      const list = subs.get(member.subcategory) ?? [];
+      list.push(member);
+      subs.set(member.subcategory, list);
+    }
+    // Eén product is geen doorsnede; zo'n rij zegt alleen iets over dat product.
+    for (const [name, list] of [...subs.entries()].sort((a, b) => b[1].length - a[1].length)) {
+      if (list.length < 2) continue;
+      out.push(summarise(setId, category, list, name));
+    }
+  }
+
+  return out.sort((a, b) =>
+    a.category.localeCompare(b.category)
+    || Number(a.subcategory !== undefined) - Number(b.subcategory !== undefined)
+    || b.total - a.total);
 }
 
 export function runScan(
@@ -121,6 +190,8 @@ export function runScan(
         setId: result.setId ?? '',
         questionId: question.questionId,
         label: question.label,
+        layer: question.layer,
+        evidence: question.evidence,
         answered: 0,
         empty: 0,
         unusable: 0,
