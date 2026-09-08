@@ -187,6 +187,7 @@ export const STRINGS = {
     },
 
     steps: {
+      segments: 'Categorieën',
       upload: 'Data aanleveren',
       bank: 'Vragenlijst',
       mapping: 'Kenmerken koppelen',
@@ -590,6 +591,29 @@ export const STRINGS = {
       allRecords: 'Alle',
     },
 
+    segments: {
+      heading: 'Categorie of kenmerk?',
+      intro:
+        'Sommige paden in je catalogus zijn geen productsoort maar een eigenschap: "Effen" en "Vlekwerend" zijn iets wat een stof ís, geen soort stof. Ze horen een kenmerk te zijn waarop een koper filtert. Elk pad dat hier als kenmerk staat, is een attribuut dat je catalogus mist.',
+      siteLabel: 'Adres van je webshop',
+      siteHint: 'We lezen alleen je categoriepagina\u2019s en houden ons aan je robots.txt. Er gaat geen productdata heen.',
+      siteRead: 'Site lezen',
+      siteBusy: 'Bezig met lezen…',
+      siteDone: 'gelezen van je site',
+      siteEmpty: 'Je site bouwt zijn menu in de browser op',
+      siteEmptyNext:
+        'Daardoor zien we geen categorieën of filters in de pagina zelf. Beoordeel de lijst hieronder met de hand; de aantallen helpen je daarbij.',
+      siteFailed: 'We konden je site niet lezen',
+      siteFailedNext: 'Controleer het adres. Lukt het niet, beoordeel de lijst dan met de hand — dat werkt net zo goed, het kost alleen meer tijd.',
+      kinds: { category: 'Categorie', facet: 'Kenmerk', unclear: 'Nog te beoordelen' },
+      products: 'producten',
+      debtHeading: 'Attribuutschuld',
+      debtBody: 'van je categoriepaden is eigenlijk een kenmerk. Elk daarvan is een filter dat je koper wil gebruiken en dat je catalogus niet vastlegt.',
+      empty: 'We vinden geen categoriepaden in je catalogus',
+      emptyNext: 'Zonder categorieën meet de scan alles als één hoop. Controleer of je export een kolom met categoriepaden bevat.',
+      continue: 'Doorgaan',
+    },
+
     auth: {
       signInTitle: 'Inloggen',
       signInIntro: 'Log in om je bewaarde scans en je koppeling terug te vinden.',
@@ -832,6 +856,7 @@ export const STRINGS = {
     },
 
     steps: {
+      segments: 'Categories',
       upload: 'Supply data',
       bank: 'Question list',
       mapping: 'Link characteristics',
@@ -1228,6 +1253,29 @@ export const STRINGS = {
       allRecords: 'All',
       openDetail: 'Show details',
       closeDetail: 'Hide details',
+    },
+
+    segments: {
+      heading: 'Category or characteristic?',
+      intro:
+        'Some paths in your catalogue are not a kind of product but a property: "Plain" and "Stain resistant" are something a fabric is, not a kind of fabric. They belong as a characteristic a buyer filters on. Every path listed here as a characteristic is an attribute your catalogue is missing.',
+      siteLabel: 'Address of your shop',
+      siteHint: 'We only read your category pages and respect your robots.txt. No product data is sent.',
+      siteRead: 'Read the site',
+      siteBusy: 'Reading…',
+      siteDone: 'read from your site',
+      siteEmpty: 'Your site builds its menu in the browser',
+      siteEmptyNext:
+        'So we cannot see any categories or filters in the page itself. Judge the list below by hand; the product counts will help.',
+      siteFailed: 'We could not read your site',
+      siteFailedNext: 'Check the address. If it will not work, judge the list by hand — that works just as well, it only takes longer.',
+      kinds: { category: 'Category', facet: 'Characteristic', unclear: 'To be judged' },
+      products: 'products',
+      debtHeading: 'Attribute debt',
+      debtBody: 'of your category paths is really a characteristic. Each one is a filter your buyer wants and your catalogue does not record.',
+      empty: 'We find no category paths in your catalogue',
+      emptyNext: 'Without categories the scan measures everything as one heap. Check whether your export contains a column with category paths.',
+      continue: 'Continue',
     },
 
     auth: {

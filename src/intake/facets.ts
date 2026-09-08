@@ -154,6 +154,53 @@ export function segmentsToResearch(classified: ClassifiedPath[]): string[] {
 }
 
 /**
+ * De categoriepaden van een catalogus, met hoeveel producten er per pad in
+ * vallen.
+ *
+ * Het volledige pad en niet alleen het eerste segment: de vraag hier is juist
+ * of `Outdoorstoffen > Gestreept` een soort product is of een eigenschap, en
+ * dat verschil zit in het laatste stuk.
+ */
+export function pathsFromProducts(
+  products: { unmapped: Record<string, unknown>; values: Record<string, unknown> }[],
+  /** Het pad van één product; de motor kent die functie al. */
+  pathOf: (product: never) => string | undefined,
+): CategoryPath[] {
+  const counts = new Map<string, number>();
+  for (const product of products) {
+    const path = pathOf(product as never);
+    if (!path) continue;
+    counts.set(path, (counts.get(path) ?? 0) + 1);
+  }
+  const out: CategoryPath[] = [];
+  counts.forEach((productCount, path) => {
+    const segments = path.split('>').map((part) => part.trim()).filter(Boolean);
+    if (segments.length > 0) out.push({ segments, productCount });
+  });
+  return out.sort((a, b) => b.productCount - a.productCount);
+}
+
+/**
+ * Wat de merchant over een pad besliste, sterker dan elk signaal.
+ *
+ * Sleutel is het genormaliseerde pad. Hij weet wat hij verkoopt; wij leiden af.
+ */
+export type Verdicts = Record<string, PathKind>;
+
+export function pathKey(segments: string[]): string {
+  return segments.map(normalizeName).join(' > ');
+}
+
+/** Het oordeel van de merchant erover leggen. */
+export function applyVerdicts(rows: ClassifiedPath[], verdicts: Verdicts): ClassifiedPath[] {
+  return rows.map((row) => {
+    const own = verdicts[pathKey(row.segments)];
+    if (!own || own === row.kind) return row;
+    return { ...row, kind: own, reason: 'De merchant heeft dit zelf aangewezen.' };
+  });
+}
+
+/**
  * Hoeveel van de boom is eigenlijk een filter?
  *
  * Over merchants heen vergelijkbaar, en daarom een bevinding op zichzelf: bij

@@ -19,12 +19,17 @@ import type { ScanClient } from '../../../src/worker/client';
 import { STRINGS } from '../../../src/i18n/strings';
 import { useLocale } from '../../../src/i18n/useLocale';
 import { UploadStep } from '../../../components/UploadStep';
+import { SegmentStep } from '../../../components/SegmentStep';
+import { pathsFromProducts, type Verdicts } from '../../../src/intake/facets';
+// Het categoriepad kent de motor al; `facets` krijgt het als argument, zodat de
+// intake niet van de engine hoeft af te hangen.
+import { categoryPath } from '../../../src/engine/join';
 import { BankStep } from '../../../components/BankStep';
 import { MappingStep } from '../../../components/MappingStep';
 import { QuestionSetStep } from '../../../components/QuestionSetStep';
 import { ReportView } from '../../../components/ReportView';
 
-type Step = 'upload' | 'bank' | 'mapping' | 'questions' | 'report';
+type Step = 'upload' | 'segments' | 'bank' | 'mapping' | 'questions' | 'report';
 
 export default function Home() {
   const [locale] = useLocale();
@@ -40,6 +45,8 @@ export default function Home() {
   // keuze beslist alleen de regex, en die faalt zodra de lijst zijn categorieën
   // anders noemt dan de catalogus.
   const [categories, setCategories] = useState<Record<string, string | null>>({});
+  /** Wat de merchant zelf over zijn categoriepaden zei; zie SegmentStep. */
+  const [verdicts, setVerdicts] = useState<Verdicts>({});
   const [report, setReport] = useState<ScanReport>();
   // De client houdt de worker vast; de datasets blijven daar zodat ze niet voor
   // elke scan opnieuw door de structured clone hoeven.
@@ -52,6 +59,7 @@ export default function Home() {
   const s = STRINGS[locale];
   const steps: { id: Step; label: string }[] = [
     { id: 'upload', label: s.steps.upload },
+    { id: 'segments', label: s.steps.segments },
     { id: 'bank', label: s.steps.bank },
     { id: 'mapping', label: s.steps.mapping },
     { id: 'questions', label: s.steps.questions },
@@ -120,7 +128,7 @@ export default function Home() {
     setClient(nextClient);
     setCatalog(nextCatalog);
     compose(banks, nextCatalog);
-    setStep('bank');
+    setStep('segments');
   }
 
   async function handleImport(entry: StoredBank) {
@@ -195,6 +203,17 @@ export default function Home() {
 
       <main>
         {step === 'upload' ? <UploadStep s={s} onReady={handleReady} /> : null}
+
+        {step === 'segments' && catalog ? (
+          <SegmentStep
+            s={s}
+            locale={locale}
+            paths={pathsFromProducts(catalog.products, categoryPath)}
+            verdicts={verdicts}
+            onChange={setVerdicts}
+            onContinue={() => setStep('bank')}
+          />
+        ) : null}
 
         {step === 'bank' && questionState ? (
           <BankStep
