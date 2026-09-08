@@ -76,14 +76,66 @@ In deze volgorde, want ze bouwen op elkaar.
 
 1. **Accounts en opslag** — nu wordt niets bewaard. Een merchant die morgen
    terugkomt begint opnieuw, en de koppeling die hij maakte is weg. Zonder dit
-   is er geen product om voor te betalen. De database-migratie ligt klaar,
-   inclusief scheiding per account; alleen de dienst ontbreekt nog.
-2. **Echte vragenbanken per markt** — de meegeleverde banken zijn voorlopig en
-   dragen bewust geen drempels. Een bank per markt is handwerk: één tot twee
-   dagen. Eerste kandidaat is woontextiel. Hier hangt het vertrouwen in de
-   uitkomst aan.
-3. **Prijs en betaling** — de bedragen staan nog niet vast en er is nog geen
-   betaalprovider gekozen. Die keuze komt pas als 1 en 2 staan.
+   is er geen product om voor te betalen, en geen achtergrondproces mogelijk:
+   een taak die doorloopt nadat de browser dicht gaat vereist een server en een
+   wachtrij. De database-migratie ligt klaar, inclusief scheiding per account.
+2. **Markt herkennen na de upload** — één kleine modelaanroep over alleen de
+   categorienamen stelt de markt voor; de merchant bevestigt of wijzigt. Zelfde
+   patroon als het koppelscherm: het model stelt voor, de mens beslist.
+3. **Vragenbanken die vanzelf ontstaan** — zie de volgende paragraaf. Vervangt
+   het handmatig uploaden van een vragenlijst.
+4. **Prijs en betaling** — de bedragen staan nog niet vast en er is nog geen
+   betaalprovider gekozen. Die keuze komt pas als 1 tot en met 3 staan.
+
+## Vragenbanken die vanzelf ontstaan
+
+Vandaag levert de merchant zelf een vragenlijst aan. Dat is een drempel die geen
+webshop-eigenaar kan nemen: hij weet niet welke vragen zijn markt stelt — dat is
+juist wat hij van ons komt halen. Het doel is dat de upload van zijn catalogus
+het proces aftrapt en hij er verder niets voor hoeft te doen.
+
+Vier keuzes bepalen de opzet. Ze zijn op 8 september gemaakt en volgen uit
+`kennis/_methode/`.
+
+**De upload trápt af, maar voedt niet.** Het generatieproces krijgt alleen
+categorienamen met aantallen en de URL van de webshop — precies wat
+`src/questions/request.ts` nu al oplevert, met een test die bewaakt dat er geen
+producttitel, veldwaarde of kolomnaam in terechtkomt. Het onderzoek gaat over de
+**markt** (een panel van vijf à acht sites), niet over deze winkel. Zo blijft
+fase 3 van de methode overeind — blinderen — en kan de app eerlijk blijven
+melden dat een vraag onbeantwoordbaar is.
+
+**Een bank hoort bij een markt en wordt hergebruikt.** De eerste merchant in
+woontextiel zet de generatie in gang; elke volgende merchant in die markt krijgt
+de bank uit de cache. Dat is tegelijk het antwoord op de kosten: het model draait
+één keer per markt, niet per merchant en al helemaal niet per product. Het wordt
+goedkoper naarmate er meer klanten bijkomen, niet duurder.
+
+**De eerste merchant in een onbekende markt wacht.** Hij krijgt bericht zodra de
+bank er is, in plaats van meteen een voorlopige uitkomst. Bewuste keuze voor
+kwaliteit boven snelheid: een rapport dat op een ongecontroleerde bank leunt,
+kost meer vertrouwen dan het wachten kost.
+
+**Kwaliteit wordt bewaakt met poorten, niet met leeswerk.** Om te voorkomen dat
+elke nieuwe markt op één paar menselijke ogen wacht, controleert de app
+machinaal wat machinaal te controleren is:
+
+| Poort | Wat het tegenhoudt |
+|---|---|
+| Herkomst afdwingen | Een vraag zonder panelbronnen of een drempel zonder gepubliceerde bron wordt niet afgekeurd maar gedegradeerd: hij komt binnen als beredeneerd, telt niet mee in de score en staat bij de open punten. Een verzonnen norm kan zo nooit als feit het rapport in. |
+| De bron terugvragen | De genoemde URL wordt opgehaald en gecontroleerd op het onderwerp. Een dode link of een pagina die er niet over gaat, valt af. Vangt de belangrijkste faalvorm van een model: een plausibele bron die niet bestaat. |
+| Twee onafhankelijke runs | Genereren met twee verschillende sitepanels; wat beide vinden is stevig, waar ze verschillen gaat naar de open punten. Zelfde logica als `dekking` in de methode. |
+| Criticus tegen de anti-patronen | Een tweede modelaanroep vinkt de concrete fouten af die de methode benoemt: attribuutnaam in plaats van klantvraag, norm zonder bron, duurzaamheidsclaim zonder certificering, bank op één site gebaseerd. |
+
+Wat er dan voor menselijke review overblijft is de handvol vragen die een poort
+markeert — een half uur per markt in plaats van twee dagen.
+
+**De merchants zijn de vijfde poort, en die is gratis.** Zij zijn de vakexperts
+van hun eigen markt en passen vragen al aan op het vragensetscherm. Halen vier
+van de vijf merchants in een markt dezelfde vraag weg, dan is dat sterker bewijs
+dan één oordeel. Met de bestaande regel eroverheen: een merchant mag
+**herwegen, niet herschrijven**, anders meten twee winkels verschillende dingen
+onder hetzelfde id.
 
 ## Techniekkeuzes
 
