@@ -610,3 +610,16 @@ test('één taal blijft één taal, zichtbaar in allebei', () => {
   assert.equal(question?.label.nl, 'How wide is this fabric?');
   assert.equal(question?.label.en, 'How wide is this fabric?');
 });
+
+test('dekking draagt zijn panelsites mee', () => {
+  // Zonder deze kolom verliest een dekking zijn herkomst zodra de bank door een
+  // tabel gaat, en dan valt de belangrijkste regel van de methode weg: herkomst
+  // staat bij elk getal. De YAML had het wel en de tabel niet.
+  const csv = [
+    'id;laag;vraag_nl;vraag_en;belang;benodigde_attributen;dekking;dekking_bronnen',
+    'BAS-01;base;Kan dit buiten blijven?;Can this stay outside?;kritiek;winterhard;3;intratuin, hartman, tuinmeubelshop',
+  ].join('\n');
+  const result = importQuestionList([{ name: 'panel.csv', text: csv }]);
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.bank?.questions[0]?.coverageSites, ['intratuin', 'hartman', 'tuinmeubelshop']);
+});

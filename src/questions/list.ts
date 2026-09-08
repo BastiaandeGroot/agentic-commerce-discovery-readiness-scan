@@ -86,6 +86,14 @@ const COLUMNS = {
   sources: ['bron', 'bronnen', 'sources', 'source'],
   profiles: ['toepassingsprofielen_kritiek', 'critical_in_profiles', 'toepassingsprofielen', 'profiles'],
   coverage: ['dekking', 'coverage'],
+  /**
+   * Op welke panelsites dit onderwerp gevonden is.
+   *
+   * Zonder deze kolom draagt een dekking van 6 geen herkomst meer zodra de bank
+   * door een CSV heen gaat, en dan is de belangrijkste regel van de methode weg:
+   * herkomst staat bij elk getal. De YAML had het wel en de tabel niet.
+   */
+  coverageSites: ['dekking_bronnen', 'coverage_sites', 'bronsites', 'panelsites', 'dekking_sites'],
   mode: ['modus', 'mode'],
   vertical: ['vertical', 'verticaal', 'markt', 'market'],
   /**
@@ -621,6 +629,7 @@ function toQuestion(row: Row, id: string, columns: ColumnMap, warnings: string[]
       .map((value) => SOURCE[normalizeHeader(value)] ?? 'expertise'),
     evidence,
     mode: modeOf(row, columns),
+    coverageSites: splitList(cell(row, columns, 'coverageSites')),
     ruleId: cell(row, columns, 'rule') || undefined,
     answerType: answerType(cell(row, columns, 'answerType')),
     answerable,
