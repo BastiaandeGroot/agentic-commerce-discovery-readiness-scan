@@ -101,7 +101,7 @@ Vier keuzes bepalen de opzet. Ze zijn op 8 september gemaakt en volgen uit
 categorienamen met aantallen en de URL van de webshop — precies wat
 `src/questions/request.ts` nu al oplevert, met een test die bewaakt dat er geen
 producttitel, veldwaarde of kolomnaam in terechtkomt. Het onderzoek gaat over de
-**markt** (een panel van vijf à acht sites), niet over deze winkel. Zo blijft
+**markt** (een panel van vijf sites), niet over deze winkel. Zo blijft
 fase 3 van de methode overeind — blinderen — en kan de app eerlijk blijven
 melden dat een vraag onbeantwoordbaar is.
 

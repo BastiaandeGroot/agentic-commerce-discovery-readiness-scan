@@ -7,7 +7,7 @@ met per vraag het bewijs dat nodig is om hem te beantwoorden. De readiness-scan
 meet daarmee of de productdata van een webshop die vragen kan beantwoorden.
 
 De bank hoort bij een **markt**, niet bij één winkel: hij wordt bij meerdere
-merchants gebruikt, en dat is precies waarom hij op een panel van vijf à acht
+merchants gebruikt, en dat is precies waarom hij op een panel van vijf
 webshops gebaseerd is en niet op één.
 
 ## Wat er in zit

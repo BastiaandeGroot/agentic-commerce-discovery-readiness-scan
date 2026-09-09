@@ -20,9 +20,7 @@ Vul overal `{{...}}` in. Draai dit in een **aparte sessie** waarin de productexp
 > | {{url_2}} | categorieleider |
 > | {{url_3}} | specialist |
 > | {{url_4}} | merk/fabrikant |
-> | {{url_5}} | merk/fabrikant |
-> | {{url_6}} | buitenlands (DE/UK) |
-> | {{url_7}} | {{...}} |
+> | {{url_5}} | buitenlands (DE/UK) |
 >
 > Het doel is niet om attributen te bedenken, maar om vast te leggen welke vragen een koper stelt en welk bewijs nodig is om die te beantwoorden. De attributen leid ik daar later uit af.
 >
@@ -42,7 +40,7 @@ Vul overal `{{...}}` in. Draai dit in een **aparte sessie** waarin de productexp
 
 ## Prompt 1 — Bronoogst per site
 
-Draai dit per site, of in groepjes van twee tot drie. Niet alle zeven tegelijk: dan vervlakt de opbrengst.
+Draai dit per site, of in groepjes van twee tot drie. Niet alle vijf tegelijk: dan vervlakt de opbrengst.
 
 > Oogst nu de klantvragen van **{{url}}** ({{type}}).
 >

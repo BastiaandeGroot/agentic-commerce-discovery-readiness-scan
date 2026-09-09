@@ -4,7 +4,7 @@ Bestemming: `/kennis/_methode/methode-vragenbank-genereren.md`
 
 Dit is de herbruikbare kant van het project. De engine is generiek, de kennis is dat niet: per vertical is dit handwerk met modelondersteuning. Deze methode beschrijft de volgorde. De losse prompt staat in `prompt-vragenbank-genereren.md`.
 
-Reken op één tot twee dagen per vertical bij een panel van vijf tot acht sites, plus de doorlooptijd van de domeinreview. De bronoogst is het meeste werk; de rest gaat snel zodra die ligt.
+Reken op één tot twee dagen per vertical bij een panel van vijf sites, plus de doorlooptijd van de domeinreview. De bronoogst is het meeste werk; de rest gaat snel zodra die ligt.
 
 De uitkomst is een asset op **vertical-niveau**, herbruikbaar over al je merchants heen. Dat is de reden om het panel breed te trekken in plaats van bij één klant te blijven.
 
@@ -52,11 +52,16 @@ Stel een panel samen met bewust verschillende soorten bronnen, want ze leveren v
 
 | Type | Aantal | Wat het bijdraagt |
 |---|---|---|
-| Categorieleiders in de thuismarkt | 2–3 | Vragen, FAQ's, gepubliceerde beslisregels |
-| Specialisten of nichespelers | 1–2 | Diepere technische vragen, randtoepassingen |
-| Merk- of fabrikantsites | 2–3 | Testnormen, attribuutnamen, datasheets |
-| Buitenlandse spelers (DE, UK) | 1–2 | Vaak veel technischer, andere wetgeving |
-| Marketplace-categoriepagina | 0–1 | Verplichte feedvelden voor die categorie |
+| Categorieleiders in de thuismarkt | 2 | Vragen, FAQ's, gepubliceerde beslisregels |
+| Specialisten of nichespelers | 1 | Diepere technische vragen, randtoepassingen |
+| Merk- of fabrikantsites | 1 | Testnormen, attribuutnamen, datasheets |
+| Buitenlandse spelers (DE, UK) | 1 | Vaak veel technischer, andere wetgeving |
+
+Vijf en niet acht: het onderzoek per site is het meeste werk, en acht sites maakt
+een bank per markt een dagtaak. Wat je inlevert is de fijnheid van de
+frequentiemaat — dekking 3 van 5 is grover dan 5 van 8 — en dat hoort bij de
+dekking vermeld te worden, niet verstopt. De marketplace-categoriepagina is
+eruit: die bracht verplichte feedvelden, en daar meet deze scan niet tegen.
 
 Duitse webshops publiceren in vrijwel elke vertical meer technische data dan Nederlandse. Ze zijn daarom onevenredig waardevol voor het attribuutdeel, ook als de vragen in het Duits staan.
 

@@ -72,7 +72,7 @@ bank te laten genereren uit zijn eigen site; dat is het anti-patroon dat de
 methode bovenaan zet. Dan bouw je de bank van één winkel inclusief zijn blinde
 vlekken, heb je geen frequentiemaat, en zijn twee merchants in dezelfde markt
 niet meer vergelijkbaar — terwijl die vergelijking het bestaansrecht van de bank
-is. De site van de merchant is één van de vijf à acht panelsites.
+is. De site van de merchant is één van de vijf panelsites.
 
 **Een bankaanvraag draagt nooit productdata.** Categorienamen met aantallen en
 de URL van de merchant, en verder niets — ook geen kolomnamen. Twee eisen

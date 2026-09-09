@@ -52,7 +52,7 @@ Draai de vaardigheid **vragenbank-maken** met wat je kreeg:
 - de segmenten uit `segments` — alleen dáárvoor maak je een overlay
 - `merchantSite` als **één** panelsite, nooit als enige bron
 - `suggestedSites` worden **toegevoegd** aan het panel dat jij samenstelt, niet
-  overgenomen. De panelregels blijven gelden: vijf à acht sites van verschillende
+  overgenomen. De panelregels blijven gelden: vijf sites van verschillende
   soorten. Zou de aanvrager het panel bepalen, dan meet hij zichzelf rijk.
 
 **Leg elke bezochte site vast** met naam, URL, type en de datum waarop je hem

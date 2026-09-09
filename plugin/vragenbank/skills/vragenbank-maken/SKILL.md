@@ -1,6 +1,6 @@
 ---
 name: vragenbank-maken
-description: Bouwt een vragenbank met consumentenvragen voor een markt of vertical, door een panel van vijf à acht webshops te onderzoeken. Gebruik dit wanneer iemand vraagt om een vragenbank, klantvragen, consumentenvragen of een vragenlijst voor een nieuwe markt, branche of productcategorie — bijvoorbeeld "maak een vragenbank voor woontextiel", "welke vragen stellen kopers van tuinmeubelen", of "we hebben een nieuwe vertical, verf". Levert één tweetalige CSV op die de readiness-scan kan inlezen.
+description: Bouwt een vragenbank met consumentenvragen voor een markt of vertical, door een panel van vijf webshops te onderzoeken. Gebruik dit wanneer iemand vraagt om een vragenbank, klantvragen, consumentenvragen of een vragenlijst voor een nieuwe markt, branche of productcategorie — bijvoorbeeld "maak een vragenbank voor woontextiel", "welke vragen stellen kopers van tuinmeubelen", of "we hebben een nieuwe vertical, verf". Levert één tweetalige CSV op die de readiness-scan kan inlezen.
 ---
 
 # Een vragenbank bouwen voor een markt
@@ -42,7 +42,7 @@ een vraag onbeantwoordbaar is. Categorienamen met aantallen mag je wel gebruiken
 Werk `references/promptreeks.md` af, prompt 0 tot en met 5, in volgorde. Voeg ze
 niet samen. Vraag om 130 vragen in één keer en je krijgt 130 middelmatige.
 
-**Stap 0 — panel en vorm van de markt.** Stel een panel samen van vijf à acht
+**Stap 0 — panel en vorm van de markt.** Stel een panel samen van vijf
 sites: twee tot drie categorieleiders, een specialist, twee merk- of
 fabrikantsites, en één tot twee buitenlandse (Duitse webshops publiceren in
 vrijwel elke markt meer technische data dan Nederlandse). Beantwoord dan de zeven

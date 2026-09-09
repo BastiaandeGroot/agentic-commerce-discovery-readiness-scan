@@ -62,7 +62,7 @@ bekijken?** Hij kent zijn markt en weet wie de serieuze spelers zijn.
 Drie regels eromheen, want zijn inbreng mag het panel niet kapen:
 
 1. **Wat hij aandraagt wordt toegevoegd, niet overgenomen.** De panelregels
-   blijven gelden: vijf à acht sites, van verschillende soorten
+   blijven gelden: vijf sites, van verschillende soorten
    (categorieleiders, een specialist, merk- of fabrikantsites, één tot twee
    buitenlandse). Zou een merchant het panel volledig bepalen, dan kiest hij zijn
    zwakste concurrenten en meet hij zichzelf rijk.

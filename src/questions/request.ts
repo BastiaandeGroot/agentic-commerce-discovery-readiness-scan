@@ -9,7 +9,7 @@
 // vergelijking het hele bestaansrecht van een bank op vertical-niveau is.
 //
 // Dus: de aanvraag hangt aan de **markt**. De site van de merchant is één van de
-// vijf à acht panelsites, en het resultaat geldt voor iedereen die daarna in
+// vijf panelsites, en het resultaat geldt voor iedereen die daarna in
 // diezelfde markt scant. Daarmee is het dure pad ook zeldzaam: één keer per
 // vertical, daarna kost de volgende merchant niets.
 //
@@ -26,40 +26,45 @@ import type { PanelSiteType } from './bank';
 import type { CategoryStat } from './generate';
 
 /** Het soort bron dat de methode in een panel wil zien, met hoeveel ervan. */
+/**
+ * Het panel: vijf sites, en de verdeling erbij.
+ *
+ * Vijf en niet acht, op verzoek van de opdrachtgever: het onderzoek per site is
+ * het meeste werk, en acht sites maakt een bank per markt een dagtaak waar er
+ * geen tijd voor is. De verdeling telt daarom precies op tot vijf en de
+ * marketplace is eruit — die bracht verplichte feedvelden, en die hangen aan een
+ * feedspecificatie waar deze scan niet tegen meet.
+ *
+ * Wat je met vijf inlevert is de frequentiemaat: dekking 3 van 5 is grover dan
+ * 5 van 8. Dat staat als waarschuwing bij de dekking, niet verstopt.
+ */
 export const PANEL_RECIPE: { type: PanelSiteType; count: string; brings: Bilingual }[] = [
   {
-    type: 'category-leader', count: '2–3',
+    type: 'category-leader', count: '2',
     brings: {
       nl: 'vragen, FAQ\'s en gepubliceerde beslisregels',
       en: 'questions, FAQs and published decision rules',
     },
   },
   {
-    type: 'specialist', count: '1–2',
+    type: 'specialist', count: '1',
     brings: {
       nl: 'diepere technische vragen en randtoepassingen',
       en: 'deeper technical questions and edge applications',
     },
   },
   {
-    type: 'brand', count: '2–3',
+    type: 'brand', count: '1',
     brings: {
       nl: 'testnormen, attribuutnamen en datasheets',
       en: 'test standards, attribute names and datasheets',
     },
   },
   {
-    type: 'foreign', count: '1–2',
+    type: 'foreign', count: '1',
     brings: {
       nl: 'vaak veel technischer, en andere wetgeving',
       en: 'often far more technical, and different legislation',
-    },
-  },
-  {
-    type: 'marketplace', count: '0–1',
-    brings: {
-      nl: 'de verplichte feedvelden voor deze categorie',
-      en: 'the mandatory feed fields for this category',
     },
   },
 ];
@@ -79,7 +84,7 @@ export interface BankRequest {
   /** De markt, niet de merchant. Sleutel van de bank die eruit moet komen. */
   vertical: string;
   verticalLabel: Bilingual;
-  /** De site van de merchant; hij wordt één panelsite van de vijf à acht. */
+  /** De site van de merchant; hij wordt één panelsite van de vijf. */
   merchantSite?: string;
   /** Categorienaam met aantal producten. Nodig voor de facetanalyse. */
   categories: { name: string; count: number }[];

@@ -91,7 +91,7 @@ vragenlijst en niet om een bestandsformaat. Vier regels die altijd gelden:
 - **Een bank hoort bij een vertical, niet bij een merchant.** Nooit een bank
   genereren uit de site of de catalogus van één winkel: dan meet je zijn blinde
   vlekken mee en zijn twee merchants in dezelfde markt niet meer vergelijkbaar.
-  Zijn site is één van de vijf à acht panelsites.
+  Zijn site is één van de vijf panelsites.
 - **Een bankaanvraag draagt geen productdata.** Categorienamen met aantallen en
   een URL, verder niets — ook geen kolomnamen. Dat is fase 3 van de methode
   (blinderen) én de privacybelofte. Het type kan het niet dragen; houd het zo.
