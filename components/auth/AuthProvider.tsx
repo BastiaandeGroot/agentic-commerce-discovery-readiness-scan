@@ -24,6 +24,16 @@ export type AuthFailure =
 export interface AuthState {
   /** `undefined` zolang we het nog niet weten; `null` als er niemand is. */
   user: User | null | undefined;
+  /**
+   * Het account waar deze gebruiker bij hoort.
+   *
+   * Iets anders dan zijn gebruikers-id, en dat verschil is niet cosmetisch: een
+   * account kan straks meerdere mensen hebben, en alles wat bewaard wordt hangt
+   * aan het account en niet aan de persoon. Wie vertrekt neemt de scans niet mee.
+   *
+   * `undefined` zolang het opgehaald wordt of er niemand is ingelogd.
+   */
+  accountId: string | undefined;
   /** Of er überhaupt een accountdienst aangesloten is. */
   configured: boolean;
   signIn(email: string, password: string): Promise<AuthFailure | null>;
@@ -55,6 +65,7 @@ function classify(message: string): AuthFailure {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const client = supabase();
   const [user, setUser] = useState<User | null | undefined>(client ? undefined : null);
+  const [accountId, setAccountId] = useState<string>();
 
   useEffect(() => {
     if (!client) return;
@@ -75,6 +86,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sub.subscription.unsubscribe();
     };
   }, [client]);
+
+  // Het account erbij zoeken zodra we weten wie er is. Een database-trigger maakt
+  // hem aan bij registratie, dus hij hoort er te zijn; is hij er niet, dan blijft
+  // dit leeg en zegt het scherm dat er geen aanvraag bewaard kan worden.
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      // Na de render, anders lokt dit een extra render uit voordat deze klaar is.
+      await Promise.resolve();
+      if (!alive) return;
+      if (!client || !user) { setAccountId(undefined); return; }
+      const { data } = await client
+        .from('account_members')
+        .select('account_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+      if (alive) setAccountId(data?.account_id ?? undefined);
+    })();
+    return () => { alive = false; };
+  }, [client, user]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!client) return 'not-configured' as const;
@@ -113,8 +145,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [client]);
 
   const value = useMemo<AuthState>(
-    () => ({ user, configured: client !== null, signIn, signUp, signOut, requestPasswordReset, setPassword }),
-    [user, client, signIn, signUp, signOut, requestPasswordReset, setPassword],
+    () => ({ user, accountId, configured: client !== null, signIn, signUp, signOut, requestPasswordReset, setPassword }),
+    [user, accountId, client, signIn, signUp, signOut, requestPasswordReset, setPassword],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

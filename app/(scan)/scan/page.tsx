@@ -51,7 +51,7 @@ export default function Home() {
   const [categories, setCategories] = useState<Record<string, string | null>>({});
   /** Wat de merchant zelf over zijn categoriepaden zei; zie SegmentStep. */
   const [verdicts, setVerdicts] = useState<Verdicts>({});
-  const { user } = useAuth();
+  const { user, accountId } = useAuth();
   /** Staat er al een aanvraag? Dan geen formulier meer, alleen de stand. */
   const [queued, setQueued] = useState<'new' | 'joined'>();
 
@@ -253,7 +253,7 @@ export default function Home() {
               <BankRequestForm
                 s={s}
                 segments={segments}
-                accountId={user?.id}
+                accountId={accountId}
                 onQueued={(joined) => setQueued(joined ? 'joined' : 'new')}
               />
             )}
