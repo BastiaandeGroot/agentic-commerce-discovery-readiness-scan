@@ -184,11 +184,12 @@ function Rows({ s, rows, onDecide }: {
   );
 }
 
-export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
+export function SegmentStep({ s, paths, verdicts, onDecide, onContinue }: {
   s: Strings;
   paths: CategoryPath[];
   verdicts: Verdicts;
-  onChange: (next: Verdicts) => void;
+  /** Eén keuze; de pagina bewaart hem, want dit scherm kent geen opslag. */
+  onDecide: (segments: string[], kind: PathKind) => void;
   onContinue: () => void;
 }) {
   const [site, setSite] = useState('');
@@ -340,7 +341,7 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
   }
 
   function decide(path: CategoryPath, kind: PathKind) {
-    onChange({ ...verdicts, [pathKey(path.segments)]: kind });
+    onDecide(path.segments, kind);
   }
 
   if (paths.length === 0) {

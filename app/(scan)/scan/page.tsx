@@ -20,7 +20,9 @@ import { STRINGS } from '../../../src/i18n/strings';
 import { useLocale } from '../../../src/i18n/useLocale';
 import { UploadStep } from '../../../components/UploadStep';
 import { SegmentStep } from '../../../components/SegmentStep';
-import { applyVerdicts, pathsFromProducts, type Verdicts } from '../../../src/intake/facets';
+import { applyVerdicts, pathKey, pathsFromProducts, type PathKind, type Verdicts } from '../../../src/intake/facets';
+import { supabase } from '../../../src/auth/client';
+import { NoVerdictStore, SupabaseVerdictStore, type VerdictStore } from '../../../src/storage/verdicts';
 // Het categoriepad kent de motor al; `facets` krijgt het als argument, zodat de
 // intake niet van de engine hoeft af te hangen.
 import { categoryPath } from '../../../src/engine/join';
@@ -52,6 +54,47 @@ export default function Home() {
   /** Wat de merchant zelf over zijn categoriepaden zei; zie SegmentStep. */
   const [verdicts, setVerdicts] = useState<Verdicts>({});
   const { user, accountId } = useAuth();
+  /**
+   * Waar het oordeel van de merchant blijft staan.
+   *
+   * Zonder dit vraagt elke scan het opnieuw, en het voorstel dat hij dan krijgt
+   * kan anders zijn — gemeten wisselden 8 van de 54 paden tussen drie identieke
+   * aanroepen. Twee rapporten zouden dan op verschillende definities rusten.
+   */
+  const store = useMemo<VerdictStore>(() => {
+    const client = supabase();
+    return client ? new SupabaseVerdictStore(client) : new NoVerdictStore();
+  }, []);
+
+  // Wat hij eerder besliste ophalen zodra we weten bij welk account hij hoort.
+  // Zijn eerdere oordeel wint van wat er nu in het scherm staat: dat is precies
+  // waarvoor het bewaard werd.
+  useEffect(() => {
+    if (!accountId) return;
+    let alive = true;
+    void (async () => {
+      await Promise.resolve();
+      const stored = await store.list(accountId);
+      if (alive && Object.keys(stored).length > 0) {
+        setVerdicts((current) => ({ ...current, ...stored }));
+      }
+    })();
+    return () => { alive = false; };
+  }, [accountId, store]);
+
+  /**
+   * Eén keuze vastleggen, en meteen bewaren.
+   *
+   * Bewaren per keuze en niet aan het eind: wie halverwege wegklikt heeft zijn
+   * werk anders voor niets gedaan, en dan begint hij de volgende keer opnieuw
+   * met een voorstel dat anders kan zijn.
+   */
+  function decideCategory(segments: string[], kind: PathKind) {
+    const key = pathKey(segments);
+    setVerdicts((current) => ({ ...current, [key]: kind }));
+    if (accountId) void store.save(accountId, { pathKey: key, segments, kind });
+  }
+
   /** Staat er al een aanvraag? Dan geen formulier meer, alleen de stand. */
   const [queued, setQueued] = useState<'new' | 'joined'>();
 
@@ -234,7 +277,7 @@ export default function Home() {
             s={s}
             paths={pathsFromProducts(catalog.products, categoryPath)}
             verdicts={verdicts}
-            onChange={setVerdicts}
+            onDecide={decideCategory}
             onContinue={() => setStep('bank')}
           />
         ) : null}

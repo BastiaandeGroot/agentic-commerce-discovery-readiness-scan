@@ -203,7 +203,10 @@ werelden.
 ## Opslag
 
 Bewaarde scans gaan via `SnapshotStore` in `src/storage/`, nooit rechtstreeks via
-`localStorage` vanuit een component. Er wordt een **snapshot** bewaard en geen
+`localStorage` vanuit een component. Hetzelfde geldt voor het oordeel van de
+merchant over zijn categorieboom (`VerdictStore`): dat blijft bewaard omdat een
+modelvoorstel niet elke keer hetzelfde is, en twee scans anders op verschillende
+definities zouden kunnen rusten. Er wordt een **snapshot** bewaard en geen
 rapport: tellingen, categorienamen en veldnamen, geen productdata en geen
 bronbestand. Dat houdt de belofte overeind dat de catalogus het apparaat niet
 verlaat, ook zodra er serverzijdig bewaard wordt.
