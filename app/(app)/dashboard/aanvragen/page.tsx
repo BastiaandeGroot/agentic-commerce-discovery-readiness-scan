@@ -43,6 +43,8 @@ interface BankRow {
   findings: string[]; panel: { name?: string; url?: string; type?: string; consultedAt?: string }[];
   questions: ReviewedQuestion[];
   summary?: BankSummary;
+  /** Vragen die de beheerder bij het vrijgeven overslaat. Terugdraaibaar. */
+  excluded?: string[];
 }
 
 type State =
@@ -84,6 +86,21 @@ export default function Page() {
     // render uit voordat deze klaar is.
     void (async () => { await Promise.resolve(); await load(); })();
   }, [load]);
+
+  /** Een vraag overslaan of weer meenemen. Meteen bewaard, dus terugdraaibaar. */
+  async function toggle(bankId: string, questionId: string) {
+    setBusy(`${bankId}:${questionId}`);
+    try {
+      await fetch('/api/admin/queue', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(await authHeader()) },
+        body: JSON.stringify({ action: 'toggle', bankId, questionId }),
+      });
+      await load();
+    } finally {
+      setBusy(undefined);
+    }
+  }
 
   async function release(bankId: string) {
     setBusy(bankId);
@@ -233,7 +250,12 @@ export default function Page() {
                   </div>
                 ) : null}
 
-                <p className="mt-3 text-sm leading-relaxed text-muted">{s.admin.issuesLegend}</p>
+                <p className="mt-3 text-sm leading-relaxed text-muted">
+                  {s.admin.issuesLegend}{' '}
+                  {(bank.excluded ?? []).length > 0
+                    ? `${(bank.excluded ?? []).length} ${s.admin.skippedCount}. ${s.admin.skippedNote}`
+                    : ''}
+                </p>
 
                 {/* De volledige bank, vraag voor vraag, met het ergste bovenaan.
                     Een lijst tellingen — "26 beslisregels zonder bron" — is niet
@@ -260,13 +282,19 @@ export default function Page() {
                       <Th>{s.admin.questions}</Th>
                       <Th>{s.questions.importance.critical}</Th>
                       <Th>{s.admin.findings}</Th>
+                      <Th>{s.admin.skip}</Th>
                     </tr>
                   </thead>
                   <tbody>
                     {bank.questions
                       .filter((q) => !onlyIssues || q.issues.length > 0)
                       .map((q) => (
-                        <tr key={q.id} className="border-t border-line align-top">
+                        <tr
+                          key={q.id}
+                          className={`border-t border-line align-top ${
+                            (bank.excluded ?? []).includes(q.id) ? 'opacity-50' : ''
+                          }`}
+                        >
                           <Td>
                             <span className="block">{q.label[locale]}</span>
                             <span className="mt-0.5 block font-mono text-xs text-muted">
@@ -322,6 +350,19 @@ export default function Page() {
                                   ))}
                               </span>
                             )}
+                          </Td>
+                          <Td>
+                            {/* Overslaan haalt de vraag niet weg maar zet hem
+                                buiten de meting. Zichtbaar en terug te draaien:
+                                een keuze die je niet kunt terugzien is geen
+                                keuze maar een gok. */}
+                            <Button
+                              variant={(bank.excluded ?? []).includes(q.id) ? 'secondary' : 'quiet'}
+                              loading={busy === `${bank.id}:${q.id}`}
+                              onClick={() => void toggle(bank.id, q.id)}
+                            >
+                              {(bank.excluded ?? []).includes(q.id) ? s.admin.include : s.admin.skip}
+                            </Button>
                           </Td>
                         </tr>
                       ))}

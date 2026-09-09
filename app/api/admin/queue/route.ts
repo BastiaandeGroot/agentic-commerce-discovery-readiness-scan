@@ -30,7 +30,7 @@ export async function GET(request: Request) {
 
   const banks = await supabase
     .from('question_banks')
-    .select('id, vertical, version, status, findings, panel, csv, created_at, released_at')
+    .select('id, vertical, version, status, findings, panel, csv, excluded, created_at, released_at')
     .order('created_at', { ascending: false });
 
   const now = Date.now();
@@ -68,13 +68,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: supabase.error }, { status: supabase.status });
   }
 
-  let body: { bankId?: string };
+  let body: { bankId?: string; questionId?: string; action?: 'release' | 'toggle' };
   try {
-    body = (await request.json()) as { bankId?: string };
+    body = (await request.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: 'Onleesbaar verzoek.' }, { status: 400 });
   }
   if (!body.bankId) return NextResponse.json({ error: 'Welke bank?' }, { status: 400 });
+
+  // Een vraag overslaan of weer meenemen. De vraag blijft in de bank staan; hem
+  // eruit knippen zou de herkomst wegnemen, en dan is later niet meer na te gaan
+  // dat hij er ooit was.
+  if (body.action === 'toggle' && body.questionId) {
+    const current = await supabase
+      .from('question_banks')
+      .select('excluded')
+      .eq('id', body.bankId)
+      .maybeSingle();
+    if (!current.data) return NextResponse.json({ error: 'Deze bank bestaat niet.' }, { status: 404 });
+
+    const excluded = new Set<string>((current.data.excluded as string[]) ?? []);
+    if (excluded.has(body.questionId)) excluded.delete(body.questionId);
+    else excluded.add(body.questionId);
+
+    const saved = await supabase
+      .from('question_banks')
+      .update({ excluded: [...excluded] })
+      .eq('id', body.bankId)
+      .select('excluded')
+      .maybeSingle();
+    return NextResponse.json({ excluded: saved.data?.excluded ?? [] });
+  }
 
   const bank = await supabase
     .from('question_banks')
