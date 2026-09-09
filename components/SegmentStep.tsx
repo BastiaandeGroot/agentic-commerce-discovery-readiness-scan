@@ -184,7 +184,7 @@ function Rows({ s, rows, onDecide }: {
   );
 }
 
-export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onContinue }: {
+export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onSite, onContinue }: {
   s: Strings;
   paths: CategoryPath[];
   verdicts: Verdicts;
@@ -200,6 +200,14 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onContin
    * had weggezet.
    */
   onSegments: (segments: { name: string; count: number }[]) => void;
+  /**
+   * Het adres van zijn eigen winkel, zodra hij het invulde.
+   *
+   * Gaat mee in de aanvraag omdat zijn winkel één van de panelsites wordt —
+   * nooit de enige, maar wel altijd één. Zonder dit zou hij hem hierboven
+   * invullen en zou er verderop niets mee gebeuren.
+   */
+  onSite: (url: string) => void;
   onContinue: () => void;
 }) {
   const [site, setSite] = useState('');
@@ -258,6 +266,9 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onContin
       });
       if (!response.ok) throw new Error('mislukt');
       const result = await response.json();
+      // Wat hij invulde en wat werkte: pas ná een geslaagde lezing weten we dat
+      // dit adres klopt, en dan is het de moeite waard om mee te dragen.
+      onSite(site.trim());
       const evidence = { navigation: result.navigation ?? [], filters: result.filters ?? [] };
       setState({
         kind: 'done',

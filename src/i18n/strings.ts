@@ -612,7 +612,7 @@ export const STRINGS = {
         'De vragen komen niet uit je eigen kolommen maar uit onderzoek naar jouw markt: wat kopers vragen voordat ze bestellen, verzameld over meerdere webshops. Dat is werk dat één keer per markt gebeurt — en jij bent de eerste in de jouwe.',
       what: 'Wat er nu gebeurt',
       whatBody:
-        'We nemen vijf à acht webshops in jouw markt door: hun veelgestelde vragen, hun categorieteksten, hun productpagina\u2019s. Daaruit komt de vragenlijst waarmee we jouw data meten. Een vakspecialist kijkt hem na voordat hij in gebruik gaat.',
+        'We nemen vijf à acht webshops in jouw markt door. De webshops die je hierboven opgaf horen daar altijd bij, net als je eigen winkel; de rest zoeken wij erbij. Van elke site lezen we de veelgestelde vragen, de categorieteksten en de productpagina\u2019s. Daaruit komt de vragenlijst waarmee we jouw data meten.',
       when: 'Hoe lang dit duurt',
       whenBody:
         'Reken op één tot twee werkdagen. Je hoeft niet te wachten: sluit dit venster gerust. Je krijgt een mail zodra je scan klaarstaat, en je gegevens blijven bewaard.',
@@ -1364,7 +1364,7 @@ export const STRINGS = {
         'The questions do not come from your own columns but from research into your market: what buyers ask before they order, gathered across several shops. That is work done once per market — and you are the first in yours.',
       what: 'What is happening now',
       whatBody:
-        'We are going through five to eight shops in your market, including the ones you just gave us: their FAQs, their category texts, their product pages. That produces the list of questions we measure your data against.',
+        'We are going through five to eight shops in your market. The ones you named above are always included, as is your own shop; we find the rest ourselves. For each site we read the FAQs, the category texts and the product pages. That produces the list of questions we measure your data against.',
       when: 'How long this takes',
       whenBody:
         'Expect one to two working days. You do not have to wait: feel free to close this window. You will get an email as soon as your scan is ready, and your details are kept.',

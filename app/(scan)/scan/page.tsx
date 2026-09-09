@@ -105,6 +105,8 @@ export default function Home() {
    * "Effen" en "Premium" als marktsegment staan.
    */
   const [segments, setSegments] = useState<{ name: string; count: number }[]>([]);
+  /** Zijn eigen winkel; wordt één van de panelsites, nooit de enige. */
+  const [shopUrl, setShopUrl] = useState<string>();
   const [report, setReport] = useState<ScanReport>();
   // De client houdt de worker vast; de datasets blijven daar zodat ze niet voor
   // elke scan opnieuw door de structured clone hoeven.
@@ -269,6 +271,7 @@ export default function Home() {
             verdicts={verdicts}
             onDecide={decideCategory}
             onSegments={setSegments}
+            onSite={setShopUrl}
             onContinue={() => setStep('bank')}
           />
         ) : null}
@@ -288,6 +291,7 @@ export default function Home() {
                 s={s}
                 segments={segments}
                 accountId={accountId}
+                siteUrl={shopUrl}
                 onQueued={(joined) => setQueued(joined ? 'joined' : 'new')}
               />
             )}
