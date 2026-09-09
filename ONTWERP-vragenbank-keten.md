@@ -54,6 +54,40 @@ Bestaat al. Aan het eind van het categoriescherm weet de app:
 - de **marktsegmenten** die overblijven (facetten eruit)
 - de URL van zijn webshop, als hij die gaf
 
+### Stap 1b — De merchant mag panelsites aandragen
+
+Voordat er iets onderzocht wordt, vraagt de app: **welke webshops moeten we
+bekijken?** Hij kent zijn markt en weet wie de serieuze spelers zijn.
+
+Drie regels eromheen, want zijn inbreng mag het panel niet kapen:
+
+1. **Wat hij aandraagt wordt toegevoegd, niet overgenomen.** De panelregels
+   blijven gelden: vijf à acht sites, van verschillende soorten
+   (categorieleiders, een specialist, merk- of fabrikantsites, één tot twee
+   buitenlandse). Zou een merchant het panel volledig bepalen, dan kiest hij zijn
+   zwakste concurrenten en meet hij zichzelf rijk.
+2. **Geeft hij niets op, dan zoeken wij ze.** Dat is de normale gang; de vraag is
+   een uitnodiging en geen voorwaarde.
+3. **Zijn eigen winkel is één panelsite**, nooit de enige.
+
+**Hoe wij een site kiezen als de merchant niets aandraagt.** Niet op gevoel, maar
+op na te lopen signalen, in deze volgorde:
+
+| Signaal | Waarom het telt |
+|---|---|
+| Reviews **onder een keurmerk** — WebwinkelKeur, Thuiswinkel Waarborg, Trusted Shops | Aantallen die een derde partij bijhoudt zijn niet zelf te schrijven. Reviews op de site zelf tellen niet mee. |
+| Aantal reviews, niet het cijfer | Een winkel met 4,7 uit 12 reviews zegt niets over marktomvang; 4,3 uit 4.000 wel. |
+| Breedte van het assortiment | Een site die de hele markt voert dekt meer vragen dan een nichespeler — maar één specialist hoort er juist bij voor de diepte. |
+| Diepte van de productinformatie | Sites die specificaties, testnormen en beslisregels publiceren zijn waardevoller als bron, ook als ze kleiner zijn. |
+| Fysieke aanwezigheid of leeftijd | Een keten met winkels of een bedrijf dat er tien jaar is, is zelden een eendagsvlieg. |
+| Land | Eén tot twee Duitse of Britse sites; die publiceren in vrijwel elke markt meer technische data. |
+
+Wat we **niet** gebruiken: advertenties, zoekpositie en verkooppraat op de site
+zelf. Wie bovenaan Google staat heeft daarvoor betaald.
+
+Het gekozen panel wordt vastgelegd met naam, URL, type en de datum waarop het
+geraadpleegd is — en het gaat mee naar de merchant, zie paragraaf 4b.
+
 ### Stap 2 — De app bepaalt of er iets te doen is
 
 Twee vragen, in deze volgorde:
@@ -93,8 +127,38 @@ De plugin krijgt er een vaardigheid bij: *aanvraag oppakken*. Die doet:
 4. Draait *vragenbank controleren* over de uitkomst.
 5. `POST /api/bank-result` met de CSV en de bevindingen.
 
-Zonder geplande taak zeg jij in Cowork "pak de openstaande aanvraag op". Met een
-geplande taak gebeurt dat elke ochtend vanzelf, zolang de app openstaat.
+**De geplande taak draait om 08:00, 12:00 en 17:00**, elke dag. Jij hoeft niets
+aan te klikken. Vindt hij niets, dan stopt hij meteen en meldt hij niets — anders
+krijg je drie berichten per dag over niets.
+
+Vijf dingen die je van deze opzet moet weten, want ze bijten pas als het misgaat:
+
+1. **Hij draait alleen terwijl de app openstaat.** Staat je Mac uit om 08:00, dan
+   draait die beurt bij de eerstvolgende start. "Drie keer per dag" is dus in de
+   praktijk "hoogstens drie keer per dag". De vertragingsmails in paragraaf 6
+   bestaan precies hiervoor.
+2. **Een generatie duurt langer dan een beurt.** Het onderzoek gaat over vijf à
+   acht sites. Sluit je de app halverwege, dan blijft de aanvraag op `running`
+   staan; na 24 uur zet de volgende beurt hem terug op `queued`. Er gaat niets
+   verloren, maar er gaat wel een dag overheen.
+3. **Meerdere beurten tegelijk kan niet misgaan.** Elke beurt pakt hoogstens één
+   aanvraag en zet hem meteen op `running`; de index laat één openstaande
+   aanvraag per markt toe. Was de app een dag dicht en lopen er drie beurten
+   achter elkaar in, dan pakken ze drie verschillende aanvragen of ze vinden
+   niets.
+4. **De uitvoerderssleutel staat op jouw laptop.** Dat is nu goed genoeg — jij
+   bent de enige uitvoerder — maar het betekent dat je machine toegang heeft tot
+   het aanleveren van banken. Bij een tweede uitvoerder krijgt die zijn eigen
+   sleutel, zodat je er één kunt intrekken.
+5. **Het crawlen gebeurt vanaf jouw verbinding.** Panelsites zien jouw IP. Bij
+   een handvol markten per maand valt dat binnen normaal bezoek; bij tientallen
+   hoort het naar een server.
+
+**Wat het kost om dit later te vervangen.** De taak is een prompt die twee
+endpoints aanroept. Uitvoerder B roept dezelfde twee endpoints aan met dezelfde
+instructies. Wat je dan schrijft is de aanroeper — de plugin, de endpoints, de
+tabellen en de poorten blijven staan. Reken op een dag werk, niet op een
+verbouwing. Dat is de hele reden dat het zo ontworpen is.
 
 **Uitvoerder B — een achtergrondproces op Render**
 
@@ -130,9 +194,12 @@ Vrijgeven is één handeling en die veroorzaakt stap 7.
 
 ### Stap 7 — De merchant krijgt bericht
 
-Elke account met een openstaande aanvraag voor deze markt krijgt een mail: je
-scan staat klaar. Niet alleen de aanvrager — ook de twee andere merchants die
-intussen op dezelfde bank wachtten.
+Alleen accounts met een **openstaande aanvraag** voor deze markt krijgen een
+mail: je scan staat klaar. Dat is meer dan alleen de aanvrager — ook de twee
+andere merchants die intussen op dezelfde bank wachtten — en minder dan iedereen
+in die markt. Wie al een bank had en gewoon scant, krijgt niets; wie in een
+andere markt zit al helemaal niet. De aanvraag is de enige reden om iemand te
+mailen.
 
 `notified_at` staat los van `finished_at`, zodat een mail die niet aankwam
 opnieuw verstuurd kan worden zonder de taak te herstarten.
@@ -176,6 +243,59 @@ een mailprovider; Resend is de eenvoudigste en gratis tot 3.000 per maand.
 
 ---
 
+## 4b. Herkomst is zichtbaar voor de merchant
+
+Elke bank draagt zijn panel, en dat panel is voor de merchant te zien — niet
+weggestopt in een exportbestand maar op het scherm, naast zijn rapport:
+
+| Site | Type | Geraadpleegd |
+|---|---|---|
+| voorbeeld.nl | categorieleider | 8 september 2026 |
+| specialist.nl | specialist | 8 september 2026 |
+| merk.de | buitenlands merk | 8 september 2026 |
+
+Waarom dit niet optioneel is: de merchant moet kunnen beoordelen of hij deze
+meetlat vertrouwt. Een bank die op zijn drie kleinste concurrenten leunt verdient
+zijn twijfel, en dan hoort hij dat te kunnen zien in plaats van het te moeten
+raden. Het is bovendien de enige manier waarop hij kan zeggen "jullie zijn de
+grootste speler vergeten".
+
+Per vraag is daarnaast te zien op hoeveel van die sites het onderwerp voorkwam en
+op welke. Dat is `dekking` met zijn bronsites, en die kolom bestaat sinds
+8 september in de lezer.
+
+## 4c. Een nieuwe versie van een bank
+
+Een bevroren bank verandert nooit. Wordt hij herzien, dan is dat een **nieuwe
+versie** naast de oude, en de merchant beslist zelf of hij overstapt.
+
+**Wat hij ziet bij het inloggen.** Een melding boven zijn dashboard: er is een
+nieuwe versie van de vragenlijst voor jouw markt. Geen automatische overstap —
+dat zou zijn volgende rapport onvergelijkbaar maken met zijn vorige, zonder dat
+hij het merkte.
+
+**Wat hij kan bekijken voordat hij beslist**, en dit is de kern van het scherm:
+
+| | |
+|---|---|
+| **Wat erbij komt** | vragen die de nieuwe versie stelt en de oude niet |
+| **Wat vervalt** | vragen die eruit gaan, met de reden |
+| **Wat zwaarder of lichter weegt** | een vraag die van hoog naar kritiek gaat verandert zijn trechter |
+| **Wat er aan drempels verandert** | een gepubliceerde norm die is bijgesteld, met de bron |
+| **Het panel** | welke sites zijn geraadpleegd, en wat er verschilt met de vorige keer |
+| **Het gevolg voor hem** | hoeveel van zijn producten er anders scoren, gerekend op zijn laatste scan |
+
+Die laatste regel is het belangrijkst. "Er komen vier vragen bij" zegt hem niets;
+"hierdoor zakt 60% van je producten uit basisgeschikt" zegt hem alles.
+
+**Wat er gebeurt met wat er al ligt.** Zijn oude scans blijven staan op de versie
+waarop ze draaiden — een rapport verandert nooit met terugwerkende kracht. Stapt
+hij over, dan meet de eerstvolgende scan op de nieuwe versie en waarschuwt de app
+bij het vergelijken dat de meetlat verschoven is. Die waarschuwing bestaat al.
+
+**Wie een herziening start:** wij, niet de merchant. Een merchant die zijn eigen
+bank mag herzien, herziet hem naar zijn eigen data toe.
+
 ## 5. Beslissingen die vastliggen
 
 **De bank hoort bij de markt, niet bij het account.** De aanvraag hoort bij een
@@ -204,7 +324,9 @@ een URL. Het type kan niet meer dragen en er staat een test op.
 | De geleverde CSV leest niet in | Niets opgeslagen, status `failed` met de foutmelding. Zichtbaar in je beheerscherm. |
 | Drempels zonder bron | Gedegradeerd tot beredeneerd, buiten de score, zichtbaar bij de open punten. |
 | De mail komt niet aan | `notified_at` blijft leeg; opnieuw versturen zonder de taak te herstarten. |
-| Er komt nooit een bank | De merchant blijft op het wachtscherm. Na een week hoort daar een bericht bij dat het langer duurt. Nog te ontwerpen. |
+| **Eén werkdag verstreken zonder resultaat** | Mail naar de beheerder (bastiaandegroot92@gmail.com) met de markt en sinds wanneer hij openstaat. De merchant merkt nog niets. |
+| **Twee werkdagen verstreken** | Mail naar de merchant: het duurt langer dan verwacht, er wordt aan gewerkt, hij hoort het zodra het klaar is. Eén keer, niet elke dag opnieuw. |
+| Geplande taak draait niet omdat de app dicht is | Geen taak gemist maar uitgesteld: hij draait bij de eerstvolgende start. De vertragingsmails hierboven vangen dit op — dat is precies waarvoor ze er zijn. |
 
 ---
 
@@ -226,12 +348,14 @@ iemand anders dan jij.
 
 ## 8. Wat ik nog niet weet
 
-- **Draait een geplande taak in Cowork op dezelfde manier als hier?** Dat bepaalt
-  of stap 3 al zonder klik werkt of pas met uitvoerder B.
-- **Hoe lang mag een merchant wachten voordat de app iets zegt?** Nu staat er
-  "één tot twee werkdagen" op het scherm. Er is nog geen bericht als dat niet
-  gehaald wordt.
-- **Wat gebeurt er met een bank die al bevroren is en herzien moet worden?**
-  Een nieuwe versie, en dan waarschuwt de app bij het vergelijken. Het pad
-  eromheen — wie dat mag starten, en wat er met lopende scans gebeurt — is nog
-  niet ontworpen.
+- **Draait een geplande taak in Cowork precies zoals hier?** Het mechanisme is
+  hetzelfde en de beperking "alleen terwijl de app openstaat" staat er expliciet
+  bij. Of Cowork dezelfde taken toont en beheert, weten we pas als de taak er
+  staat. Besloten: we bouwen hem, met de risico's uit stap 4 op tafel.
+- **Hoeveel beurten heeft een generatie nodig?** Het onderzoek beslaat vijf à
+  acht sites. Of dat in één beurt past, weten we na de eerste echte markt. Past
+  het niet, dan moet de taak zijn werk kunnen hervatten in plaats van opnieuw te
+  beginnen — dat zit nog niet in het ontwerp.
+- **Wanneer is een markt "dezelfde markt"?** Twee merchants noemen hun markt
+  misschien anders terwijl het er één is. De sleutel is nu een genormaliseerde
+  naam; dat gaat een keer botsen.
