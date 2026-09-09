@@ -114,6 +114,9 @@ export async function POST(request: Request) {
       finished_at: new Date().toISOString(),
       flagged: findings,
       bank_id: stored.data.id,
+      // Ook op de aanvraag, naast de winkel en de aangedragen sites: dan staat
+      // op één plek wat de merchant meegaf én wat er werkelijk onderzocht is.
+      panel: Array.isArray(payload.panel) ? payload.panel.slice(0, 20) : [],
     })
     .eq('id', payload.requestId);
 

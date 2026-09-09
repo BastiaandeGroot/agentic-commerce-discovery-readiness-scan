@@ -55,8 +55,11 @@ Draai de vaardigheid **vragenbank-maken** met wat je kreeg:
   overgenomen. De panelregels blijven gelden: vijf à acht sites van verschillende
   soorten. Zou de aanvrager het panel bepalen, dan meet hij zichzelf rijk.
 
-Draag alle bezochte sites vast met naam, URL, type en de datum waarop je ze
-raadpleegde. Dat panel gaat mee terug en de merchant krijgt het te zien.
+**Leg elke bezochte site vast** met naam, URL, type en de datum waarop je hem
+raadpleegde, en stuur dat panel mee terug. Dat is niet optioneel: zonder panel is
+de dekking per vraag niet reproduceerbaar, en dan blijft er een bevinding op de
+bank staan die niemand meer kan wegnemen. De merchant krijgt deze lijst bovendien
+te zien — hij moet kunnen beoordelen of hij deze meetlat vertrouwt.
 
 Kijk **niet** naar de productdata van de aanvrager. Die krijg je ook niet
 aangeleverd, en dat is met opzet.

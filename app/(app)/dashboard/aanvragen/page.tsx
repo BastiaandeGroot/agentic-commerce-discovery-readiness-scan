@@ -20,6 +20,7 @@ import { authHeader } from '../../../../src/auth/client';
 interface RequestRow {
   id: string; vertical: string; status: string;
   site_url?: string; suggested_sites?: string[]; segments?: { name: string; count: number }[];
+  panel?: { name?: string; url?: string }[];
   requested_at: string; failure?: string; bank_id?: string;
   waitingHours: number; overdue: boolean;
 }
@@ -50,6 +51,14 @@ export default function Page() {
   const [busy, setBusy] = useState<string>();
   /** Standaard alleen wat bezwaren heeft; de rest is één klik weg. */
   const [onlyIssues, setOnlyIssues] = useState(true);
+  /**
+   * Welke bevinding er uitgeklapt staat.
+   *
+   * Eén tegelijk, en per vraag: een label alleen zegt wát er is en niet waaróm
+   * het uitmaakt, en dat tweede is precies wat een beheerder nodig heeft om te
+   * beslissen of hij vrijgeeft.
+   */
+  const [openIssue, setOpenIssue] = useState<string>();
 
   const load = useCallback(async () => {
     try {
@@ -132,6 +141,9 @@ export default function Page() {
                   {one.segments?.length ?? 0} {s.admin.segments}
                   {one.site_url ? ` · ${s.admin.shop}: ${one.site_url}` : ''}
                   {one.suggested_sites?.length ? ` · ${s.admin.suggested}: ${one.suggested_sites.join(', ')}` : ''}
+                  {one.panel?.length
+                    ? ` · ${s.admin.panel}: ${one.panel.map((site) => site.name ?? site.url).join(', ')}`
+                    : ''}
                 </span>
                 {one.failure ? (
                   <span className="w-full text-xs leading-relaxed text-danger">{one.failure}</span>
@@ -235,15 +247,36 @@ export default function Page() {
                             {q.issues.length === 0 ? (
                               <span className="text-xs text-muted">{s.admin.allFine}</span>
                             ) : (
-                              <span className="flex flex-wrap gap-1.5">
-                                {q.issues.map((issue) => (
-                                  <Badge
-                                    key={issue}
-                                    tone={issue === 'not-scored' || issue === 'coverage-unknown' ? 'neutral' : 'warn'}
-                                  >
-                                    {s.admin.issues[issue] ?? issue}
-                                  </Badge>
-                                ))}
+                              <span className="flex flex-col gap-1.5">
+                                <span className="flex flex-wrap gap-1.5">
+                                  {q.issues.map((issue) => {
+                                    const key = `${q.id}:${issue}`;
+                                    const open = openIssue === key;
+                                    const soft = issue === 'not-scored' || issue === 'coverage-unknown';
+                                    return (
+                                      <button
+                                        key={issue}
+                                        type="button"
+                                        aria-expanded={open}
+                                        onClick={() => setOpenIssue(open ? undefined : key)}
+                                        className={`rounded-md border px-2 py-0.5 text-xs font-medium transition ${
+                                          soft
+                                            ? 'border-line bg-surface-2 text-muted hover:text-ink'
+                                            : 'border-transparent bg-warn-soft text-warn hover:opacity-80'
+                                        } ${open ? 'ring-2 ring-accent/40' : ''}`}
+                                      >
+                                        {s.admin.issues[issue] ?? issue}
+                                      </button>
+                                    );
+                                  })}
+                                </span>
+                                {q.issues
+                                  .filter((issue) => openIssue === `${q.id}:${issue}`)
+                                  .map((issue) => (
+                                    <span key={issue} className="block max-w-prose rounded-lg bg-surface-2 p-2.5 text-xs leading-relaxed text-ink">
+                                      {s.admin.issueHelp[issue] ?? ''}
+                                    </span>
+                                  ))}
                               </span>
                             )}
                           </Td>

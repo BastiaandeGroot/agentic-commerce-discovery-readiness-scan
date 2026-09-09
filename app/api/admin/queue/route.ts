@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 
   const requests = await supabase
     .from('bank_requests')
-    .select('id, vertical, status, site_url, suggested_sites, segments, requested_at, started_at, finished_at, failure, bank_id')
+    .select('id, vertical, status, site_url, suggested_sites, panel, segments, requested_at, started_at, finished_at, failure, bank_id')
     .order('requested_at', { ascending: true });
 
   const banks = await supabase
