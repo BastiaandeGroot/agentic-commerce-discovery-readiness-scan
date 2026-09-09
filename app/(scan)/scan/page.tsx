@@ -20,7 +20,7 @@ import { STRINGS } from '../../../src/i18n/strings';
 import { useLocale } from '../../../src/i18n/useLocale';
 import { UploadStep } from '../../../components/UploadStep';
 import { SegmentStep } from '../../../components/SegmentStep';
-import { applyVerdicts, pathKey, pathsFromProducts, type PathKind, type Verdicts } from '../../../src/intake/facets';
+import { pathKey, pathsFromProducts, type PathKind, type Verdicts } from '../../../src/intake/facets';
 import { supabase } from '../../../src/auth/client';
 import { NoVerdictStore, SupabaseVerdictStore, type VerdictStore } from '../../../src/storage/verdicts';
 // Het categoriepad kent de motor al; `facets` krijgt het als argument, zodat de
@@ -29,7 +29,6 @@ import { categoryPath } from '../../../src/engine/join';
 import { BankStep } from '../../../components/BankStep';
 import { WaitingStep } from '../../../components/WaitingStep';
 import { BankRequestForm } from '../../../components/BankRequestForm';
-import { classifyPaths } from '../../../src/intake/facets';
 import { useAuth } from '../../../components/auth/AuthProvider';
 import { MappingStep } from '../../../components/MappingStep';
 import { QuestionSetStep } from '../../../components/QuestionSetStep';
@@ -98,23 +97,14 @@ export default function Home() {
   /** Staat er al een aanvraag? Dan geen formulier meer, alleen de stand. */
   const [queued, setQueued] = useState<'new' | 'joined'>();
 
-  // De marktsegmenten: de categoriepaden die géén kenmerk zijn, op naam en met
-  // hun aantal. Dat is alles wat de aanvraag mag dragen.
-  const segments = useMemo(() => {
-    if (!catalog) return [];
-    const rows = applyVerdicts(
-      classifyPaths(pathsFromProducts(catalog.products, categoryPath)),
-      verdicts,
-    );
-    const counts = new Map<string, number>();
-    for (const row of rows) {
-      if (row.kind === 'facet') continue;
-      const name = row.segments[row.segments.length - 1];
-      counts.set(name, (counts.get(name) ?? 0) + row.productCount);
-    }
-    return [...counts.entries()].map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count).slice(0, 40);
-  }, [catalog, verdicts]);
+  /**
+   * De marktsegmenten zoals het categoriescherm ze overhoudt.
+   *
+   * Van dat scherm gekregen en hier niet opnieuw berekend: het bewijs van de
+   * site en de voorstellen van het model leven daar, en zonder die twee blijven
+   * "Effen" en "Premium" als marktsegment staan.
+   */
+  const [segments, setSegments] = useState<{ name: string; count: number }[]>([]);
   const [report, setReport] = useState<ScanReport>();
   // De client houdt de worker vast; de datasets blijven daar zodat ze niet voor
   // elke scan opnieuw door de structured clone hoeven.
@@ -278,6 +268,7 @@ export default function Home() {
             paths={pathsFromProducts(catalog.products, categoryPath)}
             verdicts={verdicts}
             onDecide={decideCategory}
+            onSegments={setSegments}
             onContinue={() => setStep('bank')}
           />
         ) : null}

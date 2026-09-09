@@ -12,7 +12,7 @@
 // De volgorde van gezag: de merchant wint van de site, de site wint van de
 // structuur. Hij weet wat hij verkoopt; wij leiden af.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Globe, HelpCircle, TriangleAlert } from 'lucide-react';
 import { Badge, Button, Card, CardTitle, EmptyState, ErrorState, Input, TableWrap, Td, Th } from './ui';
 import {
@@ -184,12 +184,22 @@ function Rows({ s, rows, onDecide }: {
   );
 }
 
-export function SegmentStep({ s, paths, verdicts, onDecide, onContinue }: {
+export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onContinue }: {
   s: Strings;
   paths: CategoryPath[];
   verdicts: Verdicts;
   /** Eén keuze; de pagina bewaart hem, want dit scherm kent geen opslag. */
   onDecide: (segments: string[], kind: PathKind) => void;
+  /**
+   * Wat er na alles overblijft als marktsegment.
+   *
+   * Omhoog gegeven en niet elders opnieuw berekend: het bewijs van de site en de
+   * voorstellen van het model leven in dít scherm. Zou de pagina het zelf
+   * uitrekenen, dan kent zij alleen de handmatige keuzes en belanden "Effen" en
+   * "Premium" als marktsegment in de aanvraag — precies wat de merchant hier net
+   * had weggezet.
+   */
+  onSegments: (segments: { name: string; count: number }[]) => void;
   onContinue: () => void;
 }) {
   const [site, setSite] = useState('');
@@ -210,6 +220,23 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onContinue }: {
     [paths, evidence, proposals, verdicts],
   );
   const debt = facetDebt(rows);
+
+  // Doorgeven wat er overblijft, zodra dat verandert. Een facet is geen markt,
+  // en een pad waar we niet uit kwamen ook niet.
+  useEffect(() => {
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      if (row.kind !== 'category') continue;
+      const name = row.segments[row.segments.length - 1];
+      counts.set(name, (counts.get(name) ?? 0) + row.productCount);
+    }
+    onSegments([...counts.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 40));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows]);
+
 
   /**
    * Eén handeling van de merchant, drie stappen van ons.
