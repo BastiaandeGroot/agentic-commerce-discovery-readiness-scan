@@ -13,7 +13,7 @@
 // structuur. Hij weet wat hij verkoopt; wij leiden af.
 
 import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, BookOpen, Globe, HelpCircle, Sparkles, TriangleAlert } from 'lucide-react';
+import { ArrowDown, ArrowUp, Globe, HelpCircle, TriangleAlert } from 'lucide-react';
 import { Badge, Button, Card, CardTitle, EmptyState, ErrorState, Input, TableWrap, Td, Th } from './ui';
 import {
   applyProposals, applyVerdicts, classifyPaths, facetDebt, pathKey,
@@ -197,6 +197,9 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
   const [proposals, setProposals] = useState<Verdicts>({});
   const [judging, setJudging] = useState(false);
   const [judgeFailed, setJudgeFailed] = useState(false);
+  /** De uitleg met zijn eigen producten erin; leeg = de vaste tekst. */
+  const [explanation, setExplanation] = useState<string[]>();
+  const [explaining, setExplaining] = useState(false);
 
   const evidence = state.kind === 'done' ? state.evidence : undefined;
   // Volgorde van gezag: de merchant wint van het model, het model vult aan waar
@@ -207,6 +210,14 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
   );
   const debt = facetDebt(rows);
 
+  /**
+   * Eén handeling van de merchant, drie stappen van ons.
+   *
+   * Site lezen, dan beoordelen wat daarna nog onbeslist is, dan de uitleg
+   * samenstellen. Achter elkaar en niet als drie knoppen: hij hoeft niet te
+   * weten dat het drie dingen zijn, en de tussenstanden zijn niets waard zonder
+   * de volgende stap.
+   */
   async function read() {
     setState({ kind: 'busy' });
     try {
@@ -219,12 +230,15 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
       });
       if (!response.ok) throw new Error('mislukt');
       const result = await response.json();
+      const evidence = { navigation: result.navigation ?? [], filters: result.filters ?? [] };
       setState({
         kind: 'done',
-        evidence: { navigation: result.navigation ?? [], filters: result.filters ?? [] },
+        evidence,
         pages: (result.read ?? []).length,
         clientRendered: result.likelyClientRendered === true,
       });
+      await judge(evidence);
+      await explain(evidence);
     } catch {
       setState({ kind: 'failed' });
     }
@@ -238,8 +252,9 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
    * overschrijven. Het scheelt bovendien tokens en het houdt zichtbaar wat
    * gemeten is en wat geraden.
    */
-  async function judge() {
-    const open = rows.filter((row) => row.kind === 'unclear');
+  async function judge(evidenceNow?: SiteEvidence) {
+    const base = applyVerdicts(classifyPaths(paths, evidenceNow ?? evidence), verdicts);
+    const open = base.filter((row) => row.kind === 'unclear');
     if (open.length === 0) return;
     setJudging(true);
     setJudgeFailed(false);
@@ -254,7 +269,7 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
             text: `${row.productCount} producten`,
           })),
           // De filternamen van de site als context; leeg mag.
-          columns: (evidence?.filters ?? []).slice(0, 60).map((name) => ({ key: name, text: '' })),
+          columns: ((evidenceNow ?? evidence)?.filters ?? []).slice(0, 60).map((name) => ({ key: name, text: '' })),
         }),
       });
       if (!response.ok) throw new Error('mislukt');
@@ -281,6 +296,49 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
     }
   }
 
+  /**
+   * De uitleg laten schrijven met zijn eigen productnamen erin.
+   *
+   * Gegenereerd en niet vast, omdat een voorbeeld uit zijn eigen markt sneller
+   * landt dan een algemene zin over stoffen. Wel met een vaste tekst eronder als
+   * terugval: dit is schermtekst, en die mag niet wegvallen omdat een aanroep
+   * mislukt of er geen sleutel is.
+   */
+  async function explain(evidenceNow?: SiteEvidence) {
+    const base = applyVerdicts(
+      applyProposals(classifyPaths(paths, evidenceNow ?? evidence), proposals),
+      verdicts,
+    );
+    const facets = base.filter((row) => row.kind === 'facet').slice(0, 8);
+    const cats = base.filter((row) => row.kind === 'category').slice(0, 6);
+    if (facets.length === 0) return;
+    setExplaining(true);
+    try {
+      const response = await fetch('/api/mapping', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          kind: 'explain',
+          attributes: [
+            ...facets.map((row) => ({ key: row.segments[row.segments.length - 1], text: 'kenmerk' })),
+            ...cats.map((row) => ({ key: row.segments[row.segments.length - 1], text: 'categorie' })),
+          ],
+          // De markt is op dit scherm nog niet vastgesteld; het grootste
+          // hoofdpad is een goed genoeg aanknopingspunt voor een voorbeeldzin.
+          columns: [{ key: paths[0]?.segments[0] ?? 'onbekend', text: '' }],
+        }),
+      });
+      if (!response.ok) return;
+      const { text } = await response.json();
+      const lines = String(text ?? '').split(/\n\s*\n/).map((one) => one.trim()).filter(Boolean);
+      if (lines.length > 0) setExplanation(lines.slice(0, 3));
+    } catch {
+      // Geen uitleg is geen fout: de vaste tekst blijft staan.
+    } finally {
+      setExplaining(false);
+    }
+  }
+
   function decide(path: CategoryPath, kind: PathKind) {
     onChange({ ...verdicts, [pathKey(path.segments)]: kind });
   }
@@ -293,26 +351,15 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
     );
   }
 
+  const doubts = rows.filter((row) => row.kind === 'unclear').length;
+  const busy = state.kind === 'busy' || judging || explaining;
+  const started = state.kind !== 'idle';
+
   return (
     <div className="flex flex-col gap-4">
-      {/* Eerst waarom, dan pas wat. Zonder de reden is dit een lijst met een
-          vraag die niemand kan beantwoorden — en het antwoord kost de merchant
-          moeite, dus hij hoort te weten waarvoor. */}
-      <Card>
-        <div className="flex items-start gap-3">
-          <BookOpen className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
-          <div className="min-w-0">
-            <p className="font-medium">{s.segments.whyHeading}</p>
-            <p className="mt-1.5 text-sm leading-relaxed text-muted">{s.segments.whyBody1}</p>
-            <p className="mt-2 text-sm leading-relaxed text-muted">{s.segments.whyBody2}</p>
-            <p className="mt-2 text-sm leading-relaxed text-ink">{s.segments.whyBody3}</p>
-          </div>
-        </div>
-      </Card>
-
+      {/* 1. Het adres. Eén handeling; wat erna gebeurt is onze zaak. */}
       <Card>
         <CardTitle sub={s.segments.intro}>{s.segments.heading}</CardTitle>
-
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-64 flex-1">
             <Input
@@ -324,11 +371,18 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
               placeholder="https://"
             />
           </div>
-          <Button onClick={() => void read()} loading={state.kind === 'busy'} disabled={site.trim() === ''}>
+          <Button onClick={() => void read()} loading={busy} disabled={site.trim() === ''}>
             <Globe className="size-4" aria-hidden />
-            {state.kind === 'busy' ? s.segments.siteBusy : s.segments.siteRead}
+            {s.segments.readShop}
           </Button>
         </div>
+
+        {/* 2. Wat we op de achtergrond doen, zodat wachten geen stilte is. */}
+        {busy ? (
+          <p className="mt-3 text-sm text-muted">
+            {state.kind === 'busy' ? s.segments.stepSite : judging ? s.segments.stepJudge : s.segments.stepExplain}
+          </p>
+        ) : null}
 
         {state.kind === 'failed' ? (
           <div className="mt-3">
@@ -336,45 +390,75 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
           </div>
         ) : null}
 
-        {/* Lege HTML is niet hetzelfde als "geen categorieën". Wie zijn menu in
-            de browser opbouwt levert een pagina zonder links, en dan hebben we
-            niet gekeken in plaats van niets gevonden. */}
         {state.kind === 'done' && state.clientRendered ? (
           <div className="mt-3">
             <ErrorState title={s.segments.siteEmpty} body={s.segments.siteEmptyNext} />
           </div>
         ) : null}
 
-        {state.kind === 'done' && !state.clientRendered ? (
-          <p className="mt-3 text-sm text-muted">
-            {state.pages} {s.segments.siteDone}
-          </p>
+        {state.kind === 'done' && !state.clientRendered && !busy ? (
+          <p className="mt-3 text-sm text-muted">{state.pages} {s.segments.siteDone}</p>
+        ) : null}
+
+        {judgeFailed ? (
+          <div className="mt-3">
+            <ErrorState title={s.segments.judgeFailed} body={s.segments.judgeFailedNext} />
+          </div>
         ) : null}
       </Card>
 
-      {debt.facets > 0 ? (
+      {/* 3. Wat we ervan vinden: de twijfels, de schuld, en waarom het uitmaakt. */}
+      {started && !busy ? (
         <Card>
           <div className="flex items-start gap-3">
-            <TriangleAlert className="mt-0.5 size-5 shrink-0 text-warn" aria-hidden />
-            <div>
-              <p className="font-medium">{s.segments.debtHeading}</p>
+            <HelpCircle className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
+            <div className="min-w-0">
+              <p className="font-medium">
+                {doubts === 0 ? s.segments.doubtsNone : s.segments.doubtsHeading}
+              </p>
               <p className="mt-1 text-sm leading-relaxed text-muted">
-                <span className="font-medium text-ink">
-                  {debt.facets} van de {rows.length}
-                </span>{' '}
-                {s.segments.debtBody}
+                {doubts === 0 ? s.segments.doubtsNoneBody : (
+                  <>
+                    <span className="font-medium text-ink">{doubts}</span> {s.segments.doubtsCount}. {s.segments.doubtsBody}
+                  </>
+                )}
               </p>
             </div>
           </div>
+
+          {debt.facets > 0 ? (
+            <div className="mt-4 flex items-start gap-3 border-t border-line pt-4">
+              <TriangleAlert className="mt-0.5 size-5 shrink-0 text-warn" aria-hidden />
+              <div className="min-w-0">
+                <p className="font-medium">{s.segments.debtHeading}</p>
+                <p className="mt-1 text-sm leading-relaxed text-muted">
+                  <span className="font-medium text-ink">{debt.facets} {s.segments.of} {rows.length}</span>{' '}
+                  {s.segments.debtBody}
+                </p>
+                {/* De uitleg met zijn eigen producten erin, of de vaste tekst als
+                    die er niet is. Schermtekst mag nooit wegvallen. */}
+                <div className="mt-3 rounded-lg bg-surface-2 p-3">
+                  {explanation
+                    ? explanation.map((line) => (
+                        <p key={line} className="mt-1.5 text-sm leading-relaxed text-ink first:mt-0">{line}</p>
+                      ))
+                    : (
+                      <>
+                        <p className="text-sm leading-relaxed text-muted">{s.segments.whyBody1}</p>
+                        <p className="mt-1.5 text-sm leading-relaxed text-ink">{s.segments.whyBody3}</p>
+                      </>
+                    )}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </Card>
       ) : null}
 
-      {/* Wat we niet zeker weten is een vraag; de rest is een uitkomst. Alles
-          op één hoop zetten maakt van tien mededelingen vierentwintig vragen, en
-          dan legt het scherm zijn werk bij de merchant neer. */}
-      {rows.some((row) => row.kind === 'unclear') ? (
+      {/* 4. De tabel, met sorteren en filteren. */}
+      {started && !busy ? (
         <Card>
-          <CardTitle sub={s.segments.askBody}>{s.segments.askHeading}</CardTitle>
+          <CardTitle>{s.segments.tableHeading}</CardTitle>
           <div className="mb-4 rounded-lg bg-surface-2 p-3">
             <p className="flex items-center gap-2 text-sm font-medium">
               <HelpCircle className="size-4 shrink-0 text-accent" aria-hidden />
@@ -382,26 +466,7 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
             </p>
             <p className="mt-1 text-sm leading-relaxed text-muted">{s.segments.ruleBody}</p>
           </div>
-          <div className="mb-4">
-            <Button onClick={() => void judge()} loading={judging} variant="secondary">
-              <Sparkles className="size-4" aria-hidden />
-              {judging ? s.segments.judgeBusy : s.segments.judge}
-            </Button>
-            <p className="mt-2 text-xs leading-relaxed text-muted">{s.segments.judgeNote}</p>
-            {judgeFailed ? (
-              <div className="mt-3">
-                <ErrorState title={s.segments.judgeFailed} body={s.segments.judgeFailedNext} />
-              </div>
-            ) : null}
-          </div>
-          <Rows s={s} rows={rows.filter((row) => row.kind === 'unclear')} onDecide={decide} />
-        </Card>
-      ) : null}
-
-      {rows.some((row) => row.kind !== 'unclear') ? (
-        <Card>
-          <CardTitle sub={s.segments.settledBody}>{s.segments.settled}</CardTitle>
-          <Rows s={s} rows={rows.filter((row) => row.kind !== 'unclear')} onDecide={decide} />
+          <Rows s={s} rows={rows} onDecide={decide} />
         </Card>
       ) : null}
 

@@ -46,7 +46,7 @@ interface Payload {
    * is precies hetzelfde probleem — Engelse vaktaal tegen Nederlandse data — en
    * het verdient geen tweede route, alleen een andere opdracht.
    */
-  kind?: 'attributes' | 'categories' | 'facets' | 'market';
+  kind?: 'attributes' | 'categories' | 'facets' | 'market' | 'explain';
 }
 
 /** Weiger wat niet klopt vóór het geld kost, en zeg waarom. */
@@ -59,14 +59,14 @@ function validate(body: unknown): Payload | string {
   const kindEarly = (body as Partial<Payload>).kind;
   // Bij een facetoordeel is de tweede lijst context en mag hij leeg zijn: een
   // winkel zonder zichtbare filters is geen fout, alleen minder houvast.
-  if (attributes.length === 0 || (columns.length === 0 && kindEarly !== 'facets' && kindEarly !== 'market')) {
+  if (attributes.length === 0 || (columns.length === 0 && kindEarly !== 'facets' && kindEarly !== 'market' && kindEarly !== 'explain')) {
     return 'Er is niets te koppelen.';
   }
   if (attributes.length > LIMITS.attributes || columns.length > LIMITS.columns) {
     return `Te groot: hoogstens ${LIMITS.attributes} kenmerken en ${LIMITS.columns} kolommen per aanvraag.`;
   }
   const kind = (body as Partial<Payload>).kind;
-  if (kind !== undefined && kind !== 'attributes' && kind !== 'categories' && kind !== 'facets' && kind !== 'market') {
+  if (kind !== undefined && kind !== 'attributes' && kind !== 'categories' && kind !== 'facets' && kind !== 'market' && kind !== 'explain') {
     return 'Onbekend soort koppeling.';
   }
   const clean = (list: { key: string; text: string }[]) => list.every((entry) =>
@@ -87,6 +87,31 @@ const SYSTEM_CATEGORIES = [
   '- De twee lijsten staan vaak in verschillende talen: "upholstery fabrics" en "Meubelstoffen" zijn hetzelfde, "curtain fabrics" en "Gordijnstoffen" ook.',
   '',
   'Antwoord met één regel per koppeling, in de vorm `vragenlijstcategorie: catalogus­categorie`. Geen inleiding, geen uitleg, geen opsommingstekens.',
+].join('\n');
+
+const SYSTEM_EXPLAIN = [
+  'Je legt aan een webshop-eigenaar uit waarom het uitmaakt of iets een categorie is of een kenmerk.',
+  '',
+  'DE SITUATIE, en houd deze richting strikt aan:',
+  '- Een CATEGORIE is een soort product: waar de klant zijn zoektocht begint. Gordijnstoffen, lampenkapstoffen.',
+  '- Een KENMERK is een eigenschap van dat product: waarmee hij verfijnt. Effen, vlekwerend, vlamvertragend.',
+  '- Deze winkel heeft een aantal EIGENSCHAPPEN als categorie in zijn boom staan. Dat is het probleem.',
+  '- Een eigenschap hoort als kenmerk in de productdata te staan, zodat er op gefilterd kan worden.',
+  '- Adviseer dus NOOIT om iets een categorie te maken. De beweging gaat één kant op: van categorie naar kenmerk.',
+  '',
+  'Schrijf precies drie zinnen, in het Nederlands, met zijn eigen producten erin.',
+  '',
+  'Zin 1: begin met \'Een AI-assistent die namens je klant zoekt\' en laat hem iets concreets zoeken, met een van de genoemde eigenschappen en een van de genoemde categorieën erin.',
+  'Zin 2: die assistent filtert op kenmerken in je productdata. Staat de eigenschap alleen als categorie in je boom, dan is er geen kenmerk om op te filteren en valt je product buiten zijn selectie.',
+  'Zin 3: daarom bepaal je hier per naam wat het is, zodat de eigenschappen als filter in je data terechtkomen.',
+  '',
+  'Regels:',
+  '- Spreek hem aan met \'je\'.',
+  '- Gebruik uitsluitend de namen die in de opdracht staan. Verzin er geen bij.',
+  '- Geen jargon: niet \'attribuut\', niet \'facet\', niet \'datamodel\'. Wel \'kenmerk\', \'filter\', \'categorie\'.',
+  '- Elke zin onder de dertig woorden.',
+  '',
+  'Antwoord met alleen die drie zinnen, gescheiden door een lege regel. Geen kop, geen opsomming.',
 ].join('\n');
 
 const SYSTEM_MARKET = [
@@ -133,6 +158,17 @@ const SYSTEM = [
 ].join('\n');
 
 function prompt({ attributes, columns, kind }: Payload): string {
+  if (kind === 'explain') {
+    return [
+      `MARKT: ${columns[0]?.key ?? 'onbekend'}`,
+      '',
+      'EIGENSCHAPPEN die nu ten onrechte als categorie in de boom staan:',
+      ...attributes.filter((entry) => entry.text === 'kenmerk').map((entry) => `- ${entry.key}`),
+      '',
+      'ECHTE CATEGORIEËN van deze winkel:',
+      ...attributes.filter((entry) => entry.text !== 'kenmerk').map((entry) => `- ${entry.key}`),
+    ].join('\n');
+  }
   if (kind === 'market') {
     return [
       'CATEGORIEËN VAN DEZE WINKEL (naam, en het aantal producten):',
@@ -195,7 +231,9 @@ export async function POST(request: Request) {
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      system: payload.kind === 'market'
+      system: payload.kind === 'explain'
+        ? SYSTEM_EXPLAIN
+        : payload.kind === 'market'
         ? SYSTEM_MARKET
         : payload.kind === 'facets'
           ? SYSTEM_FACETS
