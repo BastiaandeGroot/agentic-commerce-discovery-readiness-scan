@@ -408,27 +408,25 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
         ) : null}
       </Card>
 
-      {/* 3. Wat we ervan vinden: de twijfels, de schuld, en waarom het uitmaakt. */}
-      {started && !busy ? (
+      {/* 3. Wat we ervan vinden. Alleen als er iets te zeggen valt: "we konden
+          alles bepalen" is een mededeling over niets, en de teller Onbeslist
+          zegt het al. */}
+      {started && !busy && (doubts > 0 || debt.facets > 0) ? (
         <Card>
-          <div className="flex items-start gap-3">
-            <HelpCircle className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
-            <div className="min-w-0">
-              <p className="font-medium">
-                {doubts === 0 ? s.segments.doubtsNone : s.segments.doubtsHeading}
-              </p>
-              <p className="mt-1 text-sm leading-relaxed text-muted">
-                {doubts === 0 ? s.segments.doubtsNoneBody : (
-                  <>
-                    <span className="font-medium text-ink">{doubts}</span> {s.segments.doubtsCount}. {s.segments.doubtsBody}
-                  </>
-                )}
-              </p>
+          {doubts > 0 ? (
+            <div className="flex items-start gap-3">
+              <HelpCircle className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
+              <div className="min-w-0">
+                <p className="font-medium">{s.segments.doubtsHeading}</p>
+                <p className="mt-1 text-sm leading-relaxed text-muted">
+                  <span className="font-medium text-ink">{doubts}</span> {s.segments.doubtsCount}. {s.segments.doubtsBody}
+                </p>
+              </div>
             </div>
-          </div>
+          ) : null}
 
           {debt.facets > 0 ? (
-            <div className="mt-4 flex items-start gap-3 border-t border-line pt-4">
+            <div className={`flex items-start gap-3 ${doubts > 0 ? 'mt-4 border-t border-line pt-4' : ''}`}>
               <TriangleAlert className="mt-0.5 size-5 shrink-0 text-warn" aria-hidden />
               <div className="min-w-0">
                 <p className="font-medium">{s.segments.debtHeading}</p>
@@ -436,8 +434,8 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
                   <span className="font-medium text-ink">{debt.facets} {s.segments.of} {rows.length}</span>{' '}
                   {s.segments.debtBody}
                 </p>
-                {/* De uitleg met zijn eigen producten erin, of de vaste tekst als
-                    die er niet is. Schermtekst mag nooit wegvallen. */}
+                {/* De enige uitleg op dit scherm, met zijn eigen producten erin.
+                    Twee uitleggen die net iets anders zeggen is er één te veel. */}
                 <div className="mt-3 rounded-lg bg-surface-2 p-3">
                   {explanation
                     ? explanation.map((line) => (
@@ -445,7 +443,7 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
                       ))
                     : (
                       <>
-                        <p className="text-sm leading-relaxed text-muted">{s.segments.whyBody1}</p>
+                        <p className="text-sm leading-relaxed text-ink">{s.segments.whyBody1}</p>
                         <p className="mt-1.5 text-sm leading-relaxed text-ink">{s.segments.whyBody3}</p>
                       </>
                     )}
@@ -459,14 +457,9 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
       {/* 4. De tabel, met sorteren en filteren. */}
       {started && !busy ? (
         <Card>
-          <CardTitle>{s.segments.tableHeading}</CardTitle>
-          <div className="mb-4 rounded-lg bg-surface-2 p-3">
-            <p className="flex items-center gap-2 text-sm font-medium">
-              <HelpCircle className="size-4 shrink-0 text-accent" aria-hidden />
-              {s.segments.rule}
-            </p>
-            <p className="mt-1 text-sm leading-relaxed text-muted">{s.segments.ruleBody}</p>
-          </div>
+          <CardTitle sub={`${s.segments.rule} ${s.segments.ruleBody}`}>
+            {s.segments.tableHeading}
+          </CardTitle>
           <Rows s={s} rows={rows} onDecide={decide} />
         </Card>
       ) : null}

@@ -635,9 +635,9 @@ export const STRINGS = {
       heading: 'Categorie of kenmerk?',
       intro:
         'Een deel van je categorieën is eigenlijk een eigenschap. Dat is geen slordigheid — het gebeurt overal — maar elk geval is een filter dat je koper wil gebruiken en dat je data niet vastlegt.',
-      rule: 'Kun je zeggen "ik zoek een …"?',
+      rule: 'Vuistregel: kun je zeggen "ik zoek een …"?',
       ruleBody:
-        '"Ik zoek een lampenkapstof" loopt — dat is een categorie, het ding dat je verkoopt. "Ik zoek een effen" loopt niet; je zegt "ik zoek een effen meubelstof". Dan is het een kenmerk. Anders gezegd: waar begint je klant, en waarmee verfijnt hij?',
+        '"Ik zoek een lampenkapstof" loopt — een afdeling. "Ik zoek een effen" loopt niet; je zegt "een effen meubelstof" — een eigenschap.',
       askHeading: 'Deze weten we niet zeker',
       askBody: 'De rest hebben we kunnen bepalen; die staat eronder. Kom je er bij eentje niet uit, laat hem dan staan — onbeslist is een eerlijker antwoord dan een gok.',
       settled: 'Al bepaald',
@@ -1386,9 +1386,9 @@ export const STRINGS = {
       heading: 'Category or characteristic?',
       intro:
         'Part of your categories are really a property. That is not sloppiness — it happens everywhere — but each case is a filter your buyer wants and your data does not record.',
-      rule: 'Can you say "I am looking for a …"?',
+      rule: 'Rule of thumb: can you say "I am looking for a …"?',
       ruleBody:
-        '"I am looking for a lampshade fabric" works — that is a category, the thing you sell. "I am looking for a plain" does not; you would say "a plain upholstery fabric". Then it is a characteristic. Put differently: where does your customer start, and what do they narrow down with?',
+        '"I am looking for a lampshade fabric" works — a department. "I am looking for a plain" does not; you would say "a plain upholstery fabric" — a characteristic.',
       askHeading: 'We are not sure about these',
       askBody: 'The rest we could determine; it is listed below. If one of these stumps you, leave it — undecided is a more honest answer than a guess.',
       settled: 'Already determined',

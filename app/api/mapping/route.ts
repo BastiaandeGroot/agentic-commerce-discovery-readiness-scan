@@ -90,8 +90,10 @@ const SYSTEM_CATEGORIES = [
 ].join('\n');
 
 const SYSTEM_EXPLAIN = [
-  'Je legt aan een winkelier uit waarom het uitmaakt of iets een afdeling is of een eigenschap.',
+  'Je legt aan een webshop-eigenaar uit waarom het uitmaakt of iets een afdeling is of een eigenschap.',
   'Hij weet niets van data en hoeft dat ook niet te leren. Schrijf zoals je het aan de balie zou uitleggen.',
+  'Let op: het is een webshop. Er liggen geen spullen in een hoek; een afdeling is een pagina waar',
+  'producten onder hangen. Gebruik nooit het woord fysiek of fysieke.',
   '',
   'DE KERN, in zijn woorden:',
   '- Een AFDELING is een plek in de winkel. Je legt er producten in.',
@@ -114,7 +116,7 @@ const SYSTEM_EXPLAIN = [
   '',
   'Regels: spreek hem aan met \'je\'. Gebruik alleen de namen uit de opdracht. Elke zin onder de 25 woorden.',
   'Schrijf foutloos Nederlands en let op de verbuiging: elke stof, elk product.',
-  'Zin 1 mag de vergelijking met een winkel gebruiken, maar hou hem kort. Het woord \'fysiek\' is verboden.',
+  'Zin 1 mag de vergelijking met een winkel gebruiken, maar hou hem kort en zeg niets over neerzetten of neerleggen.',
   'Verzin geen aantallen. Je weet niet hoeveel producten er iets zijn, dus noem geen getallen.',
   'Antwoord met alleen die drie zinnen, gescheiden door een lege regel.',
 ].join('\n');
