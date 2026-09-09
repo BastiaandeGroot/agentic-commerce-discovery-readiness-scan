@@ -78,7 +78,24 @@ export function BankRequestForm({ s, segments, accountId, siteUrl, onQueued }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segments]);
 
+  /**
+   * Eén markt, en niet twee.
+   *
+   * De vragenlijst wordt voor één markt gemaakt: hij hangt aan een panel van
+   * vijf à acht winkels in díe markt. "Woontextiel en tuinmeubelen" zou één bank
+   * opleveren die voor allebei half klopt, en die is dan voor geen van beide een
+   * meetlat. Wie in twee markten handelt doet ze na elkaar.
+   */
+  function marketProblem(): string | undefined {
+    const value = market.trim();
+    if (/[,;/&]| en | and |\+/i.test(value)) return s.waiting.marketTooMany;
+    if (value.split(/\s+/).length > 4) return s.waiting.marketTooMany;
+    return undefined;
+  }
+
   async function submit() {
+    const problem = marketProblem();
+    if (problem) { setPhase({ failed: problem }); return; }
     setPhase('busy');
     try {
       const response = await fetch('/api/bank-request', {

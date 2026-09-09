@@ -594,7 +594,8 @@ export const STRINGS = {
     waiting: {
       askHeading: 'Nog twee dingen en we gaan aan de slag',
       marketLabel: 'In welke markt handel je?',
-      marketHint: 'We stellen dit voor op basis van je categorieën. Klopt het niet, pas het dan aan — hier hangt de hele vragenlijst aan.',
+      marketHint: '\u00c9\u00e9n markt, in een woord of twee \u2014 bijvoorbeeld "woontextiel" of "tuinmeubelen". Niet meerdere naast elkaar: de vragenlijst wordt voor \u00e9\u00e9n markt gemaakt. We stellen hem voor op basis van je categorie\u00ebn; klopt het niet, pas hem dan aan.',
+      marketTooMany: 'Geef \u00e9\u00e9n markt op, zonder komma of schuine streep. Verkoop je in twee markten, doe dan eerst de ene en daarna de andere.',
       marketBusy: 'Markt bepalen…',
       panelLabel: 'Welke webshops moeten we bekijken?',
       panelHint: 'Eén per regel, en dit mag leeg blijven. We onderzoeken vijf à acht winkels in jouw markt om te zien welke vragen kopers stellen. Ken jij de serieuze spelers, noem ze dan — we voegen ze toe aan wat we zelf vinden. Je krijgt altijd te zien welke sites we uiteindelijk hebben gebruikt.',
@@ -637,7 +638,7 @@ export const STRINGS = {
         'Een deel van je categorieën is eigenlijk een eigenschap. Dat is geen slordigheid — het gebeurt overal — maar elk geval is een filter dat je koper wil gebruiken en dat je data niet vastlegt.',
       rule: 'Vuistregel: kun je zeggen "ik zoek een …"?',
       ruleBody:
-        '"Ik zoek een lampenkapstof" loopt — een afdeling. "Ik zoek een effen" loopt niet; je zegt "een effen meubelstof" — een eigenschap.',
+        '"Ik zoek een lampenkapstof" loopt — een categorie. "Ik zoek een effen" loopt niet; je zegt "een effen meubelstof" — een eigenschap.',
       askHeading: 'Deze weten we niet zeker',
       askBody: 'De rest hebben we kunnen bepalen; die staat eronder. Kom je er bij eentje niet uit, laat hem dan staan — onbeslist is een eerlijker antwoord dan een gok.',
       settled: 'Al bepaald',
@@ -654,11 +655,11 @@ export const STRINGS = {
       tableHeading: 'Categorie\u00ebn en kenmerken definitief vaststellen',
       whyHeading: 'Waarom we dit vragen',
       whyBody1:
-        'Een afdeling is een plek waar je producten neerzet. Een eigenschap is iets wat van een product waar is, en dat hoort bij élk product te staan — zoals de kleur of de breedte.',
+        'Een categorie is een plek waar je producten in onderbrengt. Een eigenschap is iets wat van een product waar is, en dat hoort bij élk product te staan — zoals de kleur of de breedte.',
       whyBody2:
         'Staat zo\u2019n eigenschap bij jou als categorie in de boom, dan legt je data hem nergens als kenmerk vast. De agent kan er dus niet op filteren, en jouw stof valt buiten zijn selectie terwijl hij precies is wat de koper zocht.',
       whyBody3:
-        'Zet je een eigenschap alleen als afdeling neer, dan weet je het alleen van de producten die je daarin legde — van de rest weet niemand het. Een klant die daarop zoekt vindt die andere producten dus niet.',
+        'Zet je een eigenschap alleen als categorie neer, dan weet je het alleen van de producten die je daarin onderbracht — van de rest weet niemand het. Een klant die daarop zoekt vindt die andere producten dus niet.',
       sortName: 'Naam',
       sortCount: 'Producten',
       filterAll: 'Alles',
@@ -694,7 +695,7 @@ export const STRINGS = {
       siteFailedNext: 'Controleer het adres. Lukt het niet, beoordeel de lijst dan met de hand — dat werkt net zo goed, het kost alleen meer tijd.',
       kinds: { category: 'Categorie', facet: 'Kenmerk', unclear: 'Nog te beoordelen' },
       products: 'producten',
-      debtHeading: 'Eigenschappen die nu een afdeling zijn',
+      debtHeading: 'Eigenschappen die nu een categorie zijn',
       debtBody: 'van je categorie\u00ebn is eigenlijk een eigenschap. Zolang dat zo is, staat die eigenschap niet bij je producten \u2014 en dan weet niemand van de rest van je assortiment dat het ook zo is.',
       empty: 'We vinden geen categoriepaden in je catalogus',
       emptyNext: 'Zonder categorieën meet de scan alles als één hoop. Controleer of je export een kolom met categoriepaden bevat.',
@@ -1345,7 +1346,8 @@ export const STRINGS = {
     waiting: {
       askHeading: 'Two more things and we are off',
       marketLabel: 'Which market do you trade in?',
-      marketHint: 'We propose this from your categories. If it is wrong, correct it — the whole question list hangs on this.',
+      marketHint: 'One market, in a word or two — for example "home textiles" or "garden furniture". Not several at once: the question list is made for one market. We propose it from your categories; if it is wrong, correct it.',
+      marketTooMany: 'Give one market, without a comma or slash. If you trade in two markets, do one first and the other after.',
       marketBusy: 'Determining the market…',
       panelLabel: 'Which shops should we look at?',
       panelHint: 'One per line, and this may stay empty. We research five to eight shops in your market to see what questions buyers ask. If you know the serious players, name them — we add them to what we find ourselves. You will always be shown which sites we ended up using.',
@@ -1362,7 +1364,7 @@ export const STRINGS = {
         'The questions do not come from your own columns but from research into your market: what buyers ask before they order, gathered across several shops. That is work done once per market — and you are the first in yours.',
       what: 'What is happening now',
       whatBody:
-        'We are going through five to eight shops in your market: their FAQs, their category texts, their product pages. That produces the list of questions we measure your data against. A specialist reviews it before it goes into use.',
+        'We are going through five to eight shops in your market, including the ones you just gave us: their FAQs, their category texts, their product pages. That produces the list of questions we measure your data against.',
       when: 'How long this takes',
       whenBody:
         'Expect one to two working days. You do not have to wait: feel free to close this window. You will get an email as soon as your scan is ready, and your details are kept.',
