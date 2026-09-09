@@ -10,13 +10,21 @@
 // is een bank die raar uitvalt niet terug te voeren op één stap. Dat is precies
 // waar de agentische opzet op vastliep.
 //
+// Het antwoord komt meteen, en het werk daarna. Een fase duurt minuten en de
+// proxy van Render kapt een verzoek af dat zolang niets terugstuurt — dan kreeg
+// de poller een 502 terwijl de generatie prima liep. Een storingsmelding die bij
+// élke geslaagde stap verschijnt is erger dan geen melding: dan kun je een echte
+// storing niet meer herkennen. Dus zegt de route "opgepakt" en maakt `after` de
+// fase af; de tussenstand in `bank_runs` blijft de waarheid.
+//
 // Er zit geen mens achter dit verzoek, dus het loopt op de uitvoerderssleutel.
 
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { isExecutor, isRefusal, serviceClient } from '../../../src/server/executor';
-import { makeAsk } from '../../../src/server/generator';
+import { makeAsk, PhaseFailure } from '../../../src/server/generator';
 import { deliverBank } from '../../../src/server/deliver';
 import { advance } from '../../../src/generation/pipeline';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   decodePhase,
   emptyState,
@@ -155,90 +163,103 @@ export async function POST(request: Request) {
       if (!claimed.data) continue;
     }
 
-    const phase = decodePhase(run.phase);
+    // Vanaf hier is het werk van deze beurt, en het antwoord gaat er nu al uit.
+    // Als functie en niet als losse belofte: dan begint het werk pas nadat het
+    // antwoord verstuurd is, en niet ergens ertussenin.
+    const claimedRun = run;
+    after(() => runPhase(supabase, row, claimedRun, now));
+
     const state: RunState = { ...emptyState(briefOf(row)), ...(run.state ?? {}) };
-
-    try {
-      const result = await advance(state, phase, makeAsk(), now.toISOString().slice(0, 10));
-
-      const usage = {
-        input: run.input_tokens + result.usage.input,
-        output: run.output_tokens + result.usage.output,
-        cached: run.cached_tokens + result.usage.cached,
-      };
-
-      await supabase
-        .from('bank_runs')
-        .update({
-          phase: encodePhase(result.next),
-          state: result.state,
-          attempts: 0,
-          failure: null,
-          leased_until: null,
-          input_tokens: usage.input,
-          output_tokens: usage.output,
-          cached_tokens: usage.cached,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', run.id);
-
-      // Klaar. De bank gaat door dezelfde poorten als een bank van buiten: de
-      // app gelooft haar eigen pijplijn net zomin op haar woord.
-      if (result.next.kind === 'done') {
-        const delivered = await deliverBank(supabase, {
-          requestId: row.id,
-          csv: result.state.csv ?? '',
-          panel: result.state.panel,
-          grouping: result.state.grouping,
-          findings: result.state.findings,
-        });
-
-        return NextResponse.json({
-          request: row.id,
-          vertical: row.vertical,
-          phase: 'done',
-          delivered: delivered.ok,
-          ...(delivered.ok
-            ? { bank: delivered.bank, questions: delivered.questions, findings: delivered.findings.length }
-            : { error: delivered.error, errors: delivered.errors }),
-          tokens: usage,
-        });
-      }
-
-      return NextResponse.json({
-        request: row.id,
-        vertical: row.vertical,
-        phase: encodePhase(phase),
-        next: encodePhase(result.next),
-        step: `${phaseNumber(phase, result.state)}/${totalPhases(result.state)}`,
-        tokens: usage,
-      });
-    } catch (caught) {
-      const attempts = run.attempts + 1;
-      const failure = caught instanceof Error ? caught.message : 'Onbekende fout.';
-
-      await supabase
-        .from('bank_runs')
-        .update({ attempts, failure, leased_until: null, updated_at: new Date().toISOString() })
-        .eq('id', run.id);
-
-      // Drie keer dezelfde fase stuk: dan hoort er een mens naar te kijken in
-      // plaats van dat het model het een vierde keer op onze rekening probeert.
-      if (attempts >= MAX_ATTEMPTS) {
-        await supabase
-          .from('bank_requests')
-          .update({ status: 'blocked', failure: `Fase ${run.phase}: ${failure}` })
-          .eq('id', row.id);
-      }
-
-      console.error('bank-run', row.vertical, run.phase, failure);
-      return NextResponse.json(
-        { request: row.id, phase: run.phase, attempts, blocked: attempts >= MAX_ATTEMPTS, error: failure },
-        { status: 500 },
-      );
-    }
+    return NextResponse.json({
+      request: row.id,
+      vertical: row.vertical,
+      phase: run.phase,
+      started: true,
+      step: `${phaseNumber(decodePhase(run.phase), state)}/${totalPhases(state)}`,
+    });
   }
 
   // Niets te doen. Dat is het normale geval en het hoort niets te kosten.
   return NextResponse.json({ request: null });
+}
+
+/**
+ * Eén fase draaien en wegschrijven, nadat het antwoord al verstuurd is.
+ *
+ * Alles wat hier misgaat komt in `bank_runs` terecht en niet in een HTTP-antwoord
+ * dat niemand meer leest. Dat is ook waarom de grendel eraf gaat in beide takken:
+ * valt het proces hiertussen om, dan blijft de grendel staan tot hij verloopt en
+ * pakt de volgende beurt dezelfde fase opnieuw op.
+ */
+async function runPhase(
+  supabase: SupabaseClient,
+  row: RequestRow,
+  run: RunRow,
+  now: Date,
+): Promise<void> {
+  const phase = decodePhase(run.phase);
+  const state: RunState = { ...emptyState(briefOf(row)), ...(run.state ?? {}) };
+
+  try {
+    const result = await advance(state, phase, makeAsk(), now.toISOString().slice(0, 10));
+
+    await supabase
+      .from('bank_runs')
+      .update({
+        phase: encodePhase(result.next),
+        state: result.state,
+        attempts: 0,
+        failure: null,
+        leased_until: null,
+        input_tokens: run.input_tokens + result.usage.input,
+        output_tokens: run.output_tokens + result.usage.output,
+        cached_tokens: run.cached_tokens + result.usage.cached,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', run.id);
+
+    console.log('bank-run', row.vertical, run.phase, '→', encodePhase(result.next));
+
+    // Klaar. De bank gaat door dezelfde poorten als een bank van buiten: de app
+    // gelooft haar eigen pijplijn net zomin op haar woord.
+    if (result.next.kind === 'done') {
+      const delivered = await deliverBank(supabase, {
+        requestId: row.id,
+        csv: result.state.csv ?? '',
+        panel: result.state.panel,
+        grouping: result.state.grouping,
+        findings: result.state.findings,
+      });
+      console.log('bank-run', row.vertical, 'afgeleverd:', delivered.ok ? 'ja' : delivered.error);
+    }
+  } catch (caught) {
+    const attempts = run.attempts + 1;
+    const failure = caught instanceof Error ? caught.message : 'Onbekende fout.';
+    // Wat een gestrande fase kostte telt gewoon mee: die tokens zijn betaald.
+    const spent = caught instanceof PhaseFailure ? caught.usage : { input: 0, output: 0, cached: 0 };
+
+    await supabase
+      .from('bank_runs')
+      .update({
+        attempts,
+        failure,
+        leased_until: null,
+        input_tokens: run.input_tokens + spent.input,
+        output_tokens: run.output_tokens + spent.output,
+        cached_tokens: run.cached_tokens + spent.cached,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', run.id);
+
+    // Drie keer dezelfde fase stuk: dan hoort er een mens naar te kijken in
+    // plaats van dat het model het een vierde keer op onze rekening probeert.
+    if (attempts >= MAX_ATTEMPTS) {
+      await supabase
+        .from('bank_requests')
+        .update({ status: 'blocked', failure: `Fase ${run.phase}: ${failure}` })
+        .eq('id', row.id);
+    }
+
+    console.error('bank-run', row.vertical, run.phase, failure);
+  }
 }
