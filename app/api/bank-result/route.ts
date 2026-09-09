@@ -1,4 +1,4 @@
-// De vragenbank die de uitvoerder aanlevert.
+// De vragenbank die een uitvoerder aanlevert.
 //
 // De app gelooft de uitvoerder niet op zijn woord. Wat hier binnenkomt wordt
 // eerst ingelezen met dezelfde lezer die de merchant gebruikt; komt daar een
@@ -10,23 +10,13 @@
 // dekking zonder panelsites, een vraag die geen enkel attribuut kan dragen. Die
 // halen de bank niet onderuit maar zetten hem op `review`, zodat er een mens
 // naar kijkt voordat een merchant erop meet.
+//
+// Het aannemen zelf staat in `src/server/deliver.ts`, want de generator in deze
+// app levert langs dezelfde weg af en hoort door dezelfde poorten te gaan.
 
 import { NextResponse } from 'next/server';
 import { guard, isRefusal } from '../../../src/server/executor';
-import { importQuestionList } from '../../../src/questions/list';
-
-interface Payload {
-  requestId: string;
-  /** De vragenlijst in de vorm die de app inleest. */
-  csv: string;
-  /** Het panel waarop de bank rust: naam, url, type, datum. */
-  panel?: { name: string; url: string; type?: string; consultedAt?: string }[];
-  /** Wat de uitvoerder zelf al markeerde tijdens het controleren. */
-  findings?: string[];
-}
-
-/** Ruim genoeg voor een bank van een paar honderd vragen. */
-const MAX_CSV = 2_000_000;
+import { deliverBank, type Delivery } from '../../../src/server/deliver';
 
 export async function POST(request: Request) {
   const supabase = guard(request);
@@ -34,97 +24,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: supabase.error }, { status: supabase.status });
   }
 
-  let payload: Payload;
+  let payload: Delivery;
   try {
-    payload = (await request.json()) as Payload;
+    payload = (await request.json()) as Delivery;
   } catch {
     return NextResponse.json({ error: 'Het verzoek was geen geldige JSON.' }, { status: 400 });
   }
 
-  if (typeof payload.requestId !== 'string' || typeof payload.csv !== 'string') {
-    return NextResponse.json({ error: 'Verwacht een requestId en een csv.' }, { status: 400 });
+  const result = await deliverBank(supabase, payload);
+
+  if (!result.ok) {
+    return NextResponse.json(
+      result.errors ? { stored: false, errors: result.errors } : { error: result.error },
+      { status: result.status },
+    );
   }
-  if (payload.csv.length > MAX_CSV) {
-    return NextResponse.json({ error: 'De vragenlijst is te groot.' }, { status: 413 });
-  }
-
-  const found = await supabase
-    .from('bank_requests')
-    .select('id, vertical, status')
-    .eq('id', payload.requestId)
-    .maybeSingle();
-
-  if (!found.data) {
-    return NextResponse.json({ error: 'Deze aanvraag bestaat niet.' }, { status: 404 });
-  }
-
-  // Dezelfde lezer als de merchant gebruikt, en niet een soepelere variant. Wat
-  // hier doorkomt, komt straks ook door zijn scherm.
-  const read = importQuestionList([{ name: `${found.data.vertical}.csv`, text: payload.csv }]);
-
-  if (read.errors.length > 0 || !read.bank) {
-    await supabase
-      .from('bank_requests')
-      .update({ status: 'failed', failure: read.errors.join(' ') || 'De lijst bevat geen bruikbare vragen.' })
-      .eq('id', payload.requestId);
-    return NextResponse.json({ stored: false, errors: read.errors }, { status: 422 });
-  }
-
-  // De bevindingen: wat de lezer opmerkte plus wat de uitvoerder zelf markeerde.
-  const findings = [
-    ...read.warnings,
-    ...(Array.isArray(payload.findings) ? payload.findings.filter((one) => typeof one === 'string') : []),
-  ].slice(0, 200);
-
-  // Oplopend per markt. Een bevroren bank verandert nooit; een herziening komt
-  // ernaast te staan zodat een oud rapport zijn meetlat houdt.
-  const previous = await supabase
-    .from('question_banks')
-    .select('version')
-    .eq('vertical', found.data.vertical)
-    .order('version', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const version = (previous.data?.version ?? 0) + 1;
-
-  const stored = await supabase
-    .from('question_banks')
-    .insert({
-      vertical: found.data.vertical,
-      version,
-      // Bevindingen betekent dat er een mens naar hoort te kijken. Zonder
-      // bevindingen mag hij meteen naar de merchant.
-      status: findings.length > 0 ? 'review' : 'ready',
-      csv: payload.csv,
-      findings,
-      panel: Array.isArray(payload.panel) ? payload.panel.slice(0, 20) : [],
-    })
-    .select('id, version, status')
-    .single();
-
-  if (stored.error) {
-    return NextResponse.json({ error: 'De bank kon niet worden bewaard.' }, { status: 500 });
-  }
-
-  await supabase
-    .from('bank_requests')
-    .update({
-      status: findings.length > 0 ? 'review' : 'ready',
-      finished_at: new Date().toISOString(),
-      flagged: findings,
-      bank_id: stored.data.id,
-      // Ook op de aanvraag, naast de winkel en de aangedragen sites: dan staat
-      // op één plek wat de merchant meegaf én wat er werkelijk onderzocht is.
-      panel: Array.isArray(payload.panel) ? payload.panel.slice(0, 20) : [],
-    })
-    .eq('id', payload.requestId);
 
   return NextResponse.json({
     stored: true,
-    bank: stored.data,
-    questions: read.bank.questions.length,
-    overlays: read.bank.overlays.length,
-    findings,
+    bank: result.bank,
+    questions: result.questions,
+    overlays: result.overlays,
+    findings: result.findings,
   });
 }

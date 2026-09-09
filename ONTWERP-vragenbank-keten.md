@@ -3,8 +3,9 @@
 Hoe een merchant die zijn catalogus aanlevert uiteindelijk een scan krijgt die op
 de vragen van zíjn markt meet, zonder dat hij ooit een vragenlijst uploadt.
 
-Status: ontwerp. Nog niets hiervan is gebouwd behalve waar dat expliciet staat.
-Geschreven op 8 september 2026.
+Status: grotendeels gebouwd. Geschreven op 8 september 2026; op 9 september
+bijgewerkt toen de generatie zelf in de app kwam te draaien — zie paragraaf 3a,
+die de keuze voor uitvoerder A en B vervangt.
 
 ---
 
@@ -17,9 +18,10 @@ Geschreven op 8 september 2026.
 | Vragenbank inlezen uit een CSV | **werkt**, tweetalig, nul fouten op twee banken |
 | Inloggen, registreren, wachtwoord vergeten | **werkt** tegen het echte Supabase-project |
 | Wachtscherm in plaats van uploadvraag | **werkt** |
-| Wachtrij: tabel en route | **geschreven, niet in gebruik** — migratie niet gedraaid, niets roept de route aan |
-| De generatie zelf | **handwerk** — een mens draait de methode |
-| Resultaat terug in de app | **bestaat niet** |
+| Wachtrij: tabel en route | **werkt** |
+| De generatie zelf | **gebouwd als pijplijn in de app** — zie paragraaf 3a |
+| Beheerscherm met vrijgeven | **werkt**, inclusief de indeling van de categorieën |
+| Resultaat terug bij de merchant | **bestaat niet** — niets client-side leest `question_banks` |
 | Mail naar de merchant | **bestaat niet** |
 
 ---
@@ -169,6 +171,55 @@ rekentijd, plus de modelaanroepen per markt.
 
 Beide uitvoerders praten met dezelfde twee endpoints en gebruiken dezelfde
 instructies. Overstappen van A naar B is een nieuwe aanroeper en geen verbouwing.
+
+## 3a. De uitvoerder is de app zelf geworden
+
+Paragraaf 2 hierboven ging ervan uit dat de generatie buiten de app gebeurt,
+omdat Cowork niet van buitenaf te starten is. Dat klopt nog steeds, maar de vraag
+bleek verkeerd gesteld: de methode in `kennis/_methode/` is **geen open
+onderzoeksopdracht maar een vaste reeks van acht stappen**. Zoiets hoef je niet
+aan een agent uit te besteden; dat kun je zelf draaien.
+
+Sinds 9 september doet de app dat. `POST /api/bank-run` zet **één fase** en stopt
+dan: panel, oogst per site, consolidatie, basislaag, overlay per categorie,
+facetanalyse, samenstellen. Een markt is daarmee twaalf tot vijftien beurten van
+elk een paar minuten. Een cron op Render belt elk kwartier aan.
+
+Waarom één fase per beurt en niet één lange aanroep:
+
+- **Hervatten.** Valt het om bij site vier, dan begint de volgende beurt bij site
+  vier. In de agentische opzet kostte elke storing het hele onderzoek opnieuw, en
+  dat was het open punt waar paragraaf 8 op eindigde.
+- **Kosten.** Per fase staat er wat hij aan tokens kostte, en het model per fase
+  is een tabel in `src/server/generator.ts`: lezen op Sonnet, wegen op Opus. De
+  bronoogst is het leeuwendeel van de tokens en het minste denkwerk.
+- **Pollen is gescheiden van werken.** Een lege wachtrij kost een HTTP-verzoek en
+  geen modelaanroep. Dat was de denkfout in de eerste opzet: elk kwartier een
+  cloud-sessie starten om te concluderen dat er niets te doen is.
+
+Wat er níét verandert: de poorten. Wat de pijplijn oplevert gaat door dezelfde
+`deliverBank` als een bank van een uitvoerder van buiten — dezelfde lezer,
+dezelfde degradatie van drempels zonder bron, dezelfde `review`-status. De app
+gelooft haar eigen pijplijn net zomin op haar woord, en dat is geen wantrouwen
+maar het verschil tussen een uitvoerder die je kunt aanspreken en een pijplijn die
+dezelfde fout bij elke markt opnieuw maakt.
+
+`GET /api/bank-queue` en `POST /api/bank-result` blijven bestaan. Een uitvoerder
+van buiten kan nog steeds een bank aanleveren, en dat is de terugval als de
+pijplijn op een markt vastloopt.
+
+### De indeling is wat je vaststelt
+
+De generatie stelt per categorie voor of hij een eigen vragenset verdient
+(`overlay`), dezelfde vragen met andere drempels krijgt (`profiel`), of eigenlijk
+een eigenschap is (`facet`). Dat is het enige echte oordeel in de hele keten: het
+bepaalt op welk niveau het rapport meet. Het staat daarom op het beheerscherm,
+boven de vragen — klopt het niveau niet, dan is beoordelen wélke vragen erin
+staan zinloos werk.
+
+Wijzigen kan niet ter plekke: een categorie alsnog tot overlay promoveren
+betekent vragen schrijven die er niet zijn. Klopt de indeling niet, dan is het
+antwoord niet vrijgeven en de generatie opnieuw draaien.
 
 ### Stap 5 — Het resultaat komt binnen
 

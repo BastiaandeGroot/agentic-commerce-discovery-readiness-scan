@@ -21,21 +21,36 @@ De scan is **volledig deterministisch**. Vragen worden beantwoord uit
 gestructureerde attributen, niet uit lopende tekst, en er komt geen model aan te
 pas. Dezelfde catalogus geeft altijd hetzelfde rapport en een scan kost niets.
 
-Er is precies één plek waar een model wél mag komen, en alle drie de voorwaarden
-moeten gelden: het **koppelscherm** (`components/MappingStep.tsx`, met
-`src/semantic/` en `app/api/mapping/`). Daar bepaalt een model welk kenmerk in
-welke kolom staat — Claude Haiku 4.5 via de enige serverroute die deze app heeft,
-en anders een embeddingmodel in de browser. Dat mag omdat (1) het model geen SKU raakt: er gaan kenmerknamen,
-vraagteksten en kolomnamen de deur uit, geen productrij en geen veldwaarde;
-(2) het één keer per catalogus gebeurt en niet per product, dus de kosten zijn
-verwaarloosbaar waar een model per SKU dat niet was; en (3) de uitkomst een tabel
-is die de merchant ziet en bevestigt, geen oordeel. Daarna draait de scan er
-deterministisch op. **Zet nooit een model in de scan zelf** — zie de afgevallen
-richtingen in `NOTES.md`.
+Er zijn **twee plekken waar een model wél mag komen**, en op allebei gelden
+dezelfde drie voorwaarden: het model raakt geen SKU, het draait één keer per
+catalogus of per markt en niet per product, en de uitkomst is een tabel die een
+mens ziet en bevestigt — geen oordeel dat stilzwijgend doorwerkt.
+
+1. Het **koppelscherm** (`components/MappingStep.tsx`, met `src/semantic/` en
+   `app/api/mapping/`). Daar bepaalt een model welk kenmerk in welke kolom staat:
+   Claude Haiku 4.5 via de serverroute, en anders een embeddingmodel in de
+   browser. Er gaan kenmerknamen, vraagteksten en kolomnamen de deur uit, geen
+   productrij en geen veldwaarde.
+2. De **generatie van een vragenbank** (`src/generation/`, met
+   `src/server/generator.ts` en `app/api/bank-run/`). Daar bouwt een model de
+   vragenlijst voor een markt volgens de methode in `kennis/_methode/`. Er gaan
+   categorienamen met aantallen en een URL de deur uit — geen kolomnamen, geen
+   productrijen, geen prijzen. Het gebeurt één keer per markt en niet per
+   merchant, en wat eruit komt gaat door dezelfde poorten als een bank van
+   buiten: de app gelooft haar eigen pijplijn net zomin op haar woord.
+
+Daarna draait de scan er deterministisch op. **Zet nooit een model in de scan
+zelf** — zie de afgevallen richtingen in `NOTES.md`.
+
+De generatie is geen agent maar een **vaste reeks stappen**, en dat is een
+beslissing en geen implementatiedetail. De methode is al een reeks; hem als reeks
+uitvoeren geeft hervatten na een storing, een bekende prijs per stap, en een bank
+die raar uitvalt is terug te voeren op één stap. Eén beurt zet één fase. Zie
+`ONTWERP-vragenbank-keten.md`.
 
 De analyse draait **client-side**: de catalogus wordt in de browser gelezen,
 gescand en beoordeeld, en het bestand verlaat het apparaat nooit. `/api/mapping`
-is de enige uitzondering en de enige serverroute — die stuurt kenmerknamen,
+is de enige uitzondering waar productdata langskomt — die stuurt kenmerknamen,
 kolomnamen en een handvol voorbeeldwaarden per kolom. Dat ís productdata, dus het
 scherm zegt het, en er gaat nooit een productrij, een prijs of een aantal mee.
 Zonder `ANTHROPIC_API_KEY` geeft de route 503 en valt het scherm terug op het
@@ -48,8 +63,9 @@ browsermodel, met dat verschil in beeld.
 | `src/intake/` | formaatdetectie en kolomherkenning |
 | `src/spec/` | veldenregister, plus de woordenlijst en de matcher die bankattributen op catalogus­kolommen leggen |
 | `src/semantic/` | de modellen die koppelingen vóórstellen; nooit importeren vanuit de motor |
-| `app/api/` | de serverroutes: `/api/mapping`, `/api/site`, `/api/bank-request`, `/api/bank-queue`, `/api/bank-result` en `/api/admin/queue` |
-| `src/server/` | wat alleen serverzijdig mag draaien: de uitvoerderssleutel en de servicecliënt. Nooit importeren vanuit een component. |
+| `src/generation/` | de vragenbankgeneratie als vaste reeks fasen; puur, het modelantwoord komt binnen als argument |
+| `app/api/` | de serverroutes: `/api/mapping`, `/api/site`, `/api/bank-request`, `/api/bank-queue`, `/api/bank-run`, `/api/bank-result` en `/api/admin/queue` |
+| `src/server/` | wat alleen serverzijdig mag draaien: de uitvoerderssleutel, de servicecliënt, de modelaanroep van de generatie en het aannemen van een bank. Nooit importeren vanuit een component. |
 | `src/questions/` | vragenbanken, composer, generator, import (tabel én YAML) en aanvraag |
 | `src/engine/` | categoriekeuze, evaluatie, rapportaggregatie, vergelijken |
 | `src/i18n/` | alle teksten, NL en EN naast elkaar |

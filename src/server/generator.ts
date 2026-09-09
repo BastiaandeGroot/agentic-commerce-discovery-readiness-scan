@@ -1,0 +1,143 @@
+// De uitvoerder van één fase: hier praat de generatie werkelijk met een model.
+//
+// Alles wat de uitkomst bepaalt staat in `src/generation/` en is puur. Dit
+// bestand doet er drie dingen bij die geen van alle over de inhoud gaan: het
+// kiest het model, het zet de webgereedschappen aan, en het haalt het JSON-object
+// uit het antwoord. Zo blijft de reeks na te spelen zonder netwerk.
+//
+// Alleen serverzijdig. Nooit importeren vanuit een component.
+
+import Anthropic from '@anthropic-ai/sdk';
+import type { Ask, AskReply, AskTask } from '../generation/pipeline';
+import { extractJson } from '../generation/json';
+
+/**
+ * Twee modellen, en dat is de grootste kostenknop die deze pijplijn heeft.
+ *
+ * `reader` leest panelsites: FAQ's uitlezen, specificatietabellen overnemen,
+ * beslisregels letterlijk overschrijven. Dat is leeswerk, en het is verreweg het
+ * grootste deel van de tokens — vijf sites tegen één basislaag.
+ *
+ * `judge` weegt en schrijft: de basislaag, de overlays, de groepering. Daar hangt
+ * de kwaliteit van de hele bank aan, en daar staat het zware model. Dit is de
+ * enige plek waar die keuze valt; wil je hem anders, dan is dit de tabel.
+ */
+const MODELS: Record<'reader' | 'judge', string> = {
+  reader: 'claude-sonnet-5',
+  judge: 'claude-opus-5',
+};
+
+/**
+ * Hoe diep het model per soort werk mag nadenken.
+ *
+ * Lezen is geen denkwerk: daar kost hoge effort tokens zonder dat het antwoord
+ * beter wordt. Wegen is dat wél, en daar is bezuinigen op effort de duurste
+ * besparing die je kunt doen — die betaal je terug in een bank die een mens moet
+ * herstellen.
+ */
+const EFFORT: Record<'reader' | 'judge', 'low' | 'high'> = {
+  reader: 'low',
+  judge: 'high',
+};
+
+/** Hoe vaak een fase mag doorlopen als het model tussendoor pauzeert. */
+const MAX_CONTINUATIONS = 8;
+
+/** De gereedschappen waarmee een fase het web op mag. */
+function webTools(): Anthropic.Messages.ToolUnion[] {
+  return [
+    // Zoeken om de panelsites te vinden, ophalen om ze te lezen. Web fetch haalt
+    // alleen URL's op die al in het gesprek staan, en dat is precies goed: de
+    // panelsites staan in de prompt en er komt niets bij dat wij niet kozen.
+    { type: 'web_search_20260209', name: 'web_search', max_uses: 12 } as unknown as Anthropic.Messages.ToolUnion,
+    { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 20 } as unknown as Anthropic.Messages.ToolUnion,
+  ];
+}
+
+function usageOf(usage: Anthropic.Messages.Usage | undefined) {
+  return {
+    input: usage?.input_tokens ?? 0,
+    output: usage?.output_tokens ?? 0,
+    cached: usage?.cache_read_input_tokens ?? 0,
+  };
+}
+
+// Het uitpakken van het antwoord staat in `src/generation/json.ts` en is puur;
+// hier alleen doorgegeven, zodat er één plek is waar dat gebeurt.
+export { extractJson };
+
+/**
+ * Eén fase uitvoeren.
+ *
+ * Het systeemdeel draagt een cachemarkering en is voor élke fase gelijk. Een
+ * generatie doet twaalf tot vijftien aanroepen op diezelfde regels; zonder die
+ * markering betaal je ze vijftien keer vol.
+ */
+export function makeAsk(): Ask {
+  const workspace = process.env.ANTHROPIC_WORKSPACE_ID;
+  const client = new Anthropic(
+    workspace ? { defaultHeaders: { 'anthropic-workspace-id': workspace } } : {},
+  );
+
+  return async function ask(task: AskTask): Promise<AskReply> {
+    const messages: Anthropic.Messages.MessageParam[] = [{ role: 'user', content: task.prompt }];
+    let usage = { input: 0, output: 0, cached: 0 };
+    let text = '';
+
+    for (let round = 0; round < MAX_CONTINUATIONS; round++) {
+      const stream = client.messages.stream({
+        model: MODELS[task.model],
+        max_tokens: task.maxTokens,
+        system: [{ type: 'text', text: task.system, cache_control: { type: 'ephemeral' } }],
+        thinking: { type: 'adaptive' },
+        output_config: { effort: EFFORT[task.model] },
+        ...(task.web ? { tools: webTools() } : {}),
+        messages,
+      });
+
+      const response = await stream.finalMessage();
+      const round_usage = usageOf(response.usage);
+      usage = {
+        input: usage.input + round_usage.input,
+        output: usage.output + round_usage.output,
+        cached: usage.cached + round_usage.cached,
+      };
+
+      text = response.content
+        .filter((block): block is Anthropic.Messages.TextBlock => block.type === 'text')
+        .map((block) => block.text)
+        .join('\n');
+
+      // Een fase die vijf sites afloopt komt terug met `pause_turn`: het model is
+      // nog niet klaar maar de beurt is op. Doorgaan is dan geen herkansing maar
+      // hetzelfde werk voortzetten, dus de tokens tellen door en de inhoud gaat
+      // ongewijzigd terug.
+      if (response.stop_reason !== 'pause_turn') {
+        if (response.stop_reason === 'refusal') {
+          throw new Error(`Het model weigerde deze stap (${response.stop_details?.category ?? 'zonder reden'}).`);
+        }
+        if (response.stop_reason === 'max_tokens') {
+          throw new Error('Het antwoord liep tegen de tokenlimiet aan en is daarmee afgekapt.');
+        }
+        return { json: extractJson(text), usage };
+      }
+
+      messages.push({ role: 'assistant', content: response.content });
+    }
+
+    // Op is op. Verder laten lopen zou een fase zijn die zichzelf niet afmaakt
+    // en wel doorbetaalt; dan is drie keer stuk en een mens ernaar laten kijken
+    // het goedkopere einde.
+    throw new Error(`De stap ${task.phase} was na ${MAX_CONTINUATIONS} beurten nog niet klaar.`);
+  };
+}
+
+/** Wat een stap ongeveer kostte, in dollarcenten. Voor het beheerscherm. */
+export function estimateCents(model: 'reader' | 'judge', usage: { input: number; output: number; cached: number }): number {
+  // Prijzen per miljoen tokens, uit de tarieventabel van de API. Ze staan hier
+  // als schatting voor het scherm en nergens als afrekening: de rekening komt
+  // van Anthropic en niet van dit bestand.
+  const price = model === 'judge' ? { input: 5, output: 25 } : { input: 2, output: 10 };
+  const dollars = (usage.input * price.input + usage.output * price.output) / 1_000_000;
+  return Math.round(dollars * 100);
+}

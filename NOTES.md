@@ -373,18 +373,56 @@ Niet opnieuw voorstellen zonder dat er iets veranderd is.
 | Website scrapen voor categorieën | Onnodig — de catalogusexport heeft de echte boom. Zou bovendien een serverroute vereisen; de analyse draait nu volledig client-side. |
 | De kanaalfeed als analysebron | Een feed is een afgeleide van de catalogus: dunner, en met een afgevlakte categorieboom. Op de echte data verdween er een hoofdcategorie in en werd "Outdoorstoffen > Gestreept" tot los "Gestreept". Los je het in de catalogus op, dan is elk kanaal daarna een instelling. |
 | Titel gebruiken om andere vragen te beantwoorden | Titel is retrieval, geen filtering. En de grens naar "dan de omschrijving ook" is niet te verdedigen. |
+| De generatie als agent, in een cloud-routine of in Cowork | Een agent die elk kwartier wakker wordt om te concluderen dat de wachtrij leeg is, kost ~96 sessies per dag aan niets. En een agentische generatie kan niet hervatten: valt hij om bij site vier, dan begint hij bij nul. De methode ís een vaste reeks, dus hem als reeks draaien geeft hervatten, een prijs per stap en een model per fase. Pollen hoort goedkoop te zijn en werken duur; die twee in één ding stoppen was de fout. |
+| Een eigen agentlus op Render die de bank zelf schrijft | Dat is dezelfde pijplijn plus onderhoud: een gereedschapslus, herhalingen, en hetzelfde hervattingsprobleem opnieuw oplossen. De fasenreeks doet het met minder code en met de tussenstand in de database. |
 
 ---
 
 ## Open
 
 **Echte vragenbanken** — de grootste. Alles eromheen staat: het model, de
-composer, de import met validatie, de aanvraag, en de schermen. Wat ontbreekt
-zijn de banken zelf, en die zijn handwerk per vertical: panel samenstellen,
-bronoogst, consolidatie, domeinreview, bevriezen. Reken op één tot twee dagen per
-vertical. De vijf meegeleverde banken zijn `provisional` en dragen bewust geen
+composer, de import met validatie, de aanvraag, en de schermen. Sinds 9 september
+staat de generatie er ook: `src/generation/` draait de methode als vaste reeks
+fasen, aangestuurd door `/api/bank-run`. Wat ontbreekt is de eerste echte markt
+erdoorheen, en de domeinreview blijft mensenwerk. De vijf meegeleverde banken zijn `provisional` en dragen bewust geen
 drempels; ze houden de zelfbedieningsscan overeind en meer niet. Eerste kandidaat
 is woontextiel, want daar ligt de merchant en is de onomkeerbare fout scherp.
+
+**De generatie is nog nooit op een echte markt gedraaid** — 9 september. De reeks
+loopt in de tests van panel tot tabel, en die tabel gaat door dezelfde lezer als
+de vragenlijst van een merchant. Wat de tests niet kunnen zeggen is of het model
+bruikbare vragen oplevert; dat blijkt pas bij woontextiel. Wat er dan te
+verwachten valt: de bronoogst is de fase die het vaakst zal stranden, want die
+hangt aan sites die traag zijn, blokkeren of hun FAQ ergens anders hebben staan.
+Drie keer dezelfde fase stuk zet de aanvraag op `blocked` en dan hoort er een
+mens naar te kijken.
+
+**Wat er vóór de eerste echte markt nog moet gebeuren**, in deze volgorde:
+
+1. Migratie `0007_bank_runs.sql` draaien. Zonder die tabel doet `/api/bank-run`
+   niets en zegt hij dat niet luid genoeg.
+2. `BANK_EXECUTOR_KEY` en `ANTHROPIC_API_KEY` in het Render-dashboard nakijken.
+   Een ontbrekende uitvoerderssleutel en een verkeerde geven allebei 401, dus de
+   route kan het verschil niet zeggen.
+3. De cron aanzetten. Let op: **cron jobs zitten niet in het gratis plan van
+   Render.** Wil je er niet voor betalen, dan doet een geplande GitHub Action
+   hetzelfde — één `curl` met dezelfde twee variabelen als repository-secrets.
+   Die zijn wel onbetrouwbaarder in hun timing en worden uitgezet als de repo
+   zestig dagen stilligt.
+
+**Kosten per markt zijn nog een schatting.** De knoppen zitten er wel: het model
+per fase staat als tabel in `src/server/generator.ts` (lezen op Sonnet, wegen op
+Opus), het systeemdeel is voor elke fase gelijk en draagt een cachemarkering, en
+per run staan de tokens in `bank_runs`. Na de eerste markt is er een echt getal en
+kan `reader` op Haiku worden geprobeerd — dat is de grootste besparing die er nog
+ligt, want de oogst is het leeuwendeel van de tokens. Wat daarbij eerst
+uitgezocht moet worden: of Haiku 4.5 het ophaalgereedschap ondersteunt dat de
+oogst nodig heeft.
+
+**De vrijgegeven bank komt nog niet terug bij de merchant.** Niets client-side
+leest `question_banks`; hij leest zijn lijst vandaag nog zelf in. De mail bestaat
+evenmin — `notified_at` staat er wel. Dit zijn de twee laatste gaten in de keten,
+en ze zitten allebei aan de kant van de merchant en niet aan die van de generatie.
 
 **De scan weegt niet per toepassingsprofiel** — 9 september. De app stuurt elke
 categorie die de merchant bevestigde mee in de aanvraag, en dat zijn er bij De
