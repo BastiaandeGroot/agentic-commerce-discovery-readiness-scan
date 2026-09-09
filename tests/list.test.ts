@@ -623,3 +623,16 @@ test('dekking draagt zijn panelsites mee', () => {
   assert.deepEqual(result.errors, []);
   assert.deepEqual(result.bank?.questions[0]?.coverageSites, ['intratuin', 'hartman', 'tuinmeubelshop']);
 });
+
+test('een lijst met maar één taal meldt dat', () => {
+  // Geen fout: dezelfde tekst in beide talen is beter dan een lege regel. Wel
+  // iets om te zeggen, want wie een Nederlands rapport opent en Engelse vragen
+  // ziet denkt dat er iets stuk is. De reparatie hoort bij de bron.
+  const csv = [
+    'id;laag;vraag;belang;benodigde_attributen',
+    'BAS-01;base;How wide is this fabric?;kritiek;rolbreedte_cm',
+  ].join('\n');
+  const result = importQuestionList([{ name: 'een-taal.csv', text: csv }]);
+  assert.deepEqual(result.errors, []);
+  assert.ok(result.warnings.some((w) => w.includes('maar één taal')));
+});

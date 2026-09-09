@@ -400,6 +400,20 @@ export function importQuestionCsv(files: BankFile[]): ImportResult {
     groups.set(key, group);
   }
 
+  // Draagt de lijst maar één taal, dan staat straks in beide rapporten dezelfde
+  // tekst. Dat is geen fout — beter zichtbaar dezelfde woorden dan een lege regel
+  // — maar het hoort wel gezegd te worden, want een merchant die een Nederlands
+  // rapport opent en Engelse vragen ziet denkt dat er iets stuk is. De reparatie
+  // hoort bij de bron: één rij per vraag met twee kolommen, niet een vertaling
+  // achteraf die per keer anders uitvalt.
+  if (columns.questionNl === undefined || columns.questionEn === undefined) {
+    warnings.push(
+      'Deze lijst draagt maar één taal. In beide talen staat dan dezelfde tekst, '
+      + 'dus een Nederlands rapport toont Engelse vragen of andersom. Zet er een kolom '
+      + '`vraag_nl` én `vraag_en` bij om dat op te lossen.',
+    );
+  }
+
   if (missingId > 0) {
     warnings.push(`${missingId} regel${missingId === 1 ? '' : 's'} zonder id of zonder vraagtekst ${missingId === 1 ? 'is' : 'zijn'} overgeslagen.`);
   }
