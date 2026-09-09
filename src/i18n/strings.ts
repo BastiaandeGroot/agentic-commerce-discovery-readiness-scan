@@ -654,11 +654,11 @@ export const STRINGS = {
       tableHeading: 'Categorie\u00ebn en kenmerken definitief vaststellen',
       whyHeading: 'Waarom we dit vragen',
       whyBody1:
-        'Een AI-agent die namens een koper zoekt, filtert. Hij zoekt bijvoorbeeld een meubelstof die effen is en vlekwerend — en gaat ervan uit dat "effen" en "vlekwerend" eigenschappen zijn waarop hij kán filteren.',
+        'Een afdeling is een plek waar je producten neerzet. Een eigenschap is iets wat van een product waar is, en dat hoort bij élk product te staan — zoals de kleur of de breedte.',
       whyBody2:
         'Staat zo\u2019n eigenschap bij jou als categorie in de boom, dan legt je data hem nergens als kenmerk vast. De agent kan er dus niet op filteren, en jouw stof valt buiten zijn selectie terwijl hij precies is wat de koper zocht.',
       whyBody3:
-        'Daarom scheiden we ze hier. De categorieën bepalen wélke vragen we straks aan je data stellen. De kenmerken zijn de filters die je koper wil gebruiken — en elk kenmerk in deze lijst is er een die je nu nog mist.',
+        'Zet je een eigenschap alleen als afdeling neer, dan weet je het alleen van de producten die je daarin legde — van de rest weet niemand het. Een klant die daarop zoekt vindt die andere producten dus niet.',
       sortName: 'Naam',
       sortCount: 'Producten',
       filterAll: 'Alles',
@@ -1405,11 +1405,11 @@ export const STRINGS = {
       tableHeading: 'Settling categories and characteristics',
       whyHeading: 'Why we ask this',
       whyBody1:
-        'An AI agent searching on a buyer\u2019s behalf filters. It looks for, say, an upholstery fabric that is plain and stain resistant — and assumes that "plain" and "stain resistant" are characteristics it can filter on.',
+        'A department is a place where you put products. A characteristic is something that is true of a product, and it belongs on every single product — like the colour or the width.',
       whyBody2:
         'If such a characteristic sits in your tree as a category, your data records it nowhere as a characteristic. So the agent cannot filter on it, and your fabric falls outside its selection while being exactly what the buyer wanted.',
       whyBody3:
-        'That is why we separate them here. The categories decide which questions we will put to your data. The characteristics are the filters your buyer wants to use — and every characteristic in this list is one you are still missing.',
+        'Put a characteristic down as a department only, and you know it just for the products you placed there — for the rest, nobody knows. A customer looking for it will not find those other products.',
       sortName: 'Name',
       sortCount: 'Products',
       filterAll: 'All',
