@@ -358,8 +358,9 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
   return (
     <div className="flex flex-col gap-4">
       {/* 1. Het adres. Eén handeling; wat erna gebeurt is onze zaak. */}
+      {/* Alleen het adres. Uitleg hoort bij wat er ú komt, en dat is er nog
+          niet: het oordeel en de tabel verderop dragen hun eigen kop. */}
       <Card>
-        <CardTitle sub={s.segments.intro}>{s.segments.heading}</CardTitle>
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-64 flex-1">
             <Input
