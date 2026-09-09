@@ -226,6 +226,18 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onSite, 
   );
   const debt = facetDebt(rows);
 
+  // Het adres doorgeven zodra het er als adres uitziet, en niet pas na een
+  // geslaagde lezing. Wie zijn keuzes al bewaard heeft klikt die knop niet meer,
+  // en dan reisde zijn winkel niet mee naar de aanvraag — precies wat er in de
+  // eerste echte aanvraag misging.
+  useEffect(() => {
+    const value = site.trim();
+    if (/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(value) || /^[a-z0-9-]+\.[a-z.]{2,}$/i.test(value)) {
+      onSite(value);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [site]);
+
   /**
    * De twee namen die in de uitleg belanden.
    *
@@ -283,9 +295,6 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onSite, 
       });
       if (!response.ok) throw new Error('mislukt');
       const result = await response.json();
-      // Wat hij invulde en wat werkte: pas ná een geslaagde lezing weten we dat
-      // dit adres klopt, en dan is het de moeite waard om mee te dragen.
-      onSite(site.trim());
       const evidence = { navigation: result.navigation ?? [], filters: result.filters ?? [] };
       setState({
         kind: 'done',
