@@ -28,12 +28,19 @@ test('het ergste staat bovenaan', () => {
   assert.ok(rows[0].severity > rows[1].severity);
 });
 
-test('een dekking zonder onderzoek wordt gemeld', () => {
+test('dekking is een getal per vraag, geen bezwaar', () => {
+  // Eerder stond "dekking niet onderzocht" bij élke vraag. Een bevinding die
+  // overal staat helpt nergens kiezen. Het getal zelf zegt wél iets: op hoeveel
+  // sites dit onderwerp voorkwam.
   const rows = lees([
-    'id;laag;vraag_nl;vraag_en;belang;benodigde_attributen',
-    'A-01;base;Hoe breed is dit?;How wide is this?;hoog;breedte',
+    'id;laag;vraag_nl;vraag_en;belang;benodigde_attributen;dekking;dekking_bronnen',
+    'A-01;base;Hoe breed is dit?;How wide is this?;hoog;breedte;6;a, b, c, d, e, f',
+    'A-02;base;En dit?;And this?;hoog;kleur',
   ].join('\n'));
-  assert.ok(rows[0].issues.includes('coverage-unknown'));
+  const find = (id: string) => rows.find((r) => r.id === id)!;
+  assert.equal(find('A-01').coverage, 6);
+  assert.equal(find('A-02').coverage, null);
+  assert.ok(rows.every((r) => !r.issues.some((i) => String(i).startsWith('coverage'))));
 });
 
 test('elke vraag komt mee, ook de goede', () => {
@@ -45,4 +52,21 @@ test('elke vraag komt mee, ook de goede', () => {
     'A-02;base;Tweede;Second;laag;kleur;3;a, b, c',
   ].join('\n'));
   assert.equal(rows.length, 2);
+});
+
+test('een procesvraag en een structuurvraag zijn niet hetzelfde', () => {
+  // Beide vallen buiten de score, maar om verschillende redenen. Een procesvraag
+  // kan geen enkel veld ooit beantwoorden. Een structuurvraag wél — hij vraagt
+  // alleen een verband dat de catalogus niet legt, en dát verband leggen is werk
+  // met waarde. Ze onder één label zetten leest als "negeer allebei".
+  const rows = lees([
+    'id;laag;vraag_nl;vraag_en;belang;benodigde_attributen;antwoordtype;beantwoordbaar_uit_attributen',
+    'A-01;base;Kan ik een staal krijgen?;Can I get a swatch?;hoog;staal;proces;nee',
+    'A-02;base;Welke kleuren nog meer?;Which other colours?;hoog;kwaliteit_id;relatie;nee',
+  ].join('\n'));
+  const find = (id: string) => rows.find((r) => r.id === id)!;
+  assert.ok(find('A-01').issues.includes('process-question'));
+  assert.ok(find('A-02').issues.includes('structure-question'));
+  // En de structuurvraag weegt zwaarder, want daar valt iets aan te doen.
+  assert.ok(find('A-02').severity > find('A-01').severity);
 });

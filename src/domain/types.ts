@@ -148,6 +148,14 @@ export interface Question {
   intent?: Intent;
   /** Op hoeveel panelsites dit onderwerp voorkomt; null = niet onderzocht. */
   coverage?: number | null;
+  /**
+   * Draagt de beslisregel achter deze vraag een gepubliceerde bron?
+   *
+   * `false` betekent: er is een drempel maar niemand kan hem narekenen. Dat is
+   * iets om de merchant te laten zien, niet om stil te houden — hij meet er
+   * anders op zonder te weten waar het getal vandaan komt.
+   */
+  ruleSourced?: boolean;
   /** Uit attributen te beantwoorden? 'no' betekent: buiten de score, wel advies. */
   answerable?: Answerability;
   /**

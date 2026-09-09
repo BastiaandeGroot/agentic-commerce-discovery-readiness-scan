@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server';
 import { isAdmin } from '../../../../src/server/admin';
 import { isRefusal, serviceClient } from '../../../../src/server/executor';
 import { importQuestionList } from '../../../../src/questions/list';
-import { reviewBank } from '../../../../src/questions/review';
+import { reviewBank, summariseBank } from '../../../../src/questions/review';
 
 /** Na hoeveel uur een openstaande aanvraag te lang duurt. Eén werkdag. */
 const OVERDUE_HOURS = 24;
@@ -50,7 +50,11 @@ export async function GET(request: Request) {
       const read = importQuestionList([{ name: `${bank.vertical}.csv`, text: String(bank.csv ?? '') }]);
       const { csv, ...rest } = bank;
       void csv;
-      return { ...rest, questions: read.bank ? reviewBank(read.bank) : [] };
+      return {
+        ...rest,
+        questions: read.bank ? reviewBank(read.bank) : [],
+        summary: read.bank ? summariseBank(read.bank) : undefined,
+      };
     }),
   });
 }

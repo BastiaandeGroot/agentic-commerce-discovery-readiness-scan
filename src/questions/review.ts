@@ -24,20 +24,21 @@ export type QuestionIssue =
   | 'no-attributes'
   | 'rule-without-source'
   | 'rule-not-computed'
-  | 'attributes-unmapped'
-  | 'coverage-unknown'
   | 'critical-without-basis'
-  | 'not-scored';
+  | 'structure-question'
+  | 'process-question';
 
 /** Hoe zwaar een bevinding weegt bij het sorteren. Hoger is eerder in beeld. */
 const WEIGHT: Record<QuestionIssue, number> = {
   'no-attributes': 50,
   'rule-without-source': 40,
   'critical-without-basis': 30,
-  'attributes-unmapped': 20,
   'rule-not-computed': 10,
-  'coverage-unknown': 5,
-  'not-scored': 1,
+  // Een structuurvraag is werk met waarde: het verband léggen is precies wat
+  // deze scan hoort aan te wijzen. Een procesvraag is dat niet — daar kan geen
+  // enkel veld ooit antwoord op geven — en die weegt daarom het lichtst.
+  'structure-question': 15,
+  'process-question': 1,
 };
 
 export interface ReviewedQuestion {
@@ -49,6 +50,8 @@ export interface ReviewedQuestion {
   importance: string;
   /** De kenmerken die de vraag nodig heeft, met of ze op een veld uitkomen. */
   attributes: { key: string; mapped: boolean }[];
+  /** Op hoeveel panelsites dit onderwerp voorkomt; null = niet onderzocht. */
+  coverage: number | null;
   issues: QuestionIssue[];
   /** Optelsom van de gewichten; bepaalt de volgorde. */
   severity: number;
@@ -64,6 +67,39 @@ const isGuess = (field: string) => field.startsWith('attr:') && !field.startsWit
  * probleemgevallen ziet, weet niet wat hij vrijgeeft — en vrijgeven gaat over de
  * bank als geheel.
  */
+/**
+ * Wat er over de bank als geheel te zeggen valt.
+ *
+ * Twee dingen stonden eerder bij élke vraag: "dekking niet onderzocht" en
+ * "kenmerken komen op geen kolom uit". Een bevinding die overal staat helpt
+ * nergens kiezen — hij maakt de lijst alleen onleesbaar. En de tweede gaat niet
+ * eens over de bank maar over een stap die daarna komt: kolomnamen horen bij één
+ * winkel, een bank bij een markt.
+ */
+export interface BankSummary {
+  questions: number;
+  /** Hoeveel vragen een onderzochte dekking dragen. */
+  withCoverage: number;
+  /** Het panel waarop de dekking rust, voor zover de vragen dat noemen. */
+  panelSize: number;
+  attributes: number;
+  attributesMapped: number;
+}
+
+export function summariseBank(bank: QuestionBank): BankSummary {
+  const questions = [...bank.questions, ...bank.overlays.flatMap((o) => o.questions ?? [])];
+  const attributes = [...bank.attributes, ...bank.overlays.flatMap((o) => o.attributes ?? [])];
+  const sites = new Set<string>();
+  for (const question of questions) for (const site of question.coverageSites ?? []) sites.add(site);
+  return {
+    questions: questions.length,
+    withCoverage: questions.filter((q) => q.coverage !== null && q.coverage !== undefined).length,
+    panelSize: sites.size,
+    attributes: attributes.length,
+    attributesMapped: attributes.filter((a) => (a.evidence ?? []).some((f) => !isGuess(f))).length,
+  };
+}
+
 export function reviewBank(bank: QuestionBank): ReviewedQuestion[] {
   const rules = ruleIndex(bank);
   const out: ReviewedQuestion[] = [];
@@ -84,7 +120,6 @@ export function reviewBank(bank: QuestionBank): ReviewedQuestion[] {
       });
 
       if (used.length === 0) issues.push('no-attributes');
-      if (used.length > 0 && used.every((one) => !one.mapped)) issues.push('attributes-unmapped');
 
       if (question.ruleId) {
         const rule = rules.get(question.ruleId);
@@ -92,10 +127,6 @@ export function reviewBank(bank: QuestionBank): ReviewedQuestion[] {
         // ergste wat een bank kan dragen: hij ziet eruit als een feit.
         if (!rule || rule.source.kind !== 'published') issues.push('rule-without-source');
         else issues.push('rule-not-computed');
-      }
-
-      if (question.coverage === null || question.coverage === undefined) {
-        issues.push('coverage-unknown');
       }
 
       // Kritiek hoort te volgen uit de onomkeerbare fout. Staat die nergens en
@@ -106,7 +137,15 @@ export function reviewBank(bank: QuestionBank): ReviewedQuestion[] {
         issues.push('critical-without-basis');
       }
 
-      if (question.answerable === 'no') issues.push('not-scored');
+      // Twee heel verschillende dingen onder één noemer, en dat verschil is
+      // het punt. Een procesvraag ("kan ik een staal krijgen") kan geen enkel
+      // veld ooit beantwoorden; elke merchant zakt daar identiek op en dus meet
+      // hij niets. Een structuurvraag ("welke kleuren bestaan er nog meer in
+      // deze kwaliteit") is wél uit data te beantwoorden — alleen vraagt hij een
+      // verband dat de catalogus niet legt, en dát is een aanbeveling.
+      if (question.answerable === 'no') {
+        issues.push(question.answerType === 'process' ? 'process-question' : 'structure-question');
+      }
 
       out.push({
         id: question.id,
@@ -115,6 +154,7 @@ export function reviewBank(bank: QuestionBank): ReviewedQuestion[] {
         layer,
         importance: question.importance,
         attributes: used,
+        coverage: question.coverage ?? null,
         issues,
         severity: issues.reduce((total, issue) => total + WEIGHT[issue], 0),
       });

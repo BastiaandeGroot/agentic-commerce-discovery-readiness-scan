@@ -11,8 +11,8 @@
 // geven altijd dezelfde set.
 
 import type { Question, QuestionSet, RequirementGroup } from '../domain/types';
-import type { AttributeDef, BankQuestion, Overlay, QuestionBank } from './bank';
-import { attributeIndex, IMPORTANCE_WEIGHT } from './bank';
+import type { AttributeDef, BankQuestion, DecisionRule, Overlay, QuestionBank } from './bank';
+import { attributeIndex, ruleIndex, IMPORTANCE_WEIGHT } from './bank';
 
 /**
  * Het gewicht van een zelf toegevoegde vraag.
@@ -60,6 +60,13 @@ export function toQuestion(
   question: BankQuestion,
   attributes: Map<string, AttributeDef>,
   importance = question.importance,
+  /**
+   * De beslisregels van deze bank, zodat de vraag weet of zijn drempel een bron
+   * draagt. Optioneel: een aanroeper die ze niet heeft levert een vraag zonder
+   * die wetenschap, en dan zegt het scherm er niets over in plaats van iets
+   * verkeerds.
+   */
+  rules?: Map<string, DecisionRule>,
 ): Question {
   const evidence = question.evidence.map((key) => {
     const attribute = attributes.get(key);
@@ -81,6 +88,7 @@ export function toQuestion(
     coverage: question.coverage,
     answerable: question.answerable,
     ruleId: question.ruleId,
+    ruleSourced: question.ruleId ? rules?.get(question.ruleId)?.source.kind === 'published' : undefined,
     weightNote: question.weightNote,
     caution: question.caution,
   };
@@ -106,13 +114,14 @@ export function weightOf(question: Question): number {
  */
 export function composeQuestions(bank: QuestionBank, overlay?: Overlay): Question[] {
   const attributes = attributeIndex(bank, overlay);
+  const rules = ruleIndex(bank, overlay);
   const suppressed = new Set(overlay?.suppress ?? []);
 
   const base = bank.questions
     .filter((question) => !suppressed.has(question.id))
     .map((question) => {
       const reweight = overlay?.reweight?.[question.id];
-      const composed = toQuestion(question, attributes, reweight?.importance ?? question.importance);
+      const composed = toQuestion(question, attributes, reweight?.importance ?? question.importance, rules);
       // De verantwoording van de herweging hoort bij de vraag, niet in een
       // losse tabel: wie zich afvraagt waarom deze vraag hier zwaarder weegt,
       // kijkt naar de vraag.
@@ -121,7 +130,7 @@ export function composeQuestions(bank: QuestionBank, overlay?: Overlay): Questio
     });
 
   const extra = (overlay?.questions ?? [])
-    .map((question) => ({ ...toQuestion(question, attributes), layer: 'category' as const }));
+    .map((question) => ({ ...toQuestion(question, attributes, question.importance, rules), layer: 'category' as const }));
   return [...base, ...extra];
 }
 

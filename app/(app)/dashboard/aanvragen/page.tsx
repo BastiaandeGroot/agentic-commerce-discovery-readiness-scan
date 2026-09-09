@@ -29,13 +29,20 @@ interface ReviewedQuestion {
   id: string; label: { nl: string; en: string }; category?: string;
   layer: 'base' | 'overlay'; importance: string;
   attributes: { key: string; mapped: boolean }[];
+  coverage: number | null;
   issues: string[]; severity: number;
+}
+
+interface BankSummary {
+  questions: number; withCoverage: number; panelSize: number;
+  attributes: number; attributesMapped: number;
 }
 
 interface BankRow {
   id: string; vertical: string; version: number; status: string;
   findings: string[]; panel: { name?: string; url?: string; type?: string; consultedAt?: string }[];
   questions: ReviewedQuestion[];
+  summary?: BankSummary;
 }
 
 type State =
@@ -194,7 +201,39 @@ export default function Page() {
                   )}
                 </div>
 
-                <p className="mt-2 text-sm leading-relaxed text-muted">{s.admin.issuesLegend}</p>
+                {/* Wat over de hele bank geldt, één keer. Stond dit bij elke
+                    vraag, dan was het 129 keer hetzelfde en hielp het nergens
+                    kiezen. */}
+                {bank.summary ? (
+                  <div className="mt-3 rounded-lg bg-surface-2 p-3">
+                    <p className="text-sm font-medium">{s.admin.summary}</p>
+                    <ul className="mt-1.5 flex flex-col gap-1 text-sm text-muted">
+                      <li>
+                        {bank.summary.withCoverage === 0 ? s.admin.summaryCoverageNone : (
+                          <>
+                            <span className="font-medium text-ink">
+                              {bank.summary.withCoverage} {s.segments.of} {bank.summary.questions}
+                            </span>{' '}
+                            {s.admin.summaryCoverage}
+                            {bank.summary.panelSize > 0
+                              ? ` · ${bank.summary.panelSize} ${s.admin.summaryPanel}`
+                              : ''}
+                          </>
+                        )}
+                      </li>
+                      <li>
+                        <span className="font-medium text-ink">
+                          {bank.summary.attributes}
+                        </span>{' '}
+                        {s.admin.summaryAttributes}{' '}
+                        <span className="font-medium text-ink">{bank.summary.attributesMapped}</span>.{' '}
+                        {s.admin.summaryAttributesNote}
+                      </li>
+                    </ul>
+                  </div>
+                ) : null}
+
+                <p className="mt-3 text-sm leading-relaxed text-muted">{s.admin.issuesLegend}</p>
 
                 {/* De volledige bank, vraag voor vraag, met het ergste bovenaan.
                     Een lijst tellingen — "26 beslisregels zonder bron" — is niet
@@ -234,8 +273,11 @@ export default function Page() {
                               {q.id}
                               {q.category ? ` · ${q.category}` : ''}
                               {q.attributes.length > 0
-                                ? ` · ${q.attributes.map((a) => a.key + (a.mapped ? '' : ' ?')).join(', ')}`
+                                ? ` · ${q.attributes.map((a) => a.key).join(', ')}`
                                 : ''}
+                              {q.coverage !== null
+                                ? ` · ${s.admin.coverageOn} ${q.coverage} ${s.admin.coverageSites}`
+                                : ` · ${s.admin.coverageNone}`}
                             </span>
                           </Td>
                           <Td>
@@ -252,7 +294,8 @@ export default function Page() {
                                   {q.issues.map((issue) => {
                                     const key = `${q.id}:${issue}`;
                                     const open = openIssue === key;
-                                    const soft = issue === 'not-scored' || issue === 'coverage-unknown';
+                                    // Een procesvraag is een aantekening; een structuurvraag is werk.
+                                    const soft = issue === 'process-question';
                                     return (
                                       <button
                                         key={issue}

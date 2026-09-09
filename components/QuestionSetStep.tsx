@@ -160,6 +160,32 @@ function QuestionRow({
             {/* Dezelfde vraag, elders zwaarder. Dat is geen tweede vraag maar
                 een aantekening bij deze; apart tonen zou de lijst verdubbelen. */}
             {note ? <p className="mt-1 text-xs text-muted">{note}</p> : null}
+
+            {/* Op hoeveel webshops in zijn markt dit onderwerp voorkwam. Subtiel,
+                want het is geen oordeel over hem — maar het zegt wel iets: hoe
+                meer winkels het behandelen, hoe zekerder dat zijn koper ernaar
+                vraagt. Nul is geen leegte maar een vondst. */}
+            {question.coverage !== undefined && question.coverage !== null ? (
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                {question.coverage === 0 ? s.questions.coverageZero : (
+                  <>
+                    {s.questions.coverageOn} <span className="font-medium text-ink">{question.coverage}</span>{' '}
+                    {s.questions.coverageOf}. {s.questions.coverageWhy}
+                  </>
+                )}
+              </p>
+            ) : null}
+
+            {/* Een grenswaarde zonder bron: dat hoort hij te weten, want hij meet
+                er anders op zonder te zien waar het getal vandaan komt. Met wat
+                hij eraan kan doen erbij — een melding zonder uitweg is een
+                mededeling. */}
+            {question.ruleSourced === false ? (
+              <p className="mt-1 text-xs leading-relaxed text-warn">
+                {s.questions.ruleUnsourced}{' '}
+                <span className="text-muted">{s.questions.ruleUnsourcedWhat}</span>
+              </p>
+            ) : null}
           </>
         )}
       </div>
