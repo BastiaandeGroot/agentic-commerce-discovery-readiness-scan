@@ -8,6 +8,8 @@
 import { NextResponse } from 'next/server';
 import { isAdmin } from '../../../../src/server/admin';
 import { isRefusal, serviceClient } from '../../../../src/server/executor';
+import { importQuestionList } from '../../../../src/questions/list';
+import { reviewBank } from '../../../../src/questions/review';
 
 /** Na hoeveel uur een openstaande aanvraag te lang duurt. Eén werkdag. */
 const OVERDUE_HOURS = 24;
@@ -28,7 +30,7 @@ export async function GET(request: Request) {
 
   const banks = await supabase
     .from('question_banks')
-    .select('id, vertical, version, status, findings, panel, created_at, released_at')
+    .select('id, vertical, version, status, findings, panel, csv, created_at, released_at')
     .order('created_at', { ascending: false });
 
   const now = Date.now();
@@ -41,7 +43,15 @@ export async function GET(request: Request) {
       overdue: one.status !== 'ready'
         && (now - new Date(one.requested_at as string).getTime()) / 3600_000 > OVERDUE_HOURS,
     })),
-    banks: banks.data ?? [],
+    // De bank vraag voor vraag, met het ergste bovenaan. Een lijst tellingen —
+    // "26 beslisregels zonder bron" — is niet te beoordelen: je weet niet wélke
+    // vragen het betreft. Een beheerder beoordeelt vragen.
+    banks: (banks.data ?? []).map((bank) => {
+      const read = importQuestionList([{ name: `${bank.vertical}.csv`, text: String(bank.csv ?? '') }]);
+      const { csv, ...rest } = bank;
+      void csv;
+      return { ...rest, questions: read.bank ? reviewBank(read.bank) : [] };
+    }),
   });
 }
 

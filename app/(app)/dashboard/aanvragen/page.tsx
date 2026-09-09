@@ -11,8 +11,8 @@
 // melding, niet andermans gegevens.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Clock, TriangleAlert } from 'lucide-react';
-import { Badge, Button, Card, CardTitle, EmptyState, ErrorState, SkeletonLines } from '../../../../components/ui';
+import { Clock } from 'lucide-react';
+import { Badge, Button, Card, CardTitle, EmptyState, ErrorState, SkeletonLines, TableWrap, Td, Th } from '../../../../components/ui';
 import { STRINGS } from '../../../../src/i18n/strings';
 import { useLocale } from '../../../../src/i18n/useLocale';
 import { authHeader } from '../../../../src/auth/client';
@@ -24,9 +24,17 @@ interface RequestRow {
   waitingHours: number; overdue: boolean;
 }
 
+interface ReviewedQuestion {
+  id: string; label: { nl: string; en: string }; category?: string;
+  layer: 'base' | 'overlay'; importance: string;
+  attributes: { key: string; mapped: boolean }[];
+  issues: string[]; severity: number;
+}
+
 interface BankRow {
   id: string; vertical: string; version: number; status: string;
   findings: string[]; panel: { name?: string; url?: string; type?: string; consultedAt?: string }[];
+  questions: ReviewedQuestion[];
 }
 
 type State =
@@ -40,6 +48,8 @@ export default function Page() {
   const s = STRINGS[locale];
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [busy, setBusy] = useState<string>();
+  /** Standaard alleen wat bezwaren heeft; de rest is één klik weg. */
+  const [onlyIssues, setOnlyIssues] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -153,19 +163,75 @@ export default function Page() {
                   </span>
                 </div>
 
-                {/* De bevindingen staan open en niet ingeklapt: ze zijn de reden
-                    dat deze bank niet vanzelf is vrijgegeven, en wegklikken wat
-                    je moet lezen maakt vrijgeven een routineklik. */}
-                {bank.findings.length > 0 ? (
-                  <ul className="mt-2 flex flex-col gap-1.5">
-                    {bank.findings.map((finding) => (
-                      <li key={finding} className="flex items-start gap-2 text-sm leading-relaxed text-muted">
-                        <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
-                        <span>{finding}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
+                <p className="mt-2 text-sm leading-relaxed text-muted">{s.admin.issuesLegend}</p>
+
+                {/* De volledige bank, vraag voor vraag, met het ergste bovenaan.
+                    Een lijst tellingen — "26 beslisregels zonder bron" — is niet
+                    te beoordelen: je weet niet wélke vragen het betreft. En de
+                    goede vragen staan er ook bij, want vrijgeven gaat over de
+                    bank als geheel en niet over de probleemgevallen alleen. */}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Button
+                    variant={onlyIssues ? 'secondary' : 'quiet'}
+                    onClick={() => setOnlyIssues(!onlyIssues)}
+                  >
+                    {onlyIssues ? s.admin.onlyIssues : s.admin.showAll}
+                    <span className="text-muted">
+                      {onlyIssues
+                        ? bank.questions.filter((q) => q.issues.length > 0).length
+                        : bank.questions.length}
+                    </span>
+                  </Button>
+                </div>
+
+                <TableWrap>
+                  <thead>
+                    <tr>
+                      <Th>{s.admin.questions}</Th>
+                      <Th>{s.questions.importance.critical}</Th>
+                      <Th>{s.admin.findings}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bank.questions
+                      .filter((q) => !onlyIssues || q.issues.length > 0)
+                      .map((q) => (
+                        <tr key={q.id} className="border-t border-line align-top">
+                          <Td>
+                            <span className="block">{q.label[locale]}</span>
+                            <span className="mt-0.5 block font-mono text-xs text-muted">
+                              {q.id}
+                              {q.category ? ` · ${q.category}` : ''}
+                              {q.attributes.length > 0
+                                ? ` · ${q.attributes.map((a) => a.key + (a.mapped ? '' : ' ?')).join(', ')}`
+                                : ''}
+                            </span>
+                          </Td>
+                          <Td>
+                            <Badge tone={q.importance === 'critical' ? 'danger' : 'neutral'}>
+                              {s.questions.importance[q.importance] ?? q.importance}
+                            </Badge>
+                          </Td>
+                          <Td>
+                            {q.issues.length === 0 ? (
+                              <span className="text-xs text-muted">{s.admin.allFine}</span>
+                            ) : (
+                              <span className="flex flex-wrap gap-1.5">
+                                {q.issues.map((issue) => (
+                                  <Badge
+                                    key={issue}
+                                    tone={issue === 'not-scored' || issue === 'coverage-unknown' ? 'neutral' : 'warn'}
+                                  >
+                                    {s.admin.issues[issue] ?? issue}
+                                  </Badge>
+                                ))}
+                              </span>
+                            )}
+                          </Td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </TableWrap>
 
                 <div className="mt-3">
                   <Button onClick={() => void release(bank.id)} loading={busy === bank.id}>

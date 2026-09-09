@@ -12,6 +12,7 @@ import { ChevronDown, Inbox, LayoutGrid, ListChecks, Settings, ArrowLeft } from 
 import { useEffect, useState } from 'react';
 import { STRINGS } from '../../src/i18n/strings';
 import { authHeader } from '../../src/auth/client';
+import { useAuth } from '../auth/AuthProvider';
 import { useLocale } from '../../src/i18n/useLocale';
 
 const LINKS = [
@@ -27,6 +28,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [locale] = useLocale();
   const pathname = usePathname();
   const s = STRINGS[locale];
+  const { user } = useAuth();
 
   /**
    * Of deze bezoeker beheerder is.
@@ -55,19 +57,19 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-full flex-col md:flex-row">
       <aside className="shrink-0 border-b border-line bg-surface md:w-60 md:border-b-0 md:border-r">
         <div className="flex flex-col gap-3 px-4 py-3 md:h-full md:py-4">
-          {/* Accountwissel. Nog zonder accounts, dus uitgezet en met de reden
-              erbij in plaats van een knop die niets doet. */}
-          <button
-            type="button"
-            disabled
-            className="flex w-full items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-left text-sm text-muted disabled:cursor-not-allowed"
-          >
+          {/* Wie er is ingelogd. De wissel zelf is uitgezet: er is één account
+              per gebruiker, en een knop die niets doet is erger dan geen knop.
+              Het adres staat er wél, want wie op twee accounts test moet kunnen
+              zien met welke hij kijkt. */}
+          <div className="flex w-full items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-left text-sm">
             <span className="min-w-0">
               <span className="block text-xs text-muted">{s.shell.account}</span>
-              <span className="block truncate text-ink">{s.shell.accountPlaceholder}</span>
+              <span className="block truncate text-ink">
+                {user === undefined ? '\u2026' : user?.email ?? s.shell.accountPlaceholder}
+              </span>
             </span>
-            <ChevronDown className="size-4 shrink-0" aria-hidden />
-          </button>
+            <ChevronDown className="size-4 shrink-0 text-muted" aria-hidden />
+          </div>
 
           <nav aria-label={s.shell.menu} className="flex flex-row gap-1 md:flex-col">
             {LINKS.filter((link) => !link.admin || admin).map(({ href, key, Icon }) => {
