@@ -8,13 +8,18 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { ChevronDown, LayoutGrid, ListChecks, Settings, ArrowLeft } from 'lucide-react';
+import { ChevronDown, Inbox, LayoutGrid, ListChecks, Settings, ArrowLeft } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { STRINGS } from '../../src/i18n/strings';
+import { authHeader } from '../../src/auth/client';
 import { useLocale } from '../../src/i18n/useLocale';
 
 const LINKS = [
   { href: '/dashboard', key: 'overview', Icon: LayoutGrid },
   { href: '/dashboard/scans', key: 'scans', Icon: ListChecks },
+  // Alleen zichtbaar voor beheerders. De pagina zelf beslist dat serverzijdig;
+  // dit is navigatie en geen slot.
+  { href: '/dashboard/aanvragen', key: 'requests', Icon: Inbox, admin: true },
   { href: '/dashboard/instellingen', key: 'settings', Icon: Settings },
 ];
 
@@ -22,6 +27,29 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [locale] = useLocale();
   const pathname = usePathname();
   const s = STRINGS[locale];
+
+  /**
+   * Of deze bezoeker beheerder is.
+   *
+   * Eén vraag aan de server, want de browser kan dit niet weten en mag het ook
+   * niet bepalen. Dit is navigatie en geen slot: de pagina zelf weigert
+   * onafhankelijk hiervan. Zonder deze vraag zou een merchant "Aanvragen" in zijn
+   * menu zien staan en daar te horen krijgen dat het niet voor hem is.
+   */
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      await Promise.resolve();
+      try {
+        const response = await fetch('/api/admin/queue', { headers: await authHeader() });
+        if (alive) setAdmin(response.ok);
+      } catch {
+        // Niet kunnen vragen betekent: geen beheerdersmenu. Dat is de veilige kant.
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   return (
     <div className="flex min-h-full flex-col md:flex-row">
@@ -42,7 +70,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
 
           <nav aria-label={s.shell.menu} className="flex flex-row gap-1 md:flex-col">
-            {LINKS.map(({ href, key, Icon }) => {
+            {LINKS.filter((link) => !link.admin || admin).map(({ href, key, Icon }) => {
               const active = pathname === href;
               return (
                 <Link

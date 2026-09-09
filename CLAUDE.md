@@ -48,7 +48,7 @@ browsermodel, met dat verschil in beeld.
 | `src/intake/` | formaatdetectie en kolomherkenning |
 | `src/spec/` | veldenregister, plus de woordenlijst en de matcher die bankattributen op catalogus­kolommen leggen |
 | `src/semantic/` | de modellen die koppelingen vóórstellen; nooit importeren vanuit de motor |
-| `app/api/` | de serverroutes: `/api/mapping`, `/api/site`, `/api/bank-request`, `/api/bank-queue` en `/api/bank-result` |
+| `app/api/` | de serverroutes: `/api/mapping`, `/api/site`, `/api/bank-request`, `/api/bank-queue`, `/api/bank-result` en `/api/admin/queue` |
 | `src/server/` | wat alleen serverzijdig mag draaien: de uitvoerderssleutel en de servicecliënt. Nooit importeren vanuit een component. |
 | `src/questions/` | vragenbanken, composer, generator, import (tabel én YAML) en aanvraag |
 | `src/engine/` | categoriekeuze, evaluatie, rapportaggregatie, vergelijken |
