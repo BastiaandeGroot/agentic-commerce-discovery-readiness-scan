@@ -16,6 +16,7 @@ webshops gebaseerd is en niet op één.
 |---|---|
 | **Vragenbank maken** | Er is een nieuwe markt en er is nog geen vragenlijst. Onderzoekt een panel van webshops en levert een tweetalige CSV op. Reken op een halve tot een hele werkdag. |
 | **Vragenbank controleren** | Er ligt een bank en je wilt weten of hij zijn bewijs draagt. Vier poorten: herkomst, bronnen, een tweede lezing, en de bekende anti-patronen. Ook los te gebruiken op een bank die er al langer ligt. |
+| **Aanvraag oppakken** | Er staat werk klaar in de readiness-scan. Haalt de eerstvolgende aanvraag op, maakt de bank, controleert hem en levert hem terug. Draait ook als geplande taak. |
 | **Vragenbank voorleggen** | Je wilt de bank laten nakijken door iemand uit het vak. Maakt er een leesbaar document van met gerichte vragen. |
 
 ## Wat de plugin nodig heeft
