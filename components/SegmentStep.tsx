@@ -216,9 +216,6 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onSite, 
   const [proposals, setProposals] = useState<Verdicts>({});
   const [judging, setJudging] = useState(false);
   const [judgeFailed, setJudgeFailed] = useState(false);
-  /** De uitleg met zijn eigen producten erin; leeg = de vaste tekst. */
-  const [explanation, setExplanation] = useState<string[]>();
-  const [explaining, setExplaining] = useState(false);
 
   const evidence = state.kind === 'done' ? state.evidence : undefined;
   // Volgorde van gezag: de merchant wint van het model, het model vult aan waar
@@ -228,6 +225,26 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onSite, 
     [paths, evidence, proposals, verdicts],
   );
   const debt = facetDebt(rows);
+
+  /**
+   * De twee namen die in de uitleg belanden.
+   *
+   * De grootste eigenschap die nu een categorie is, en de grootste echte
+   * categorie. Grootste en niet de eerste: een voorbeeld dat over drie producten
+   * gaat overtuigt niemand. Zijn ze er niet, dan staan er algemene woorden en
+   * blijft de zin lopen.
+   */
+  const example = useMemo(() => {
+    const biggest = (kind: PathKind) => rows
+      .filter((row) => row.kind === kind)
+      .sort((a, b) => b.productCount - a.productCount)[0]
+      ?.segments.slice(-1)[0];
+    return {
+      kenmerk: biggest('facet') ?? s.segments.kinds.facet.toLowerCase(),
+      categorie: biggest('category') ?? s.segments.kinds.category.toLowerCase(),
+    };
+  }, [rows, s]);
+
 
   // Doorgeven wat er overblijft, zodra dat verandert. Een facet is geen markt,
   // en een pad waar we niet uit kwamen ook niet.
@@ -277,7 +294,6 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onSite, 
         clientRendered: result.likelyClientRendered === true,
       });
       await judge(evidence);
-      await explain(evidence);
     } catch {
       setState({ kind: 'failed' });
     }
@@ -335,49 +351,6 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onSite, 
     }
   }
 
-  /**
-   * De uitleg laten schrijven met zijn eigen productnamen erin.
-   *
-   * Gegenereerd en niet vast, omdat een voorbeeld uit zijn eigen markt sneller
-   * landt dan een algemene zin over stoffen. Wel met een vaste tekst eronder als
-   * terugval: dit is schermtekst, en die mag niet wegvallen omdat een aanroep
-   * mislukt of er geen sleutel is.
-   */
-  async function explain(evidenceNow?: SiteEvidence) {
-    const base = applyVerdicts(
-      applyProposals(classifyPaths(paths, evidenceNow ?? evidence), proposals),
-      verdicts,
-    );
-    const facets = base.filter((row) => row.kind === 'facet').slice(0, 8);
-    const cats = base.filter((row) => row.kind === 'category').slice(0, 6);
-    if (facets.length === 0) return;
-    setExplaining(true);
-    try {
-      const response = await fetch('/api/mapping', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          kind: 'explain',
-          attributes: [
-            ...facets.map((row) => ({ key: row.segments[row.segments.length - 1], text: 'kenmerk' })),
-            ...cats.map((row) => ({ key: row.segments[row.segments.length - 1], text: 'categorie' })),
-          ],
-          // De markt is op dit scherm nog niet vastgesteld; het grootste
-          // hoofdpad is een goed genoeg aanknopingspunt voor een voorbeeldzin.
-          columns: [{ key: paths[0]?.segments[0] ?? 'onbekend', text: '' }],
-        }),
-      });
-      if (!response.ok) return;
-      const { text } = await response.json();
-      const lines = String(text ?? '').split(/\n\s*\n/).map((one) => one.trim()).filter(Boolean);
-      if (lines.length > 0) setExplanation(lines.slice(0, 3));
-    } catch {
-      // Geen uitleg is geen fout: de vaste tekst blijft staan.
-    } finally {
-      setExplaining(false);
-    }
-  }
-
   function decide(path: CategoryPath, kind: PathKind) {
     onDecide(path.segments, kind);
   }
@@ -391,7 +364,7 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onSite, 
   }
 
   const doubts = rows.filter((row) => row.kind === 'unclear').length;
-  const busy = state.kind === 'busy' || judging || explaining;
+  const busy = state.kind === 'busy' || judging;
   const started = state.kind !== 'idle';
 
   return (
@@ -420,7 +393,7 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onSite, 
         {/* 2. Wat we op de achtergrond doen, zodat wachten geen stilte is. */}
         {busy ? (
           <p className="mt-3 text-sm text-muted">
-            {state.kind === 'busy' ? s.segments.stepSite : judging ? s.segments.stepJudge : s.segments.stepExplain}
+            {state.kind === 'busy' ? s.segments.stepSite : s.segments.stepJudge}
           </p>
         ) : null}
 
@@ -473,19 +446,16 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onSite, 
                   <span className="font-medium text-ink">{debt.facets} {s.segments.of} {rows.length}</span>{' '}
                   {s.segments.debtBody}
                 </p>
-                {/* De enige uitleg op dit scherm, met zijn eigen producten erin.
-                    Twee uitleggen die net iets anders zeggen is er één te veel. */}
+                {/* De enige uitleg op dit scherm, met twee namen uit zijn
+                    eigen data erin. Vaste tekst: een gegenereerde versie beweerde
+                    twee keer overtuigend het tegenovergestelde, en schermtekst
+                    die per merchant anders luidt is niet na te lopen. */}
                 <div className="mt-3 rounded-lg bg-surface-2 p-3">
-                  {explanation
-                    ? explanation.map((line) => (
-                        <p key={line} className="mt-1.5 text-sm leading-relaxed text-ink first:mt-0">{line}</p>
-                      ))
-                    : (
-                      <>
-                        <p className="text-sm leading-relaxed text-ink">{s.segments.whyBody1}</p>
-                        <p className="mt-1.5 text-sm leading-relaxed text-ink">{s.segments.whyBody3}</p>
-                      </>
-                    )}
+                  {[s.segments.why1, s.segments.why2, s.segments.why3].map((line, index) => (
+                    <p key={index} className="mt-1.5 text-sm leading-relaxed text-ink first:mt-0">
+                      {line.replace('{kenmerk}', example.kenmerk).replace('{categorie}', example.categorie)}
+                    </p>
+                  ))}
                 </div>
               </div>
             </div>

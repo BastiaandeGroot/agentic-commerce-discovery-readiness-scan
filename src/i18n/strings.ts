@@ -654,12 +654,13 @@ export const STRINGS = {
       doubtsBody: 'Die staan hieronder als onbeslist. Gebruik het filter om ze als eerste af te werken.',
       tableHeading: 'Categorie\u00ebn en kenmerken definitief vaststellen',
       whyHeading: 'Waarom we dit vragen',
-      whyBody1:
-        'Een categorie is een plek waar je producten in onderbrengt. Een eigenschap is iets wat van een product waar is, en dat hoort bij élk product te staan — zoals de kleur of de breedte.',
-      whyBody2:
-        'Staat zo\u2019n eigenschap bij jou als categorie in de boom, dan legt je data hem nergens als kenmerk vast. De agent kan er dus niet op filteren, en jouw stof valt buiten zijn selectie terwijl hij precies is wat de koper zocht.',
-      whyBody3:
-        'Zet je een eigenschap alleen als categorie neer, dan weet je het alleen van de producten die je daarin onderbracht — van de rest weet niemand het. Een klant die daarop zoekt vindt die andere producten dus niet.',
+      // Vaste tekst met twee gaten erin: de app vult het grootste kenmerk en een
+      // echte categorie uit zijn eigen data in. Bewust niet gegenereerd — dat
+      // gaf twee keer een uitleg die overtuigend het tegenovergestelde beweerde,
+      // en schermtekst die per merchant anders luidt is niet na te lopen.
+      why1: 'Je hebt {kenmerk} nu als categorie in je winkel staan. Maar dat is geen soort product \u2014 het is een kenmerk van een product, net als de kleur of de breedte.',
+      why2: 'Daardoor weet je het alleen van de producten die je in die categorie hebt gezet. Van al je andere producten staat het nergens.',
+      why3: 'Zoekt een klant hierop binnen {categorie}, dan krijgt hij alleen dat handjevol te zien \u2014 en niet de rest die het ook is.',
       sortName: 'Naam',
       sortCount: 'Producten',
       filterAll: 'Alles',
@@ -1406,12 +1407,9 @@ export const STRINGS = {
       doubtsBody: 'They are listed below as undecided. Use the filter to deal with them first.',
       tableHeading: 'Settling categories and characteristics',
       whyHeading: 'Why we ask this',
-      whyBody1:
-        'A department is a place where you put products. A characteristic is something that is true of a product, and it belongs on every single product — like the colour or the width.',
-      whyBody2:
-        'If such a characteristic sits in your tree as a category, your data records it nowhere as a characteristic. So the agent cannot filter on it, and your fabric falls outside its selection while being exactly what the buyer wanted.',
-      whyBody3:
-        'Put a characteristic down as a department only, and you know it just for the products you placed there — for the rest, nobody knows. A customer looking for it will not find those other products.',
+      why1: 'You currently have {kenmerk} as a category in your shop. But that is not a kind of product \u2014 it is a characteristic of a product, like the colour or the width.',
+      why2: 'So you only know it about the products you put in that category. For all your other products it is recorded nowhere.',
+      why3: 'If a customer looks for this within {categorie}, they see only that handful \u2014 and not the rest that is the same.',
       sortName: 'Name',
       sortCount: 'Products',
       filterAll: 'All',

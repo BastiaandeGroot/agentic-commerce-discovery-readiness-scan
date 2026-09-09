@@ -46,7 +46,7 @@ interface Payload {
    * is precies hetzelfde probleem — Engelse vaktaal tegen Nederlandse data — en
    * het verdient geen tweede route, alleen een andere opdracht.
    */
-  kind?: 'attributes' | 'categories' | 'facets' | 'market' | 'explain';
+  kind?: 'attributes' | 'categories' | 'facets' | 'market';
 }
 
 /** Weiger wat niet klopt vóór het geld kost, en zeg waarom. */
@@ -59,14 +59,14 @@ function validate(body: unknown): Payload | string {
   const kindEarly = (body as Partial<Payload>).kind;
   // Bij een facetoordeel is de tweede lijst context en mag hij leeg zijn: een
   // winkel zonder zichtbare filters is geen fout, alleen minder houvast.
-  if (attributes.length === 0 || (columns.length === 0 && kindEarly !== 'facets' && kindEarly !== 'market' && kindEarly !== 'explain')) {
+  if (attributes.length === 0 || (columns.length === 0 && kindEarly !== 'facets' && kindEarly !== 'market')) {
     return 'Er is niets te koppelen.';
   }
   if (attributes.length > LIMITS.attributes || columns.length > LIMITS.columns) {
     return `Te groot: hoogstens ${LIMITS.attributes} kenmerken en ${LIMITS.columns} kolommen per aanvraag.`;
   }
   const kind = (body as Partial<Payload>).kind;
-  if (kind !== undefined && kind !== 'attributes' && kind !== 'categories' && kind !== 'facets' && kind !== 'market' && kind !== 'explain') {
+  if (kind !== undefined && kind !== 'attributes' && kind !== 'categories' && kind !== 'facets' && kind !== 'market') {
     return 'Onbekend soort koppeling.';
   }
   const clean = (list: { key: string; text: string }[]) => list.every((entry) =>
@@ -87,42 +87,6 @@ const SYSTEM_CATEGORIES = [
   '- De twee lijsten staan vaak in verschillende talen: "upholstery fabrics" en "Meubelstoffen" zijn hetzelfde, "curtain fabrics" en "Gordijnstoffen" ook.',
   '',
   'Antwoord met één regel per koppeling, in de vorm `vragenlijstcategorie: catalogus­categorie`. Geen inleiding, geen uitleg, geen opsommingstekens.',
-].join('\n');
-
-const SYSTEM_EXPLAIN = [
-  'Je legt aan een webshop-eigenaar uit waarom het uitmaakt of iets een categorie is of een eigenschap.',
-  'Hij weet niets van data en hoeft dat ook niet te leren. Schrijf zoals je het aan de balie zou uitleggen.',
-  'Let op: het is een webshop. Er liggen geen spullen in een hoek; een categorie is een pagina waar',
-  'producten onder hangen. Gebruik nooit het woord fysiek of fysieke, en nooit het woord afdeling.',
-  '',
-  'DE KERN, in zijn woorden:',
-  '- Een CATEGORIE is een plek in de winkel. Je brengt er producten in onder.',
-  '- Een EIGENSCHAP is iets wat van een product waar is, en dat hoort bij élk product genoteerd te staan.',
-  '- Deze winkelier heeft eigenschappen als categorie neergezet. Dan weet hij het alleen van de producten',
-  '  die hij in die categorie onderbracht, en van al zijn andere producten weet niemand het.',
-  '- Vraagt een klant om zo\'n eigenschap, dan komen alleen die paar producten bovendrijven en de rest niet.',
-  '',
-  'Schrijf precies drie korte zinnen in het Nederlands.',
-  '',
-  'Kies vooraf ÉÉN eigenschap uit de lijst en gebruik in alle drie de zinnen díe eigenschap. Nooit twee',
-  'eigenschappen door elkaar: "de stoffen in je categorie Effen zijn vlekwerend" is onzin.',
-  '',
-  'Zin 1: het verschil, met één van zijn categorieën en de gekozen eigenschap als voorbeeld.',
-  'Zin 2: wat er dan misgaat — hij weet die eigenschap alleen van de producten die hij er zelf in',
-  '  onderbracht, en van al zijn andere producten niet.',
-  'Zin 3: wat het hem kost, in klanten of verkoop, als iemand op die eigenschap zoekt.',
-  '',
-  'VERBODEN WOORDEN, gebruik er geen enkele:',
-  'productdata, data, boom, categorieboom, filteren, filter, kenmerk, attribuut, facet, selectie,',
-  'verfijnen, veld, systeem, structuur, model, AI, assistent, agent, waar of onwaar, true, false, afdeling.',
-  '',
-  'Zeg in plaats daarvan: categorie, eigenschap, staat erbij, weet niemand, vindt niet, klant die zoekt.',
-  '',
-  'Regels: spreek hem aan met \'je\'. Gebruik alleen de namen uit de opdracht. Elke zin onder de 25 woorden.',
-  'Schrijf foutloos Nederlands en let op de verbuiging: elke stof, elk product.',
-  'Zin 1 mag de vergelijking met een winkel gebruiken, maar hou hem kort en zeg niets over neerzetten of neerleggen.',
-  'Verzin geen aantallen. Je weet niet hoeveel producten er iets zijn, dus noem geen getallen.',
-  'Antwoord met alleen die drie zinnen, gescheiden door een lege regel.',
 ].join('\n');
 
 const SYSTEM_MARKET = [
@@ -169,17 +133,6 @@ const SYSTEM = [
 ].join('\n');
 
 function prompt({ attributes, columns, kind }: Payload): string {
-  if (kind === 'explain') {
-    return [
-      `MARKT: ${columns[0]?.key ?? 'onbekend'}`,
-      '',
-      'EIGENSCHAPPEN die nu ten onrechte als categorie in de boom staan:',
-      ...attributes.filter((entry) => entry.text === 'kenmerk').map((entry) => `- ${entry.key}`),
-      '',
-      'ECHTE CATEGORIEËN van deze winkel:',
-      ...attributes.filter((entry) => entry.text !== 'kenmerk').map((entry) => `- ${entry.key}`),
-    ].join('\n');
-  }
   if (kind === 'market') {
     return [
       'CATEGORIEËN VAN DEZE WINKEL (naam, en het aantal producten):',
@@ -242,9 +195,7 @@ export async function POST(request: Request) {
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      system: payload.kind === 'explain'
-        ? SYSTEM_EXPLAIN
-        : payload.kind === 'market'
+      system: payload.kind === 'market'
         ? SYSTEM_MARKET
         : payload.kind === 'facets'
           ? SYSTEM_FACETS
