@@ -358,4 +358,8 @@ iemand anders dan jij.
   beginnen — dat zit nog niet in het ontwerp.
 - **Wanneer is een markt "dezelfde markt"?** Twee merchants noemen hun markt
   misschien anders terwijl het er één is. De sleutel is nu een genormaliseerde
-  naam; dat gaat een keer botsen.
+  naam; dat gaat een keer botsen. Bij de eerste echte proef gebeurde het meteen:
+  dezelfde winkel diende in twee minuten "woontextiel" en "meubelstoffen" in, en
+  de index liet dat door omdat het voor de database twee markten zijn. Het scherm
+  waarschuwt nu als de markt gelijk is aan een van zijn eigen categorieën, maar
+  twee merchants die dezelfde markt anders noemen worden nog niet gevonden.

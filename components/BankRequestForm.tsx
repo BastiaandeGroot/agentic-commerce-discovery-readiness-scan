@@ -16,7 +16,7 @@
 // een URL.
 
 import { useEffect, useState } from 'react';
-import { Send } from 'lucide-react';
+import { Send, TriangleAlert } from 'lucide-react';
 import { Button, Card, CardTitle, ErrorState, Input } from './ui';
 import { authHeader } from '../src/auth/client';
 import type { Strings } from '../src/i18n/strings';
@@ -77,6 +77,23 @@ export function BankRequestForm({ s, segments, accountId, siteUrl, onQueued }: {
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segments]);
+
+  /**
+   * Is de opgegeven markt eigenlijk een van zijn eigen categorieën?
+   *
+   * Dat is geen fout maar wel bijna altijd een vergissing: "meubelstoffen" is
+   * een segment van woontextiel, en een eigen bank daarvoor zou zijn
+   * meubelstoffen langs een andere lat leggen dan zijn gordijnstoffen. De
+   * volgende merchant in die markt is dan met geen van beide te vergelijken.
+   *
+   * Een waarschuwing en geen blokkade: een winkel die uitsluitend meubelstoffen
+   * verkoopt heeft wél die markt, en dat weet hij beter dan wij. Vandaar ook de
+   * eis dat er meer dan één segment is — bij één segment is het geen vergissing
+   * maar een specialist.
+   */
+  const looksLikeCategory = segments.length > 1 && segments.some(
+    (one) => one.name.trim().toLowerCase() === market.trim().toLowerCase(),
+  );
 
   /**
    * Eén markt, en niet twee.
@@ -159,6 +176,15 @@ export function BankRequestForm({ s, segments, accountId, siteUrl, onQueued }: {
           />
           <p id="bank-panel-hint" className="text-xs leading-relaxed text-muted">{s.waiting.panelHint}</p>
         </div>
+
+        {looksLikeCategory ? (
+          <div className="flex items-start gap-2.5 rounded-lg border border-warn/40 bg-warn-soft px-3 py-2.5">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
+            <p className="text-sm leading-relaxed text-ink">
+              {s.waiting.marketIsCategory.replace('{naam}', market.trim())}
+            </p>
+          </div>
+        ) : null}
 
         {typeof phase === 'object' ? (
           <ErrorState title={s.waiting.submitFailed} body={phase.failed} />
