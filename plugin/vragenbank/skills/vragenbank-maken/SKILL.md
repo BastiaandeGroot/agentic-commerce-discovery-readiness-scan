@@ -23,9 +23,10 @@ opdracht die in één antwoord klaar is.
 Vraag om drie dingen, in gewone taal, en stel niet meer dan twee vragen tegelijk:
 
 1. **Welke markt?** Eén naam, bijvoorbeeld "woontextiel" of "buitenverf".
-2. **Welke segmenten?** De onderdelen van die markt die eigen vragen verdienen —
-   meubelstoffen, gordijnstoffen, outdoorstoffen. Komt dit uit de scan, dan
-   staat er een aantal producten bij; neem dat over.
+2. **Welke categorieën?** Vraag niet om segmenten — die bepaal jij in stap 2b.
+   Vraag om de categorielijst zoals de winkel hem voert, met aantallen als die
+   erbij staan. Komt dit uit de scan, dan zijn het er vaak tientallen; dat is
+   goed, en je gooit er niets van weg.
 3. **De webshop van de opdrachtgever**, als die er is. Die wordt **één** van de
    panelsites en nooit de enige bron.
 
@@ -65,7 +66,31 @@ nooit over: zonder hem reproduceer je de blinde vlekken van de hele branche.
 
 **Stap 2 — basislaag.** De vragen die voor elk product in deze markt gelden.
 
-**Stap 3 — overlay per segment.** Alleen voor de segmenten die je meekreeg. Een
+**Stap 2b — segmenten van toepassingen scheiden.** Je kreeg een categorielijst,
+geen segmentenlijst. Groepeer hem voordat je één overlay schrijft, want deze keuze
+bepaalt de omvang van de hele bank.
+
+Een **segment** stelt andere vragen. Een **toepassing** stelt dezelfde vragen met
+een andere drempel. Toets het zo: schrijf de drie zwaarste vragen van de groep op.
+Staan er bij twee categorieën andere vragen, dan zijn het twee segmenten. Staan
+er dezelfde vragen met een ander getal — Martindale 30.000 voor banken tegen
+15.000 voor een stoel die weinig gebruikt wordt — dan is het één segment met twee
+toepassingen.
+
+Toepassingen worden **geen overlay** maar `toepassingsprofielen` binnen de overlay
+van hun segment, met hun eigen drempel per vraag. Zou elk een eigen overlay
+krijgen, dan schrijf je dezelfde vraag tien keer over en suggereer je een
+onderscheid dat er niet is; de merchant beantwoordt hem dan tien keer.
+
+Wat een **eigenschap** is (Vlekwerend, Effen, Gedessineerd) valt hier al af — dat
+werk je uit in stap 4.
+
+Leg de groepering vast en lever hem mee: welke categorie onder welk segment
+landt, en waarom. Een domeinexpert moet het kunnen omgooien zonder de bank
+opnieuw te bouwen.
+
+**Stap 3 — overlay per segment.** Alleen voor de segmenten uit stap 2b, dus niet
+per categorie die je meekreeg. Een
 overlay mag een basisvraag **herwegen of uitschakelen, maar niet herschrijven**.
 Zou een segment de tekst van een basisvraag mogen veranderen, dan meten twee
 segmenten verschillende dingen onder hetzelfde id.
@@ -89,6 +114,11 @@ andersom.
 panel rechtvaardigt `hoog`; dekking van 100% samen met de onomkeerbare fout
 rechtvaardigt `kritiek`. Maar een vraag met dekking 0 kan alsnog kritiek zijn als
 vakkennis zegt dat er een dure fout achter zit — leg dan uit waarom je afwijkt.
+
+**Een drempel hoort bij een toepassing, niet bij een segment.** "Sterk genoeg"
+heeft geen antwoord zonder te weten waarvoor. Zet de vraag één keer in de overlay
+en de getallen in de profielen; zonder profiel blijft de drempel de strengste van
+de groep en meet je elke stoel als bank.
 
 **Eén vraag mag meerdere attributen plus een regel nodig hebben.** Dat is normaal
 en het is precies waar de waarde zit. "Hoeveel meter heb ik nodig" vraagt breedte
@@ -116,6 +146,9 @@ Doe geen van deze dingen, ook niet als erom gevraagd wordt. Leg uit waarom niet.
   classificeert alleen of een product binnen de scope valt.
 - **Duurzaamheidsclaims genereren.** Alleen verifieerbare certificeringen met bron.
 - **Alles in één prompt.**
+- **Elke meegeleverde categorie een eigen overlay geven.** Dat is de makkelijke
+  lezing van de opdracht en het maakt de bank drie keer zo groot zonder één vraag
+  toe te voegen.
 - **Frequentie verwarren met belang.** `dekking` is hoeveel sites het onderwerp
   behandelen, niet hoe vaak klanten het vragen. Het is een proxy.
 
