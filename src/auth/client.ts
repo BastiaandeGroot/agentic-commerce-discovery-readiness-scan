@@ -37,3 +37,19 @@ export function supabase(): SupabaseClient | null {
     : null;
   return cached;
 }
+
+/**
+ * De kop waarmee een serverroute weet wie er belt.
+ *
+ * Nodig omdat de routes met het token van de merchant werken en niet met een
+ * servicesleutel: zo blijft row level security gelden en kan hij alleen iets
+ * doen op een account waar hij lid van is. Zonder sessie een lege kop, en dan
+ * weigert de route — dat is beter dan stilzwijgend iets namens niemand doen.
+ */
+export async function authHeader(): Promise<Record<string, string>> {
+  const client = supabase();
+  if (!client) return {};
+  const { data } = await client.auth.getSession();
+  const token = data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}

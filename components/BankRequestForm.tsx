@@ -18,6 +18,7 @@
 import { useEffect, useState } from 'react';
 import { Send } from 'lucide-react';
 import { Button, Card, CardTitle, ErrorState, Input } from './ui';
+import { authHeader } from '../src/auth/client';
 import type { Strings } from '../src/i18n/strings';
 
 export interface Segment {
@@ -25,7 +26,7 @@ export interface Segment {
   count: number;
 }
 
-type Phase = 'idle' | 'busy' | 'failed';
+type Phase = 'idle' | 'busy' | { failed: string };
 
 export function BankRequestForm({ s, segments, accountId, siteUrl, onQueued }: {
   s: Strings;
@@ -82,7 +83,9 @@ export function BankRequestForm({ s, segments, accountId, siteUrl, onQueued }: {
     try {
       const response = await fetch('/api/bank-request', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        // Zijn token gaat mee, anders weet de route niet wie er belt en weigert
+        // hij — terecht, want dan zou hij namens niemand iets vastleggen.
+        headers: { 'content-type': 'application/json', ...(await authHeader()) },
         body: JSON.stringify({
           accountId,
           vertical: market.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
@@ -93,11 +96,16 @@ export function BankRequestForm({ s, segments, accountId, siteUrl, onQueued }: {
           suggestedSites: panel.split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 20),
         }),
       });
-      if (!response.ok) throw new Error('mislukt');
-      const result = await response.json();
+      const result = await response.json().catch(() => undefined);
+      if (!response.ok) {
+        // De route weet vaak wél wat er mis is — "probeer het nog eens" helpt
+        // niemand als het antwoord "je bent niet ingelogd" was.
+        setPhase({ failed: typeof result?.error === 'string' ? result.error : s.waiting.submitFailedNext });
+        return;
+      }
       onQueued(result?.joined === true);
     } catch {
-      setPhase('failed');
+      setPhase({ failed: s.waiting.submitFailedNext });
     }
   }
 
@@ -135,8 +143,8 @@ export function BankRequestForm({ s, segments, accountId, siteUrl, onQueued }: {
           <p id="bank-panel-hint" className="text-xs leading-relaxed text-muted">{s.waiting.panelHint}</p>
         </div>
 
-        {phase === 'failed' ? (
-          <ErrorState title={s.waiting.submitFailed} body={s.waiting.submitFailedNext} />
+        {typeof phase === 'object' ? (
+          <ErrorState title={s.waiting.submitFailed} body={phase.failed} />
         ) : null}
 
         <div>

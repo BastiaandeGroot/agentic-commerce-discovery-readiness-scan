@@ -119,6 +119,9 @@ export async function POST(request: Request) {
     .single();
 
   if (inserted.error) {
+    // Serverzijdig loggen: de merchant krijgt een leesbare zin, maar zonder de
+    // echte melding is een mislukte insert niet te vinden.
+    console.error('bank-request insert:', inserted.error.code, inserted.error.message);
     // De unieke index kan alsnog toeslaan als er tussen kijken en schrijven een
     // andere merchant was; dat is geen fout maar hetzelfde antwoord.
     if (inserted.error.code === '23505') {
