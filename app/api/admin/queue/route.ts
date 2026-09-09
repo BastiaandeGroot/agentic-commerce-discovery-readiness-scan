@@ -25,18 +25,39 @@ export async function GET(request: Request) {
 
   const requests = await supabase
     .from('bank_requests')
-    .select('id, vertical, status, site_url, suggested_sites, panel, segments, requested_at, started_at, finished_at, failure, bank_id')
+    .select('id, vertical, status, site_url, suggested_sites, panel, grouping, segments, requested_at, started_at, finished_at, failure, bank_id')
     .order('requested_at', { ascending: true });
 
   const banks = await supabase
     .from('question_banks')
-    .select('id, vertical, version, status, findings, panel, csv, excluded, created_at, released_at')
+    .select('id, vertical, version, status, findings, panel, grouping, csv, excluded, created_at, released_at')
     .order('created_at', { ascending: false });
+
+  // Hoe ver de generatie is. Een aparte vraag en geen join: het is de enige
+  // plek waar de stand van het werk vandaan komt, en een aanvraag zonder run —
+  // aangeleverd door een uitvoerder van buiten — hoort er gewoon zonder te staan.
+  const runs = await supabase
+    .from('bank_runs')
+    .select('request_id, phase, attempts, input_tokens, output_tokens, cached_tokens, failure, updated_at');
+
+  const runBy = new Map(
+    (runs.data ?? []).map((run) => [
+      run.request_id as string,
+      {
+        phase: run.phase as string,
+        attempts: run.attempts as number,
+        tokens: (run.input_tokens as number) + (run.output_tokens as number),
+        failure: (run.failure as string | null) ?? undefined,
+        updatedAt: run.updated_at as string,
+      },
+    ]),
+  );
 
   const now = Date.now();
   return NextResponse.json({
     requests: (requests.data ?? []).map((one) => ({
       ...one,
+      run: runBy.get(one.id as string),
       // Hoe lang iemand al wacht is wat een beheerder wil weten; de app rekent
       // dat hier uit zodat het scherm geen klok hoeft te hebben.
       waitingHours: Math.floor((now - new Date(one.requested_at as string).getTime()) / 3600_000),

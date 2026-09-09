@@ -28,3 +28,34 @@ services:
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
         sync: false
+
+  # De poller van de vragenbankgeneratie.
+  #
+  # Hij doet zelf niets: hij belt elk kwartier één keer aan, en de app zet dan
+  # hooguit één fase. Dat is precies de bedoeling — pollen hoort goedkoop te zijn
+  # en werken duur, en die twee in één ding stoppen was de denkfout waar dit
+  # ontwerp uit voortkomt. Een lege wachtrij kost hier een HTTP-verzoek en geen
+  # modelaanroep.
+  #
+  # Let op: cron jobs zitten niet in het gratis plan van Render. Wil je er niet
+  # voor betalen, dan doet een geplande GitHub Action hetzelfde met dezelfde twee
+  # variabelen — zie NOTES.md.
+  - type: cron
+    name: vragenbank-generator
+    runtime: node
+    plan: starter
+    region: frankfurt
+    schedule: "*/15 * * * *"
+    buildCommand: echo geen build nodig
+    startCommand: >-
+      curl --silent --show-error --fail-with-body --max-time 900
+      -X POST "$APP_URL/api/bank-run"
+      -H "x-executor-key: $BANK_EXECUTOR_KEY"
+    envVars:
+      # Het adres van de webservice hierboven. Als losse variabele en niet
+      # afgeleid: dan draait dezelfde cron ook tegen een testomgeving.
+      - key: APP_URL
+        sync: false
+      # Dezelfde sleutel als de webservice. In het dashboard zetten, niet hier.
+      - key: BANK_EXECUTOR_KEY
+        sync: false

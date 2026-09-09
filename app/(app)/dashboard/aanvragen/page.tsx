@@ -17,10 +17,21 @@ import { STRINGS } from '../../../../src/i18n/strings';
 import { useLocale } from '../../../../src/i18n/useLocale';
 import { authHeader } from '../../../../src/auth/client';
 
+interface GroupingEntry {
+  category: string; count: number; kind: string; parent?: string; reason?: string;
+}
+
+/** Hoe ver de generatie is. Ontbreekt bij een bank die van buiten kwam. */
+interface RunProgress {
+  phase: string; attempts: number; tokens: number; failure?: string;
+}
+
 interface RequestRow {
   id: string; vertical: string; status: string;
   site_url?: string; suggested_sites?: string[]; segments?: { name: string; count: number }[];
   panel?: { name?: string; url?: string }[];
+  grouping?: GroupingEntry[];
+  run?: RunProgress;
   requested_at: string; failure?: string; bank_id?: string;
   waitingHours: number; overdue: boolean;
 }
@@ -41,6 +52,7 @@ interface BankSummary {
 interface BankRow {
   id: string; vertical: string; version: number; status: string;
   findings: string[]; panel: { name?: string; url?: string; type?: string; consultedAt?: string }[];
+  grouping?: GroupingEntry[];
   questions: ReviewedQuestion[];
   summary?: BankSummary;
   /** Vragen die de beheerder bij het vrijgeven overslaat. Terugdraaibaar. */
@@ -169,6 +181,19 @@ export default function Page() {
                     ? ` · ${s.admin.panel}: ${one.panel.map((site) => site.name ?? site.url).join(', ')}`
                     : ''}
                 </span>
+                {/* Waar de generatie is. Zonder dit is een aanvraag die uren
+                    op `running` staat niet te onderscheiden van een die vastzit,
+                    en dat verschil bepaalt of je moet wachten of ingrijpen. */}
+                {one.run ? (
+                  <span className="w-full text-xs leading-relaxed text-muted">
+                    {s.admin.progress} {one.run.phase}
+                    {' · '}
+                    {one.run.tokens.toLocaleString(locale === 'nl' ? 'nl-NL' : 'en-GB')} {s.admin.progressTokens}
+                  </span>
+                ) : null}
+                {one.status === 'blocked' ? (
+                  <span className="w-full text-xs leading-relaxed text-danger">{s.admin.progressBlocked}</span>
+                ) : null}
                 {one.failure ? (
                   <span className="w-full text-xs leading-relaxed text-danger">{one.failure}</span>
                 ) : null}
@@ -215,6 +240,38 @@ export default function Page() {
                     </>
                   ) : (
                     <p className="mt-0.5 text-xs leading-relaxed text-muted">{s.admin.noPanelBody}</p>
+                  )}
+                </div>
+
+                {/* De indeling. Dit staat bewust vóór de vragen: klopt het
+                    niveau niet, dan is beoordelen wélke vragen erin staan
+                    zinloos werk. Een facet krijgt geen vragenset, dus een
+                    categorie die hier verkeerd staat verdwijnt uit het rapport
+                    of krijgt er een rij bij die niets onderscheidt. */}
+                <div className="mt-3 rounded-lg bg-surface-2 p-3">
+                  <p className="text-sm font-medium">{s.admin.grouping}</p>
+                  {bank.grouping && bank.grouping.length > 0 ? (
+                    <>
+                      <p className="mt-0.5 text-xs leading-relaxed text-muted">{s.admin.groupingBody}</p>
+                      <ul className="mt-2 flex flex-col gap-1">
+                        {bank.grouping.map((entry) => (
+                          <li key={entry.category} className="text-sm text-ink">
+                            {entry.category}
+                            <span className="text-muted"> · {entry.count}</span>
+                            <span className="text-muted">
+                              {' · '}
+                              {s.admin.groupingKinds[entry.kind] ?? entry.kind}
+                              {entry.parent ? ` (${entry.parent})` : ''}
+                            </span>
+                            {entry.reason ? (
+                              <span className="block text-xs leading-relaxed text-muted">{entry.reason}</span>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <p className="mt-0.5 text-xs leading-relaxed text-muted">{s.admin.noGrouping}</p>
                   )}
                 </div>
 
