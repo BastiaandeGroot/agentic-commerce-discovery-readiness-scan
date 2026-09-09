@@ -49,7 +49,14 @@ Pak er **één** per keer. Loopt er nog een taak, dan is die van jou.
 Draai de vaardigheid **vragenbank-maken** met wat je kreeg:
 
 - de markt uit `vertical`
-- de segmenten uit `segments` — alleen dáárvoor maak je een overlay
+- de categorieën uit `segments`. **Dat zijn nog geen marktsegmenten.** De app
+  stuurt alles door wat de merchant als categorie bevestigde — vaak tientallen,
+  en het merendeel is een toepassing binnen een segment (banken, eetkamerstoelen,
+  poefs binnen meubelstoffen). Groepeer ze eerst, volgens stap 2b van
+  **vragenbank-maken**. Wat een toepassing is krijgt geen eigen overlay maar een
+  toepassingsprofiel; alleen wat een eigen vragenset verdient wordt een overlay.
+  Meld in je oplevering welke groepering je koos — dat is een oordeel over de
+  markt en de merchant moet het kunnen tegenspreken.
 - `merchantSite` als **één** panelsite, nooit als enige bron
 - `suggestedSites` worden **toegevoegd** aan het panel dat jij samenstelt, niet
   overgenomen. De panelregels blijven gelden: vijf sites van verschillende

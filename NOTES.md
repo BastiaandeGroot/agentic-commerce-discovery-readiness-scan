@@ -386,6 +386,19 @@ vertical. De vijf meegeleverde banken zijn `provisional` en dragen bewust geen
 drempels; ze houden de zelfbedieningsscan overeind en meer niet. Eerste kandidaat
 is woontextiel, want daar ligt de merchant en is de onomkeerbare fout scherp.
 
+**De scan weegt niet per toepassingsprofiel** — 9 september. De app stuurt elke
+categorie die de merchant bevestigde mee in de aanvraag, en dat zijn er bij De
+Groot 29. Het merendeel is geen marktsegment maar een toepassing binnen een
+segment: banken, eetkamerstoelen en poefs stellen dezelfde vragen als
+meubelstoffen, met een andere drempel. De uitvoerder groepeert ze nu zelf
+(`plugin/vragenbank/skills/`, stap 2b) en legt ze vast in
+`toepassingsprofielen_kritiek`. De lezer neemt die kolom over, maar `evaluate`
+doet er niets mee, dus geen enkel profiel verschuift een score en de strengste
+drempel van de groep blijft gelden voor de hele groep. Twee dingen ontbreken:
+een drempel per profiel in het model (nu staat hij in `toelichting`, als tekst),
+en een manier om een product aan zijn profiel te koppelen. Dat laatste is het
+lastige — de catalogus zegt zelden waarvoor een stof bedoeld is.
+
 **De wachtrij achter de bankaanvraag** — sinds 7 september heeft de aanvraag geen
 scherm meer (zie boven). De overdracht is handmatig én buiten de app: jij of een
 agent draait de promptreeks, en het resultaat komt terug via de upload op het
