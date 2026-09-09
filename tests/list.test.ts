@@ -581,3 +581,58 @@ test('een subcategorie krijgt alleen een eigen niveau als de lijst hem kent', ()
   assert.deepEqual(set?.distinguishes, ['Naaigarens']);
   assert.equal(set?.distinguishes?.includes('Effen'), false);
 });
+
+test('een lijst mag beide talen dragen, in één bestand', () => {
+  // Eén rij per vraag en niet twee bestanden: dan meten twee talen
+  // gegarandeerd hetzelfde. Twee lijsten naast elkaar lopen uit de pas zodra
+  // iemand er één bewerkt, en dan staat er onder hetzelfde id een andere vraag.
+  const csv = [
+    'id;category;layer;question_nl;question_en;importance;required_attributes',
+    'BAS-01;interieurstoffen;base;Hoe breed is deze stof?;How wide is this fabric?;kritiek;rolbreedte_cm',
+  ].join('\n');
+  const result = importQuestionList([{ name: 'tweetalig.csv', text: csv }]);
+  assert.deepEqual(result.errors, []);
+  const question = result.bank?.questions[0];
+  assert.equal(question?.label.nl, 'Hoe breed is deze stof?');
+  assert.equal(question?.label.en, 'How wide is this fabric?');
+});
+
+test('één taal blijft één taal, zichtbaar in allebei', () => {
+  // Een lijst met alleen `vraag` vult beide kanten met dezelfde tekst. Zichtbaar
+  // dezelfde woorden is eerlijker dan een lege regel in het andere rapport.
+  const csv = [
+    'id;layer;question;importance;required_attributes',
+    'BAS-01;base;How wide is this fabric?;critical;rolbreedte_cm',
+  ].join('\n');
+  const result = importQuestionList([{ name: 'een-taal.csv', text: csv }]);
+  assert.deepEqual(result.errors, []);
+  const question = result.bank?.questions[0];
+  assert.equal(question?.label.nl, 'How wide is this fabric?');
+  assert.equal(question?.label.en, 'How wide is this fabric?');
+});
+
+test('dekking draagt zijn panelsites mee', () => {
+  // Zonder deze kolom verliest een dekking zijn herkomst zodra de bank door een
+  // tabel gaat, en dan valt de belangrijkste regel van de methode weg: herkomst
+  // staat bij elk getal. De YAML had het wel en de tabel niet.
+  const csv = [
+    'id;laag;vraag_nl;vraag_en;belang;benodigde_attributen;dekking;dekking_bronnen',
+    'BAS-01;base;Kan dit buiten blijven?;Can this stay outside?;kritiek;winterhard;3;intratuin, hartman, tuinmeubelshop',
+  ].join('\n');
+  const result = importQuestionList([{ name: 'panel.csv', text: csv }]);
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.bank?.questions[0]?.coverageSites, ['intratuin', 'hartman', 'tuinmeubelshop']);
+});
+
+test('een lijst met maar één taal meldt dat', () => {
+  // Geen fout: dezelfde tekst in beide talen is beter dan een lege regel. Wel
+  // iets om te zeggen, want wie een Nederlands rapport opent en Engelse vragen
+  // ziet denkt dat er iets stuk is. De reparatie hoort bij de bron.
+  const csv = [
+    'id;laag;vraag;belang;benodigde_attributen',
+    'BAS-01;base;How wide is this fabric?;kritiek;rolbreedte_cm',
+  ].join('\n');
+  const result = importQuestionList([{ name: 'een-taal.csv', text: csv }]);
+  assert.deepEqual(result.errors, []);
+  assert.ok(result.warnings.some((w) => w.includes('maar één taal')));
+});

@@ -12,6 +12,37 @@ export function isBlank(v: unknown): boolean {
   return false;
 }
 
+/**
+ * Gevuld, maar met een waarde die niets zegt.
+ *
+ * Iets anders dan leeg, en dat verschil is het hele punt. `isBlank` behandelt
+ * een handvol van deze gevallen als leeg omdat de intake ze nergens voor kan
+ * gebruiken; hier gaat het om de vraag die een merchant moet beantwoorden.
+ * "Je veld is leeg" stuurt hem op zoek naar een lege cel die hij niet vindt,
+ * terwijl er `n.v.t.` staat. "Er staat iets, maar het beantwoordt niets" wijst
+ * naar de juiste rij en naar het juiste werk.
+ *
+ * Vanuit de agent geredeneerd: hij kan hier niets mee filteren, vergelijken of
+ * narekenen, en dus is de vraag onbeantwoord — ongeacht dat de kolom gevuld is.
+ *
+ * De lijst blijft bewust kort en generiek: dit zijn de woorden die in élke
+ * export voorkomen, in beide talen. Vaktaal hoort bij de markt en dus bij de
+ * vragenlijst, niet in de motor. Alleen exacte treffers, want `geen` mag nooit
+ * `geen strijkbehandeling nodig` wegpoetsen.
+ */
+const PLACEHOLDERS = new Set([
+  'n.v.t.', 'nvt', 'n.v.t', 'niet van toepassing', 'not applicable',
+  'onbekend', 'unknown', 'geen', 'none', 'nvt.', 'nb', 'n.b.',
+  'tbd', 'todo', 'volgt', 'volgt nog', 'op aanvraag', 'on request',
+  'x', 'xx', 'xxx', '?', '??', '...', '--', '.',
+  'diverse', 'various', 'wisselend', 'zie omschrijving', 'see description',
+]);
+
+export function isPlaceholder(v: unknown): boolean {
+  if (typeof v !== 'string') return false;
+  return PLACEHOLDERS.has(v.trim().toLowerCase());
+}
+
 export function str(v: unknown): string | undefined {
   if (isBlank(v)) return undefined;
   return String(v).trim();

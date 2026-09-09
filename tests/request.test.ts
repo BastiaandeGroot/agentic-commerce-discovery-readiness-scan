@@ -62,7 +62,7 @@ test('de site van de merchant is één panelsite, nooit de enige bron', () => {
   const tekst = renderBankRequest(request('https://degrootstoffen.example').request, 'nl');
   assert.match(tekst, /degrootstoffen\.example/);
   assert.match(tekst, /nooit als enige bron/);
-  // En het panelrecept staat erbij, want vijf tot acht sites is de opdracht.
+  // En het panelrecept staat erbij, want vijf sites is de opdracht.
   assert.match(tekst, /category-leader/);
 });
 

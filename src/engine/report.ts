@@ -14,6 +14,7 @@ import type {
   QuestionSetState, ScanReport,
 } from '../domain/types';
 import { evaluateProduct } from './evaluate';
+import { segmentLevel } from './join';
 import { FIELD_REGISTER_ID } from '../spec/snapshot';
 import { SCAN_VERSION } from './version';
 
@@ -175,8 +176,11 @@ export function runScan(
    *  dezelfde invoer twee keer een ander rapport. */
   options: { scannedAt: string },
 ): ScanReport {
+  // Eén keer bepalen voor de hele catalogus, niet per product: het niveau is een
+  // eigenschap van de boom en niet van een rij.
+  const level = segmentLevel(catalog.products, questionState.sets.map((set) => set.category ?? ''));
   const products = catalog.products.map(
-    (product) => evaluateProduct(product, questionState.sets, catalog),
+    (product) => evaluateProduct(product, questionState.sets, catalog, level),
   );
   const scored = products.filter((r) => !r.unmatched);
 

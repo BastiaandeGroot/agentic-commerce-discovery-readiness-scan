@@ -48,7 +48,8 @@ browsermodel, met dat verschil in beeld.
 | `src/intake/` | formaatdetectie en kolomherkenning |
 | `src/spec/` | veldenregister, plus de woordenlijst en de matcher die bankattributen op catalogus­kolommen leggen |
 | `src/semantic/` | de modellen die koppelingen vóórstellen; nooit importeren vanuit de motor |
-| `app/api/` | de enige serverroute: `/api/mapping` |
+| `app/api/` | de serverroutes: `/api/mapping`, `/api/site`, `/api/bank-request`, `/api/bank-queue`, `/api/bank-result` en `/api/admin/queue` |
+| `src/server/` | wat alleen serverzijdig mag draaien: de uitvoerderssleutel en de servicecliënt. Nooit importeren vanuit een component. |
 | `src/questions/` | vragenbanken, composer, generator, import (tabel én YAML) en aanvraag |
 | `src/engine/` | categoriekeuze, evaluatie, rapportaggregatie, vergelijken |
 | `src/i18n/` | alle teksten, NL en EN naast elkaar |
@@ -56,6 +57,7 @@ browsermodel, met dat verschil in beeld.
 | `app/` | routes |
 | `scripts/` | headless testharnas, geen productiecode |
 | `kennis/_methode/` | de methode en de promptreeks; documentatie, geen code |
+| `plugin/vragenbank/` | de Cowork-plugin die banken maakt, controleert en voorlegt; de naslag erin is een kopie uit `kennis/_methode/` en moet meeveranderen |
 
 ## Design
 
@@ -89,7 +91,7 @@ vragenlijst en niet om een bestandsformaat. Vier regels die altijd gelden:
 - **Een bank hoort bij een vertical, niet bij een merchant.** Nooit een bank
   genereren uit de site of de catalogus van één winkel: dan meet je zijn blinde
   vlekken mee en zijn twee merchants in dezelfde markt niet meer vergelijkbaar.
-  Zijn site is één van de vijf à acht panelsites.
+  Zijn site is één van de vijf panelsites.
 - **Een bankaanvraag draagt geen productdata.** Categorienamen met aantallen en
   een URL, verder niets — ook geen kolomnamen. Dat is fase 3 van de methode
   (blinderen) én de privacybelofte. Het type kan het niet dragen; houd het zo.
@@ -201,7 +203,10 @@ werelden.
 ## Opslag
 
 Bewaarde scans gaan via `SnapshotStore` in `src/storage/`, nooit rechtstreeks via
-`localStorage` vanuit een component. Er wordt een **snapshot** bewaard en geen
+`localStorage` vanuit een component. Hetzelfde geldt voor het oordeel van de
+merchant over zijn categorieboom (`VerdictStore`): dat blijft bewaard omdat een
+modelvoorstel niet elke keer hetzelfde is, en twee scans anders op verschillende
+definities zouden kunnen rusten. Er wordt een **snapshot** bewaard en geen
 rapport: tellingen, categorienamen en veldnamen, geen productdata en geen
 bronbestand. Dat houdt de belofte overeind dat de catalogus het apparaat niet
 verlaat, ook zodra er serverzijdig bewaard wordt.

@@ -1,0 +1,7 @@
+{
+  "name": "vragenbank",
+  "version": "0.1.0",
+  "description": "Bouwt een vragenbank met consumentenvragen voor een markt: onderzoekt een panel van webshops, schrijft de vragen met hun bewijs, controleert ze op herkomst en levert een tweetalige lijst op.",
+  "author": { "name": "Bastiaan de Groot" },
+  "keywords": ["vragenbank", "consumentenvragen", "productdata", "agentic commerce"]
+}

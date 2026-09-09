@@ -1,7 +1,7 @@
 // Bouwers voor de meegeleverde banken.
 //
 // Deze banken zijn **voorlopig**, en dat is geen slag om de arm maar een
-// eigenschap. De methode vraagt een panel van vijf tot acht sites, een oogst per
+// eigenschap. De methode vraagt een panel van vijf sites, een oogst per
 // bron, een domeinreview en daarna bevriezen. Dat is handwerk per vertical, en
 // het gebeurt buiten de app. Wat hier staat is de terugval voor een merchant die
 // zomaar een feed uploadt terwijl er voor zijn markt nog geen bank ligt.
@@ -75,8 +75,8 @@ export function pendingResearch(vertical: string) {
     kind: 'gap' as const,
     weight: 'critical' as const,
     question: {
-      nl: 'Welke vragen stelt een koper in deze markt werkelijk? Dit vraagt een panel van vijf tot acht sites, een bronoogst per site en een domeinreview. Tot die er is, weegt deze bank op vakkennis.',
-      en: 'What does a buyer in this market actually ask? This requires a panel of five to eight sites, a source harvest per site and a domain review. Until that exists, this bank rests on domain knowledge.',
+      nl: 'Welke vragen stelt een koper in deze markt werkelijk? Dit vraagt een panel van vijf sites, een bronoogst per site en een domeinreview. Tot die er is, weegt deze bank op vakkennis.',
+      en: 'What does a buyer in this market actually ask? This requires a panel of five sites, a source harvest per site and a domain review. Until that exists, this bank rests on domain knowledge.',
     },
   };
 }

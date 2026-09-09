@@ -17,8 +17,8 @@ import type {
 } from '../domain/types';
 import { CUSTOM_IMPORTANCE, isScored, weightOf } from '../questions/compose';
 import { FIELD_BY_KEY } from '../spec/fields';
-import { isBlank, str } from '../intake/normalize';
-import { mainCategory, subCategory } from './join';
+import { isBlank, isPlaceholder, isValidGtin, str } from '../intake/normalize';
+import { mainCategory, segmentLevel, subCategory } from './join';
 
 /**
  * Kwaliteitsdrempels. Aanwezigheid is niet hetzelfde als bruikbaarheid: een
@@ -43,14 +43,25 @@ export function fieldState(product: ProductRecord, requirement: string): FieldSt
   // de categoriespecifieke informatie waar geen enkele standaard een naam voor heeft.
   if (requirement.startsWith('attr:')) {
     const re = new RegExp(requirement.slice(5), 'i');
-    const hit = Object.entries(product.unmapped).some(
+    const hits = Object.entries(product.unmapped).filter(
       ([column, value]) => re.test(column) && !isBlank(value),
     );
-    return hit ? 'ok' : 'absent';
+    if (hits.length === 0) return 'absent';
+    // Eén bruikbare waarde is genoeg; staat er overal een plaatshouder, dan is
+    // het veld gevuld en zegt het niets. Dat is werk aan bestaande rijen, geen
+    // ontbrekend veld, en die twee vragen een andere handeling.
+    return hits.some(([, value]) => !isPlaceholder(value)) ? 'ok' : 'weak';
   }
 
   const value = product.values[requirement];
   if (isBlank(value)) return 'absent';
+  if (isPlaceholder(value)) return 'weak';
+
+  // Een streepjescode met een verkeerd controlecijfer is geen streepjescode. Een
+  // agent die erop matcht vindt niets, dus het veld is gevuld en onbruikbaar —
+  // precies wat `weak` betekent. De controle stond al geschreven en werd nergens
+  // aangeroepen.
+  if (requirement === 'gtin' && !isValidGtin(String(value).trim())) return 'weak';
 
   const minWords = MIN_WORDS[requirement];
   if (minWords !== undefined) {
@@ -155,8 +166,8 @@ function answerState(
  * dus daar matchen we ook op. Anders valt "Fietsbanden > Racefiets" buiten de
  * set die juist voor Fietsbanden is gemaakt.
  */
-export function pickSet(product: ProductRecord, sets: QuestionSet[]): QuestionSet | undefined {
-  const category = mainCategory(product);
+export function pickSet(product: ProductRecord, sets: QuestionSet[], level = 0): QuestionSet | undefined {
+  const category = mainCategory(product, level);
   if (!category) return undefined; // geen categorie -> geflagd en geteld, niet gescoord
 
   for (const set of sets) {
@@ -209,8 +220,10 @@ export function evaluateProduct(
   product: ProductRecord,
   sets: QuestionSet[],
   catalog: Dataset,
+  /** Op welk niveau van de categorieboom de segmenten zitten; zie segmentLevel. */
+  level = 0,
 ): ProductResult {
-  const set = pickSet(product, sets);
+  const set = pickSet(product, sets, level);
   const questions: QuestionOutcome[] = [];
   const gaps = new Map<string, Gap>();
 
@@ -262,8 +275,8 @@ export function evaluateProduct(
     key: product.key,
     title: str(product.values.title),
     image: str(product.values.image),
-    category: mainCategory(product),
-    subcategory: subCategory(product),
+    category: mainCategory(product, level),
+    subcategory: subCategory(product, level),
     setId: set?.id,
     unmatched: set === undefined,
     findable: set !== undefined && scored.length > 0 && scored.every((q) => q.answered),

@@ -10,7 +10,7 @@
 // zonder te zien waarlangs hij gemeten is, en zonder te weten dat die lat
 // voorlopig kan zijn.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Dataset, QuestionSetState, ScanReport } from '../../../src/domain/types';
 import { generateQuestionSets } from '../../../src/questions/generate';
 import type { Mapping } from '../../../src/questions/mapping';
@@ -19,12 +19,22 @@ import type { ScanClient } from '../../../src/worker/client';
 import { STRINGS } from '../../../src/i18n/strings';
 import { useLocale } from '../../../src/i18n/useLocale';
 import { UploadStep } from '../../../components/UploadStep';
+import { SegmentStep } from '../../../components/SegmentStep';
+import { pathKey, pathsFromProducts, type PathKind, type Verdicts } from '../../../src/intake/facets';
+import { supabase } from '../../../src/auth/client';
+import { NoVerdictStore, SupabaseVerdictStore, type VerdictStore } from '../../../src/storage/verdicts';
+// Het categoriepad kent de motor al; `facets` krijgt het als argument, zodat de
+// intake niet van de engine hoeft af te hangen.
+import { categoryPath } from '../../../src/engine/join';
 import { BankStep } from '../../../components/BankStep';
+import { WaitingStep } from '../../../components/WaitingStep';
+import { BankRequestForm } from '../../../components/BankRequestForm';
+import { useAuth } from '../../../components/auth/AuthProvider';
 import { MappingStep } from '../../../components/MappingStep';
 import { QuestionSetStep } from '../../../components/QuestionSetStep';
 import { ReportView } from '../../../components/ReportView';
 
-type Step = 'upload' | 'bank' | 'mapping' | 'questions' | 'report';
+type Step = 'upload' | 'segments' | 'bank' | 'mapping' | 'questions' | 'report';
 
 export default function Home() {
   const [locale] = useLocale();
@@ -40,6 +50,63 @@ export default function Home() {
   // keuze beslist alleen de regex, en die faalt zodra de lijst zijn categorieën
   // anders noemt dan de catalogus.
   const [categories, setCategories] = useState<Record<string, string | null>>({});
+  /** Wat de merchant zelf over zijn categoriepaden zei; zie SegmentStep. */
+  const [verdicts, setVerdicts] = useState<Verdicts>({});
+  const { user, accountId } = useAuth();
+  /**
+   * Waar het oordeel van de merchant blijft staan.
+   *
+   * Zonder dit vraagt elke scan het opnieuw, en het voorstel dat hij dan krijgt
+   * kan anders zijn — gemeten wisselden 8 van de 54 paden tussen drie identieke
+   * aanroepen. Twee rapporten zouden dan op verschillende definities rusten.
+   */
+  const store = useMemo<VerdictStore>(() => {
+    const client = supabase();
+    return client ? new SupabaseVerdictStore(client) : new NoVerdictStore();
+  }, []);
+
+  // Wat hij eerder besliste ophalen zodra we weten bij welk account hij hoort.
+  // Zijn eerdere oordeel wint van wat er nu in het scherm staat: dat is precies
+  // waarvoor het bewaard werd.
+  useEffect(() => {
+    if (!accountId) return;
+    let alive = true;
+    void (async () => {
+      await Promise.resolve();
+      const stored = await store.list(accountId);
+      if (alive && Object.keys(stored).length > 0) {
+        setVerdicts((current) => ({ ...current, ...stored }));
+      }
+    })();
+    return () => { alive = false; };
+  }, [accountId, store]);
+
+  /**
+   * Eén keuze vastleggen, en meteen bewaren.
+   *
+   * Bewaren per keuze en niet aan het eind: wie halverwege wegklikt heeft zijn
+   * werk anders voor niets gedaan, en dan begint hij de volgende keer opnieuw
+   * met een voorstel dat anders kan zijn.
+   */
+  function decideCategory(segments: string[], kind: PathKind) {
+    const key = pathKey(segments);
+    setVerdicts((current) => ({ ...current, [key]: kind }));
+    if (accountId) void store.save(accountId, { pathKey: key, segments, kind });
+  }
+
+  /** Staat er al een aanvraag? Dan geen formulier meer, alleen de stand. */
+  const [queued, setQueued] = useState<'new' | 'joined'>();
+
+  /**
+   * De marktsegmenten zoals het categoriescherm ze overhoudt.
+   *
+   * Van dat scherm gekregen en hier niet opnieuw berekend: het bewijs van de
+   * site en de voorstellen van het model leven daar, en zonder die twee blijven
+   * "Effen" en "Premium" als marktsegment staan.
+   */
+  const [segments, setSegments] = useState<{ name: string; count: number }[]>([]);
+  /** Zijn eigen winkel; wordt één van de panelsites, nooit de enige. */
+  const [shopUrl, setShopUrl] = useState<string>();
   const [report, setReport] = useState<ScanReport>();
   // De client houdt de worker vast; de datasets blijven daar zodat ze niet voor
   // elke scan opnieuw door de structured clone hoeven.
@@ -52,6 +119,7 @@ export default function Home() {
   const s = STRINGS[locale];
   const steps: { id: Step; label: string }[] = [
     { id: 'upload', label: s.steps.upload },
+    { id: 'segments', label: s.steps.segments },
     { id: 'bank', label: s.steps.bank },
     { id: 'mapping', label: s.steps.mapping },
     { id: 'questions', label: s.steps.questions },
@@ -120,7 +188,7 @@ export default function Home() {
     setClient(nextClient);
     setCatalog(nextCatalog);
     compose(banks, nextCatalog);
-    setStep('bank');
+    setStep('segments');
   }
 
   async function handleImport(entry: StoredBank) {
@@ -196,15 +264,48 @@ export default function Home() {
       <main>
         {step === 'upload' ? <UploadStep s={s} onReady={handleReady} /> : null}
 
-        {step === 'bank' && questionState ? (
-          <BankStep
+        {step === 'segments' && catalog ? (
+          <SegmentStep
             s={s}
-            locale={locale}
-            stored={banks}
-            onImport={(entry) => void handleImport(entry)}
-            onRemove={(vertical) => void handleRemoveBank(vertical)}
-            onContinue={() => setStep('mapping')}
+            paths={pathsFromProducts(catalog.products, categoryPath)}
+            verdicts={verdicts}
+            onDecide={decideCategory}
+            onSegments={setSegments}
+            onSite={setShopUrl}
+            onContinue={() => setStep('bank')}
           />
+        ) : null}
+
+        {/* Geen uploadscherm meer als eerste beeld. Een webshop-eigenaar weet
+            niet welke vragen zijn markt stelt — dat is wat hij komt halen — en
+            hem die laten aanleveren is de drempel die niemand neemt. Het inlezen
+            staat er nog, als beheerhandeling onder het wachtscherm. */}
+        {step === 'bank' && questionState ? (
+          <WaitingStep
+            s={s}
+            status="queued"
+            email={user?.email}
+            hasList={banks.length > 0}
+            request={queued ? undefined : (
+              <BankRequestForm
+                s={s}
+                segments={segments}
+                accountId={accountId}
+                siteUrl={shopUrl}
+                onQueued={(joined) => setQueued(joined ? 'joined' : 'new')}
+              />
+            )}
+            onContinue={() => setStep('mapping')}
+          >
+            <BankStep
+              s={s}
+              locale={locale}
+              stored={banks}
+              onImport={(entry) => void handleImport(entry)}
+              onRemove={(vertical) => void handleRemoveBank(vertical)}
+              onContinue={() => setStep('mapping')}
+            />
+          </WaitingStep>
         ) : null}
 
         {step === 'mapping' && catalog && questionState ? (

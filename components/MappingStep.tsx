@@ -16,7 +16,7 @@
 // voorkomen.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Sparkles } from 'lucide-react';
+import { AlertTriangle, Sparkles } from 'lucide-react';
 import type { Dataset, Locale, QuestionSetState } from '../src/domain/types';
 import { attributeInventory, type Mapping } from '../src/questions/mapping';
 import { describeAttribute, describeColumn } from '../src/semantic/describe';
@@ -57,7 +57,9 @@ export function MappingStep({
   const [matchingSets, setMatchingSets] = useState(false);
   const [setsBy, setSetsBy] = useState<string>();
 
-  const rows = useMemo(() => attributeInventory(state), [state]);
+  // De keuze van nu telt mee, anders blijft de waarschuwing hieronder staan
+  // bij een kenmerk dat de merchant zojuist gekoppeld heeft.
+  const rows = useMemo(() => attributeInventory(state, mapping), [state, mapping]);
   const columns = useMemo(
     () => [...catalog.columns].sort((a, b) => a.localeCompare(b)),
     [catalog.columns],
@@ -404,7 +406,27 @@ export function MappingStep({
                       context, en dan kan niemand beoordelen of de kolom klopt. */}
                   <p className="mt-0.5 truncate text-xs text-muted">
                     {row.questions[0]?.[locale]}
+                    {row.questions.length > 1
+                      ? ` +${row.questions.length - 1} ${s.mapping.moreQuestions}`
+                      : null}
                   </p>
+                  {/* Een som heeft al zijn termen. Koppel je de rolbreedte en
+                      niet de rapporthoogte, dan blijft "hoeveel meter heb ik
+                      nodig" onbeantwoordbaar — en dít is het moment waarop de
+                      merchant er nog iets aan kan doen. */}
+                  {row.blocked.map((entry) => (
+                    <p
+                      key={entry.question.nl}
+                      className="mt-1 flex items-start gap-1.5 text-xs leading-relaxed text-warn"
+                    >
+                      <AlertTriangle className="mt-0.5 size-3 shrink-0" aria-hidden />
+                      <span className="min-w-0">
+                        <span className="text-ink">{entry.question[locale]}</span>{' '}
+                        {s.mapping.alsoNeeds}{' '}
+                        {entry.missing.map((one) => one.label[locale]).join(', ')}
+                      </span>
+                    </p>
+                  ))}
                 </div>
                 {isProposal ? <Badge tone="accent">{s.mapping.proposed}</Badge> : null}
                 <select

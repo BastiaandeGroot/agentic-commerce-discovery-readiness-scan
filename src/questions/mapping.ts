@@ -63,6 +63,22 @@ export function applyMapping(
   };
 }
 
+/**
+ * Een vraag die op dit kenmerk leunt maar er niet mee beantwoord is.
+ *
+ * Alleen bij `mode: 'all'`: dan is de vraag een som en heeft hij al zijn termen
+ * nodig. Koppel je de rolbreedte en laat je de rapporthoogte leeg, dan blijft
+ * "hoeveel meter heb ik nodig" onbeantwoordbaar — en dat is precies het moment
+ * waarop de merchant er nog iets aan kan doen. Zonder deze lijst ziet hij een
+ * gekoppeld kenmerk, denkt hij dat de vraag rond is, en ontdekt hij het gat pas
+ * twee schermen later zonder te weten waar het vandaan kwam.
+ */
+export interface BlockedQuestion {
+  question: Bilingual;
+  /** De kenmerken die deze vraag óók nodig heeft en die nergens op uitkomen. */
+  missing: { key: string; label: Bilingual }[];
+}
+
 /** Eén regel op het koppelscherm. */
 export interface AttributeRow {
   key: string;
@@ -73,6 +89,8 @@ export interface AttributeRow {
   questions: Bilingual[];
   /** Hoeveel producten er onder de sets vallen die deze vraag stellen. */
   weight: number;
+  /** Vragen die blijven staan zolang een ánder kenmerk ongekoppeld is. */
+  blocked: BlockedQuestion[];
 }
 
 /**
@@ -108,21 +126,51 @@ const isGuess = (field: string) => field.startsWith('attr:') && !field.startsWit
  * eerst wat de meeste producten raakt. Wie halverwege stopt heeft dan het
  * belangrijkste deel gehad.
  */
-export function attributeInventory(state: QuestionSetState): AttributeRow[] {
+export function attributeInventory(
+  state: QuestionSetState,
+  /**
+   * Wat de merchant op dit moment in het scherm heeft staan.
+   *
+   * Meegeven en niet afleiden uit de sets, omdat een keuze pas op de bank landt
+   * als hij bevestigd wordt. Zonder deze laag zou de waarschuwing hieronder pas
+   * verdwijnen ná het toepassen, en dan blijft er rood staan bij een kenmerk dat
+   * de merchant zojuist gekoppeld heeft.
+   */
+  pending?: Mapping,
+): AttributeRow[] {
   const rows = new Map<string, AttributeRow>();
+
+  /** Komt dit kenmerk ergens op uit — via de bank of via de keuze van nu? */
+  const linked = (key: string, fields: string[]) => {
+    const chosen = pending?.[key];
+    if (chosen !== undefined) return chosen.length > 0;
+    return fields.some((field) => !isGuess(field));
+  };
 
   for (const set of state.sets) {
     for (const question of set.questions) {
-      for (const group of question.evidence ?? []) {
+      const groups = question.evidence ?? [];
+      for (const group of groups) {
         const row = rows.get(group.attributeKey) ?? {
           key: group.attributeKey,
           label: group.label,
           fields: group.fields.filter((field) => !isGuess(field)),
           questions: [],
           weight: 0,
+          blocked: [],
         };
         if (!row.questions.some((entry) => entry.nl === question.label.nl)) {
           row.questions.push(question.label);
+
+          // Een som heeft al zijn termen. Bij `any` stapelt bewijs en volstaat
+          // dit kenmerk op zichzelf, dus dan valt er niets te blokkeren.
+          if (question.mode === 'all') {
+            const missing = groups
+              .filter((other) => other.attributeKey !== group.attributeKey)
+              .filter((other) => !linked(other.attributeKey, other.fields))
+              .map((other) => ({ key: other.attributeKey, label: other.label }));
+            if (missing.length > 0) row.blocked.push({ question: question.label, missing });
+          }
         }
         row.weight += set.productCount ?? 0;
         rows.set(group.attributeKey, row);

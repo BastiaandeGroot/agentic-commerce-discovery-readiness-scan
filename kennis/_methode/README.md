@@ -37,4 +37,4 @@ De verleiding is om per merchant een bank te laten genereren uit zijn eigen site
 Dat is het anti-patroon dat de methode bovenaan zet: dan bouw je de bank van één
 winkel inclusief zijn blinde vlekken, heb je geen frequentiemaat, en zijn twee
 merchants in dezelfde markt niet meer met elkaar te vergelijken. De site van de
-merchant is één van de vijf à acht panelsites, nooit de enige.
+merchant is één van de vijf panelsites, nooit de enige.

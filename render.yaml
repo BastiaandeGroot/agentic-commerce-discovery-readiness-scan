@@ -17,3 +17,14 @@ services:
       # browser en zegt dat erbij; de scan zelf raakt hem nooit aan.
       - key: ANTHROPIC_API_KEY
         sync: false
+      # De sleutel van de uitvoerder die vragenbanken aanlevert. `sync: false`:
+      # in het dashboard zetten, niet in deze repo.
+      - key: BANK_EXECUTOR_KEY
+        sync: false
+      # Serverzijdig schrijven buiten row level security om; alleen de uitvoerder.
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
