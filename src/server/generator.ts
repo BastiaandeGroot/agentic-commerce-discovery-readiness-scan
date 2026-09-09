@@ -43,6 +43,20 @@ const EFFORT: Record<'reader' | 'judge', 'low' | 'high'> = {
 /** Hoe vaak een fase mag doorlopen als het model tussendoor pauzeert. */
 const MAX_CONTINUATIONS = 8;
 
+/**
+ * Een fase die strandt, met wat hij tot dat moment verbruikt heeft.
+ *
+ * Die tokens zijn wél betaald. Ze weglaten maakt de kostenkolom onwaar op precies
+ * het moment dat je hem nodig hebt: een markt die drie keer struikelt is duur, en
+ * dat hoort te zien te zijn.
+ */
+export class PhaseFailure extends Error {
+  constructor(message: string, readonly usage: { input: number; output: number; cached: number }) {
+    super(message);
+    this.name = 'PhaseFailure';
+  }
+}
+
 /** De gereedschappen waarmee een fase het web op mag. */
 function webTools(): Anthropic.Messages.ToolUnion[] {
   return [
@@ -114,12 +128,19 @@ export function makeAsk(): Ask {
       // ongewijzigd terug.
       if (response.stop_reason !== 'pause_turn') {
         if (response.stop_reason === 'refusal') {
-          throw new Error(`Het model weigerde deze stap (${response.stop_details?.category ?? 'zonder reden'}).`);
+          throw new PhaseFailure(
+            `Het model weigerde deze stap (${response.stop_details?.category ?? 'zonder reden'}).`,
+            usage,
+          );
         }
         if (response.stop_reason === 'max_tokens') {
-          throw new Error('Het antwoord liep tegen de tokenlimiet aan en is daarmee afgekapt.');
+          throw new PhaseFailure('Het antwoord liep tegen de tokenlimiet aan en is daarmee afgekapt.', usage);
         }
-        return { json: extractJson(text), usage };
+        try {
+          return { json: extractJson(text), usage };
+        } catch (caught) {
+          throw new PhaseFailure(caught instanceof Error ? caught.message : 'Onleesbaar antwoord.', usage);
+        }
       }
 
       messages.push({ role: 'assistant', content: response.content });
@@ -128,7 +149,7 @@ export function makeAsk(): Ask {
     // Op is op. Verder laten lopen zou een fase zijn die zichzelf niet afmaakt
     // en wel doorbetaalt; dan is drie keer stuk en een mens ernaar laten kijken
     // het goedkopere einde.
-    throw new Error(`De stap ${task.phase} was na ${MAX_CONTINUATIONS} beurten nog niet klaar.`);
+    throw new PhaseFailure(`De stap ${task.phase} was na ${MAX_CONTINUATIONS} beurten nog niet klaar.`, usage);
   };
 }
 
