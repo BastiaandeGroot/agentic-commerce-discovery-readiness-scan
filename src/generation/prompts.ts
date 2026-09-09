@@ -76,6 +76,17 @@ export interface PhasePrompt {
   model: 'reader' | 'judge';
   /** Mag deze fase het web op? Alleen de fasen die werkelijk bronnen raadplegen. */
   web: boolean;
+  /**
+   * De ruimte voor het antwoord.
+   *
+   * Ruim, en dat is met schade en schande geleerd: het denkwerk en het zoeken
+   * tellen mee tegen dezelfde limiet als de tekst. Op 16.000 liep de panelfase
+   * er meteen tegenaan en kwam het JSON-object er half uit — een afgekapt
+   * antwoord is geen antwoord, dus dat kost een hele fase opnieuw.
+   *
+   * Het is een plafond en geen begroting: wat er niet gebruikt wordt, wordt niet
+   * betaald. Te krap zetten bespaart dus niets en kost een herkansing.
+   */
   maxTokens: number;
 }
 
@@ -122,7 +133,7 @@ export function promptFor(phase: Phase, state: RunState): PhasePrompt {
       return {
         model: 'judge',
         web: true,
-        maxTokens: 16000,
+        maxTokens: 64000,
         prompt: `Markt: ${vertical}
 
 De merchant bevestigde deze categorieën:
@@ -181,7 +192,7 @@ Antwoord met dit JSON-object:
       return {
         model: 'reader',
         web: true,
-        maxTokens: 16000,
+        maxTokens: 64000,
         prompt: `Oogst de klantvragen van ${site?.url ?? ''} (${site?.type ?? 'onbekend type'}) in de markt ${vertical}.
 
 Loop deze bronnen af, in deze volgorde van bewijskracht:
@@ -218,7 +229,7 @@ Antwoord met dit JSON-object:
       return {
         model: 'judge',
         web: false,
-        maxTokens: 32000,
+        maxTokens: 64000,
         prompt: `Markt: ${vertical}. Panel van ${state.panel.length} sites: ${state.panel.map((site) => site.name).join(', ')}.
 
 Dit is de ruwe oogst per site:
@@ -254,7 +265,7 @@ Antwoord met dit JSON-object:
       return {
         model: 'judge',
         web: false,
-        maxTokens: 32000,
+        maxTokens: 64000,
         prompt: `Markt: ${vertical}.
 
 Vorm van de markt:
@@ -313,7 +324,7 @@ Antwoord met dit JSON-object:
       return {
         model: 'judge',
         web: false,
-        maxTokens: 24000,
+        maxTokens: 48000,
         prompt: `Markt: ${vertical}. Categorie: ${category}.
 
 De basislaag stelt deze vragen al:
@@ -351,7 +362,7 @@ Antwoord met hetzelfde JSON-object als de basislaag, plus reweight:
       return {
         model: 'judge',
         web: false,
-        maxTokens: 16000,
+        maxTokens: 32000,
         prompt: `Markt: ${vertical}.
 
 De groepering die in fase 0 is voorgesteld:
