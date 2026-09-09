@@ -46,7 +46,7 @@ interface Payload {
    * is precies hetzelfde probleem — Engelse vaktaal tegen Nederlandse data — en
    * het verdient geen tweede route, alleen een andere opdracht.
    */
-  kind?: 'attributes' | 'categories' | 'facets';
+  kind?: 'attributes' | 'categories' | 'facets' | 'market';
 }
 
 /** Weiger wat niet klopt vóór het geld kost, en zeg waarom. */
@@ -59,14 +59,14 @@ function validate(body: unknown): Payload | string {
   const kindEarly = (body as Partial<Payload>).kind;
   // Bij een facetoordeel is de tweede lijst context en mag hij leeg zijn: een
   // winkel zonder zichtbare filters is geen fout, alleen minder houvast.
-  if (attributes.length === 0 || (columns.length === 0 && kindEarly !== 'facets')) {
+  if (attributes.length === 0 || (columns.length === 0 && kindEarly !== 'facets' && kindEarly !== 'market')) {
     return 'Er is niets te koppelen.';
   }
   if (attributes.length > LIMITS.attributes || columns.length > LIMITS.columns) {
     return `Te groot: hoogstens ${LIMITS.attributes} kenmerken en ${LIMITS.columns} kolommen per aanvraag.`;
   }
   const kind = (body as Partial<Payload>).kind;
-  if (kind !== undefined && kind !== 'attributes' && kind !== 'categories' && kind !== 'facets') {
+  if (kind !== undefined && kind !== 'attributes' && kind !== 'categories' && kind !== 'facets' && kind !== 'market') {
     return 'Onbekend soort koppeling.';
   }
   const clean = (list: { key: string; text: string }[]) => list.every((entry) =>
@@ -87,6 +87,18 @@ const SYSTEM_CATEGORIES = [
   '- De twee lijsten staan vaak in verschillende talen: "upholstery fabrics" en "Meubelstoffen" zijn hetzelfde, "curtain fabrics" en "Gordijnstoffen" ook.',
   '',
   'Antwoord met één regel per koppeling, in de vorm `vragenlijstcategorie: catalogus­categorie`. Geen inleiding, geen uitleg, geen opsommingstekens.',
+].join('\n');
+
+const SYSTEM_MARKET = [
+  'Je benoemt in welke markt een webshop handelt, op basis van zijn categorienamen.',
+  '',
+  'Regels:',
+  '- Antwoord met één korte naam voor de markt als geheel, niet voor een onderdeel ervan. "woontextiel", niet "gordijnstoffen".',
+  '- Gebruik de taal van de categorienamen zelf.',
+  '- Twee tot vier woorden, kleine letters. Geen merknaam en geen winkelnaam.',
+  '- Weet je het niet zeker, antwoord dan `onbekend`. Een verkeerde markt zet de verkeerde vragenlijst op de hele winkel.',
+  '',
+  'Antwoord met alleen die naam. Geen inleiding, geen uitleg, geen punt erachter.',
 ].join('\n');
 
 const SYSTEM_FACETS = [
@@ -121,6 +133,12 @@ const SYSTEM = [
 ].join('\n');
 
 function prompt({ attributes, columns, kind }: Payload): string {
+  if (kind === 'market') {
+    return [
+      'CATEGORIEËN VAN DEZE WINKEL (naam, en het aantal producten):',
+      ...attributes.map((entry) => `- ${entry.key} — ${entry.text}`),
+    ].join('\n');
+  }
   if (kind === 'facets') {
     return [
       'PADEN (pad, en het aantal producten erin):',
@@ -177,9 +195,11 @@ export async function POST(request: Request) {
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      system: payload.kind === 'facets'
-        ? SYSTEM_FACETS
-        : payload.kind === 'categories' ? SYSTEM_CATEGORIES : SYSTEM,
+      system: payload.kind === 'market'
+        ? SYSTEM_MARKET
+        : payload.kind === 'facets'
+          ? SYSTEM_FACETS
+          : payload.kind === 'categories' ? SYSTEM_CATEGORIES : SYSTEM,
       messages: [{ role: 'user', content: prompt(payload) }],
     });
 

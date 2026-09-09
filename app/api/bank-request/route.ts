@@ -27,6 +27,8 @@ interface Payload {
   /** De segmenten die onderzocht moeten worden, met hoeveel producten erin. */
   segments: { name: string; count: number }[];
   siteUrl?: string;
+  /** Webshops die de merchant aandroeg; suggestie, niet het panel. */
+  suggestedSites?: string[];
 }
 
 const LIMITS = {
@@ -86,6 +88,13 @@ export async function POST(request: Request) {
 
   // Loopt er al een aanvraag voor deze markt? Dan is dát het antwoord: wachten
   // op dezelfde taak in plaats van een tweede onderzoek starten.
+  // Alleen echte adressen, en niet te veel. Wat hier binnenkomt is vrije invoer.
+  const suggested = (payload.suggestedSites ?? [])
+    .filter((one) => typeof one === 'string')
+    .map((one) => one.trim())
+    .filter((one) => /^https?:\/\/[^\s]+$/i.test(one) || /^[a-z0-9-]+\.[a-z.]{2,}$/i.test(one))
+    .slice(0, 20);
+
   const open = await supabase
     .from('bank_requests')
     .select('id, status, requested_at, finished_at')
@@ -104,6 +113,7 @@ export async function POST(request: Request) {
       vertical,
       segments,
       site_url: payload.siteUrl ?? null,
+      suggested_sites: suggested,
     })
     .select('id, status, requested_at')
     .single();

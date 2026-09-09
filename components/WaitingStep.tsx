@@ -26,7 +26,7 @@ const TONE = {
   queued: 'neutral', running: 'accent', review: 'accent', ready: 'ok', failed: 'danger',
 } as const;
 
-export function WaitingStep({ s, status, requestedAt, email, hasList, onContinue, children }: {
+export function WaitingStep({ s, status, requestedAt, email, hasList, request, onContinue, children }: {
   s: Strings;
   status: RequestStatus;
   /** Wanneer de aanvraag binnenkwam, al opgemaakt; de motor heeft geen klok. */
@@ -35,6 +35,13 @@ export function WaitingStep({ s, status, requestedAt, email, hasList, onContinue
   email?: string;
   /** Ligt er al een lijst waarmee doorgegaan kan worden? */
   hasList: boolean;
+  /**
+   * Het aanvraagformulier, of niets als er al een aanvraag loopt.
+   *
+   * Meegegeven en niet hier opgebouwd: dit scherm weet wat er gebeurt en hoe
+   * lang het duurt, niet hoe je een aanvraag maakt.
+   */
+  request?: React.ReactNode;
   onContinue: () => void;
   /** Het inleesscherm, weggevouwen onder beheer. */
   children: React.ReactNode;
@@ -43,6 +50,10 @@ export function WaitingStep({ s, status, requestedAt, email, hasList, onContinue
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Eerst vragen, dan pas vertellen dat er gewacht wordt. Andersom lees je
+          een belofte over iets wat nog niet is aangevraagd. */}
+      {request}
+
       <Card>
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <Badge tone={TONE[status]}>{s.waiting.status[status]}</Badge>

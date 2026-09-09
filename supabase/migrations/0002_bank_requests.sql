@@ -32,6 +32,16 @@ create table if not exists bank_requests (
   -- De winkel zelf. Eén van de vijf à acht panelsites, nooit de enige bron.
   site_url text,
 
+  -- Webshops die de merchant aandroeg. Een suggestie en niet het panel: zijn
+  -- inbreng wordt toegevoegd aan wat de uitvoerder zelf vindt, want een merchant
+  -- die zijn panel bepaalt kiest zijn zwakste concurrenten.
+  suggested_sites jsonb not null default '[]'::jsonb,
+
+  -- Het panel zoals het uiteindelijk gebruikt is, met datum per site. Wordt
+  -- gevuld door de uitvoerder en is voor de merchant zichtbaar: hij moet kunnen
+  -- beoordelen of hij deze meetlat vertrouwt.
+  panel jsonb not null default '[]'::jsonb,
+
   status text not null default 'queued'
     check (status in ('queued', 'running', 'review', 'ready', 'failed')),
 

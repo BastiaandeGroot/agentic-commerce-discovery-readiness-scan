@@ -592,6 +592,20 @@ export const STRINGS = {
     },
 
     waiting: {
+      askHeading: 'Nog twee dingen en we gaan aan de slag',
+      marketLabel: 'In welke markt handel je?',
+      marketHint: 'We stellen dit voor op basis van je categorieën. Klopt het niet, pas het dan aan — hier hangt de hele vragenlijst aan.',
+      marketBusy: 'Markt bepalen…',
+      panelLabel: 'Welke webshops moeten we bekijken?',
+      panelHint: 'Eén per regel, en dit mag leeg blijven. We onderzoeken vijf à acht winkels in jouw markt om te zien welke vragen kopers stellen. Ken jij de serieuze spelers, noem ze dan — we voegen ze toe aan wat we zelf vinden. Je krijgt altijd te zien welke sites we uiteindelijk hebben gebruikt.',
+      panelPlaceholder: 'https://voorbeeld.nl',
+      submit: 'Zet de aanvraag klaar',
+      submitBusy: 'Bezig…',
+      submitFailed: 'De aanvraag kon niet worden vastgelegd',
+      submitFailedNext: 'Probeer het zo nog eens. Blijft het misgaan, laat het ons dan weten.',
+      needAccount: 'Maak eerst een account aan',
+      needAccountBody: 'We bewaren je aanvraag en sturen je bericht zodra je scan klaarstaat. Daar hebben we een account voor nodig — anders weten we niet naar wie.',
+      joined: 'Er liep al een aanvraag voor deze markt. Je bent daaraan toegevoegd en krijgt bericht zodra hij klaar is.',
       heading: 'We stellen de vragen voor jouw markt samen',
       intro:
         'De vragen komen niet uit je eigen kolommen maar uit onderzoek naar jouw markt: wat kopers vragen voordat ze bestellen, verzameld over meerdere webshops. Dat is werk dat één keer per markt gebeurt — en jij bent de eerste in de jouwe.',
@@ -1301,6 +1315,20 @@ export const STRINGS = {
     },
 
     waiting: {
+      askHeading: 'Two more things and we are off',
+      marketLabel: 'Which market do you trade in?',
+      marketHint: 'We propose this from your categories. If it is wrong, correct it — the whole question list hangs on this.',
+      marketBusy: 'Determining the market…',
+      panelLabel: 'Which shops should we look at?',
+      panelHint: 'One per line, and this may stay empty. We research five to eight shops in your market to see what questions buyers ask. If you know the serious players, name them — we add them to what we find ourselves. You will always be shown which sites we ended up using.',
+      panelPlaceholder: 'https://example.com',
+      submit: 'Put the request in',
+      submitBusy: 'Working…',
+      submitFailed: 'The request could not be recorded',
+      submitFailedNext: 'Try again in a moment. If it keeps failing, let us know.',
+      needAccount: 'Create an account first',
+      needAccountBody: 'We keep your request and tell you as soon as your scan is ready. That needs an account — otherwise we do not know who to tell.',
+      joined: 'A request for this market was already running. You have been added to it and will hear from us when it is done.',
       heading: 'We are putting together the questions for your market',
       intro:
         'The questions do not come from your own columns but from research into your market: what buyers ask before they order, gathered across several shops. That is work done once per market — and you are the first in yours.',

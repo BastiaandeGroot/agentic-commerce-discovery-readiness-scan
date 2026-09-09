@@ -10,7 +10,7 @@
 // zonder te zien waarlangs hij gemeten is, en zonder te weten dat die lat
 // voorlopig kan zijn.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Dataset, QuestionSetState, ScanReport } from '../../../src/domain/types';
 import { generateQuestionSets } from '../../../src/questions/generate';
 import type { Mapping } from '../../../src/questions/mapping';
@@ -20,12 +20,14 @@ import { STRINGS } from '../../../src/i18n/strings';
 import { useLocale } from '../../../src/i18n/useLocale';
 import { UploadStep } from '../../../components/UploadStep';
 import { SegmentStep } from '../../../components/SegmentStep';
-import { pathsFromProducts, type Verdicts } from '../../../src/intake/facets';
+import { applyVerdicts, pathsFromProducts, type Verdicts } from '../../../src/intake/facets';
 // Het categoriepad kent de motor al; `facets` krijgt het als argument, zodat de
 // intake niet van de engine hoeft af te hangen.
 import { categoryPath } from '../../../src/engine/join';
 import { BankStep } from '../../../components/BankStep';
 import { WaitingStep } from '../../../components/WaitingStep';
+import { BankRequestForm } from '../../../components/BankRequestForm';
+import { classifyPaths } from '../../../src/intake/facets';
 import { useAuth } from '../../../components/auth/AuthProvider';
 import { MappingStep } from '../../../components/MappingStep';
 import { QuestionSetStep } from '../../../components/QuestionSetStep';
@@ -50,6 +52,26 @@ export default function Home() {
   /** Wat de merchant zelf over zijn categoriepaden zei; zie SegmentStep. */
   const [verdicts, setVerdicts] = useState<Verdicts>({});
   const { user } = useAuth();
+  /** Staat er al een aanvraag? Dan geen formulier meer, alleen de stand. */
+  const [queued, setQueued] = useState<'new' | 'joined'>();
+
+  // De marktsegmenten: de categoriepaden die géén kenmerk zijn, op naam en met
+  // hun aantal. Dat is alles wat de aanvraag mag dragen.
+  const segments = useMemo(() => {
+    if (!catalog) return [];
+    const rows = applyVerdicts(
+      classifyPaths(pathsFromProducts(catalog.products, categoryPath)),
+      verdicts,
+    );
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      if (row.kind === 'facet') continue;
+      const name = row.segments[row.segments.length - 1];
+      counts.set(name, (counts.get(name) ?? 0) + row.productCount);
+    }
+    return [...counts.entries()].map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count).slice(0, 40);
+  }, [catalog, verdicts]);
   const [report, setReport] = useState<ScanReport>();
   // De client houdt de worker vast; de datasets blijven daar zodat ze niet voor
   // elke scan opnieuw door de structured clone hoeven.
@@ -227,6 +249,14 @@ export default function Home() {
             status="queued"
             email={user?.email}
             hasList={banks.length > 0}
+            request={queued ? undefined : (
+              <BankRequestForm
+                s={s}
+                segments={segments}
+                accountId={user?.id}
+                onQueued={(joined) => setQueued(joined ? 'joined' : 'new')}
+              />
+            )}
             onContinue={() => setStep('mapping')}
           >
             <BankStep
