@@ -85,6 +85,7 @@ export default function Page() {
 
   /** Wachttijd in de eenheid die klopt: uren tot een dag, daarna dagen. */
   function waited(hours: number): string {
+    if (hours < 1) return s.admin.lessThanHour;
     return hours < 48 ? `${hours} ${s.admin.hours}` : `${Math.floor(hours / 24)} ${s.admin.days}`;
   }
 
@@ -156,11 +157,29 @@ export default function Page() {
                       ? `${bank.findings.length} ${s.admin.findings}`
                       : s.admin.noFindings}
                   </Badge>
-                  <span className="text-xs text-muted">
-                    {s.admin.panel}: {bank.panel.length > 0
-                      ? bank.panel.map((site) => site.name ?? site.url).join(', ')
-                      : s.admin.noPanel}
-                  </span>
+                </div>
+
+                {/* Welke sites er werkelijk zijn doorgenomen. Een eigen blok en
+                    geen regeltje achteraan: dit is waarop de hele bank rust, en
+                    de merchant krijgt dezelfde lijst te zien. */}
+                <div className="mt-3 rounded-lg bg-surface-2 p-3">
+                  <p className="text-sm font-medium">{s.admin.panel}</p>
+                  {bank.panel.length > 0 ? (
+                    <>
+                      <p className="mt-0.5 text-xs leading-relaxed text-muted">{s.admin.panelBody}</p>
+                      <ul className="mt-2 flex flex-col gap-1">
+                        {bank.panel.map((site) => (
+                          <li key={site.url ?? site.name} className="text-sm text-ink">
+                            {site.name ?? site.url}
+                            {site.type ? <span className="text-muted"> · {site.type}</span> : null}
+                            {site.consultedAt ? <span className="text-muted"> · {site.consultedAt}</span> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <p className="mt-0.5 text-xs leading-relaxed text-muted">{s.admin.noPanelBody}</p>
+                  )}
                 </div>
 
                 <p className="mt-2 text-sm leading-relaxed text-muted">{s.admin.issuesLegend}</p>
