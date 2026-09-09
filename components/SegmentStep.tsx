@@ -13,7 +13,7 @@
 // structuur. Hij weet wat hij verkoopt; wij leiden af.
 
 import { useMemo, useState } from 'react';
-import { Globe, HelpCircle, Sparkles, TriangleAlert } from 'lucide-react';
+import { ArrowDown, ArrowUp, BookOpen, Globe, HelpCircle, Sparkles, TriangleAlert } from 'lucide-react';
 import { Badge, Button, Card, CardTitle, EmptyState, ErrorState, Input, TableWrap, Td, Th } from './ui';
 import {
   applyProposals, applyVerdicts, classifyPaths, facetDebt, pathKey,
@@ -28,9 +28,6 @@ type SiteState =
   | { kind: 'done'; evidence: SiteEvidence; pages: number; clientRendered: boolean }
   | { kind: 'failed' };
 
-const TONE: Record<PathKind, 'ok' | 'warn' | 'neutral'> = {
-  category: 'ok', facet: 'warn', unclear: 'neutral',
-};
 
 /** Waarop het oordeel steunt, in de taal van de merchant. */
 function why(s: Strings, reason: PathReason): string {
@@ -45,49 +42,145 @@ function why(s: Strings, reason: PathReason): string {
   }
 }
 
+type SortKey = 'name' | 'count';
+type Filter = 'all' | 'proposed' | 'open';
+
+/**
+ * Eén regel: de stand links, de keuze rechts.
+ *
+ * De keuze is een schakelaar met twee standen en geen badge naast een knop. Dat
+ * onderscheid bleek nodig: met een badge én een losse knop ernaast is niet te
+ * zien wat de stand is en wat de handeling, zeker niet als de knop op smalle
+ * schermen onder de badge terechtkomt.
+ */
+function Choice({ s, row, onDecide }: {
+  s: Strings;
+  row: ClassifiedPath;
+  onDecide: (path: CategoryPath, kind: PathKind) => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={row.segments.join(' > ')}
+      className="inline-flex shrink-0 overflow-hidden rounded-lg border border-line"
+    >
+      {(['category', 'facet'] as const).map((kind) => {
+        const active = row.kind === kind;
+        return (
+          <button
+            key={kind}
+            type="button"
+            aria-pressed={active}
+            title={kind === 'category' ? s.segments.isCategory : s.segments.isFacet}
+            onClick={() => onDecide(row, kind)}
+            className={`px-2.5 py-1 text-xs font-medium transition ${
+              active
+                ? kind === 'category'
+                  ? 'bg-ok-soft text-ok'
+                  : 'bg-warn-soft text-warn'
+                : 'bg-surface text-muted hover:bg-surface-2 hover:text-ink'
+            }`}
+          >
+            {s.segments.kinds[kind]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function Rows({ s, rows, onDecide }: {
   s: Strings;
   rows: ClassifiedPath[];
   onDecide: (path: CategoryPath, kind: PathKind) => void;
 }) {
+  const [sort, setSort] = useState<SortKey>('name');
+  const [descending, setDescending] = useState(false);
+  const [filter, setFilter] = useState<Filter>('all');
+
+  const shown = useMemo(() => {
+    const kept = rows.filter((row) => {
+      if (filter === 'proposed') return row.reason === 'model';
+      if (filter === 'open') return row.kind === 'unclear';
+      return true;
+    });
+    const sorted = [...kept].sort((a, b) => (
+      sort === 'count'
+        ? b.productCount - a.productCount
+        : a.segments.join(' > ').localeCompare(b.segments.join(' > '), undefined, { numeric: true })
+    ));
+    return descending ? sorted.reverse() : sorted;
+  }, [rows, sort, descending, filter]);
+
+  /** Op dezelfde kop klikken draait de volgorde om; op een andere sorteert erop. */
+  function head(key: SortKey) {
+    if (sort === key) setDescending(!descending);
+    else { setSort(key); setDescending(key === 'count'); }
+  }
+
+  const Arrow = descending ? ArrowDown : ArrowUp;
+  const counts = {
+    all: rows.length,
+    proposed: rows.filter((row) => row.reason === 'model').length,
+    open: rows.filter((row) => row.kind === 'unclear').length,
+  };
+
   return (
-    <TableWrap>
-      <thead>
-        <tr>
-          <Th>{s.segments.heading}</Th>
-          <Th>{s.segments.products}</Th>
-          <Th>{s.segments.kinds.category}</Th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr key={pathKey(row.segments)} className="border-t border-line align-top">
-            <Td>
-              <span className="block">{row.segments.join(' \u203a ')}</span>
-              <span className="mt-0.5 block text-xs leading-relaxed text-muted">{why(s, row.reason)}</span>
-            </Td>
-            <Td>{row.productCount}</Td>
-            <Td>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Badge tone={TONE[row.kind]}>{s.segments.kinds[row.kind]}</Badge>
-                {/* Een voorstel is geen koppeling tot de merchant het laat
-                    staan; dat hoort hij te kunnen zien. */}
-                {row.reason === 'model' ? <Badge tone="accent">{s.segments.proposed}</Badge> : null}
-                {/* De keuze staat naast het oordeel en niet in de plaats ervan:
-                    zo blijft zichtbaar waar de app op uitkwam. */}
-                {(['category', 'facet'] as const)
-                  .filter((kind) => kind !== row.kind)
-                  .map((kind) => (
-                    <Button key={kind} variant="quiet" onClick={() => onDecide(row, kind)}>
-                      {s.segments.kinds[kind]}
-                    </Button>
-                  ))}
-              </div>
-            </Td>
-          </tr>
+    <>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        {(['all', 'proposed', 'open'] as const).map((key) => (
+          <Button
+            key={key}
+            variant={filter === key ? 'secondary' : 'quiet'}
+            onClick={() => setFilter(key)}
+          >
+            {key === 'all' ? s.segments.filterAll : key === 'proposed' ? s.segments.filterProposed : s.segments.filterOpen}
+            <span className="text-muted">{counts[key]}</span>
+          </Button>
         ))}
-      </tbody>
-    </TableWrap>
+      </div>
+
+      {shown.length === 0 ? (
+        <EmptyState title={s.segments.noRows} body={s.segments.noRowsBody} />
+      ) : (
+        <TableWrap>
+          <thead>
+            <tr>
+              <Th>
+                <button type="button" onClick={() => head('name')} className="inline-flex items-center gap-1 hover:text-ink">
+                  {s.segments.sortName}
+                  {sort === 'name' ? <Arrow className="size-3" aria-hidden /> : null}
+                </button>
+              </Th>
+              <Th>
+                <button type="button" onClick={() => head('count')} className="inline-flex items-center gap-1 hover:text-ink">
+                  {s.segments.sortCount}
+                  {sort === 'count' ? <Arrow className="size-3" aria-hidden /> : null}
+                </button>
+              </Th>
+              <Th>{s.segments.kinds.category}</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((row) => (
+              <tr key={pathKey(row.segments)} className="border-t border-line align-top">
+                <Td>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span>{row.segments.join(' \u203a ')}</span>
+                    {/* Een voorstel is geen koppeling tot de merchant het laat
+                        staan; dat hoort hij te kunnen zien. */}
+                    {row.reason === 'model' ? <Badge tone="accent">{s.segments.proposed}</Badge> : null}
+                  </span>
+                  <span className="mt-0.5 block text-xs leading-relaxed text-muted">{why(s, row.reason)}</span>
+                </Td>
+                <Td>{row.productCount}</Td>
+                <Td><Choice s={s} row={row} onDecide={onDecide} /></Td>
+              </tr>
+            ))}
+          </tbody>
+        </TableWrap>
+      )}
+    </>
   );
 }
 
@@ -202,6 +295,21 @@ export function SegmentStep({ s, paths, verdicts, onChange, onContinue }: {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Eerst waarom, dan pas wat. Zonder de reden is dit een lijst met een
+          vraag die niemand kan beantwoorden — en het antwoord kost de merchant
+          moeite, dus hij hoort te weten waarvoor. */}
+      <Card>
+        <div className="flex items-start gap-3">
+          <BookOpen className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
+          <div className="min-w-0">
+            <p className="font-medium">{s.segments.whyHeading}</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted">{s.segments.whyBody1}</p>
+            <p className="mt-2 text-sm leading-relaxed text-muted">{s.segments.whyBody2}</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink">{s.segments.whyBody3}</p>
+          </div>
+        </div>
+      </Card>
+
       <Card>
         <CardTitle sub={s.segments.intro}>{s.segments.heading}</CardTitle>
 
