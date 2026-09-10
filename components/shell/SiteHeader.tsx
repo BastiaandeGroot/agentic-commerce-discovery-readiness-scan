@@ -76,13 +76,26 @@ export function SiteHeader() {
               doodlopende weg in de navigatie. */}
           {configured ? (
             user ? (
-              <button
-                type="button"
-                onClick={() => void signOut()}
-                className="rounded-md text-sm text-muted transition hover:text-ink"
-              >
-                {s.auth.signOut}
-              </button>
+              <>
+                {/* De weg terug naar je eigen kant van de app. Wie ingelogd is,
+                    kwam ergens vandaan — zijn bewaarde scans, zijn aanvragen —
+                    en die kon hij vanaf hier alleen terugvinden door het adres
+                    te typen. Uitloggen was de enige knop die zijn account
+                    erkende, en dat is een vreemde enige uitweg. */}
+                <Link
+                  href="/dashboard"
+                  className="rounded-md text-sm font-medium text-ink transition hover:text-accent"
+                >
+                  {s.shell.nav.dashboard}
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => void signOut()}
+                  className="rounded-md text-sm text-muted transition hover:text-ink"
+                >
+                  {s.auth.signOut}
+                </button>
+              </>
             ) : (
               <Link href="/inloggen" className="rounded-md text-sm text-muted transition hover:text-ink">
                 {s.auth.signIn}
