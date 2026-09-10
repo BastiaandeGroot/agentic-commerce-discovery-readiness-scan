@@ -119,7 +119,13 @@ export function reviewBank(bank: QuestionBank): ReviewedQuestion[] {
         return { key, mapped: fields.some((field) => !isGuess(field)) };
       });
 
-      if (used.length === 0) issues.push('no-attributes');
+      // Geen kenmerken is alleen een gebrek als de lijst wél beweert dat de
+      // vraag uit data te beantwoorden is. Een procesvraag hoort er geen te
+      // hebben — dat schrijft de methode voor — en hem daarvoor aanmerken maakte
+      // het beoordeelscherm onbruikbaar: bij de eerste echte bank stonden 115
+      // van de 171 vragen als bezwaar, waarvan het merendeel precies volgens de
+      // methode was opgeschreven.
+      if (used.length === 0 && question.answerable !== 'no') issues.push('no-attributes');
 
       if (question.ruleId) {
         const rule = rules.get(question.ruleId);
