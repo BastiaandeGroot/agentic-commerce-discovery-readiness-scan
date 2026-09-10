@@ -307,6 +307,21 @@ export default function Page() {
                   </div>
                 ) : null}
 
+                {/* Wat er van jou verwacht wordt, in de volgorde waarin het
+                    scherm het aanbiedt. Zonder dit is "vrijgeven" een knop
+                    onderaan een lijst van 171 vragen, en dan drukt niemand hem
+                    met vertrouwen in. */}
+                <div className="mt-3 rounded-lg border border-line bg-surface-2 p-3">
+                  <p className="text-sm font-medium">{s.admin.checkTitle}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted">{s.admin.checkBody}</p>
+                  <ol className="mt-2 flex flex-col gap-1 text-sm leading-relaxed text-muted">
+                    <li>1. {s.admin.check1}</li>
+                    <li>2. {s.admin.check2}</li>
+                    <li>3. {s.admin.check3}</li>
+                    <li>4. {s.admin.check4}</li>
+                  </ol>
+                </div>
+
                 <p className="mt-3 text-sm leading-relaxed text-muted">
                   {s.admin.issuesLegend}{' '}
                   {(bank.excluded ?? []).length > 0
@@ -333,6 +348,26 @@ export default function Page() {
                   </Button>
                 </div>
 
+                {/* Per categorie en niet als één lijst van 171. Een bank
+                    beoordeel je per vragenset: de algemene vragen gelden overal,
+                    en daarna zie je per categorie wat er bovenop komt. In één
+                    lijst is dat onderscheid weg, en dan is elke vraag even
+                    belangrijk — precies wat dit product nergens doet. */}
+                {groupsOf(bank.questions, onlyIssues).map((group) => (
+                <div key={group.key} className="mt-4">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line pb-1.5">
+                    <span className="text-sm font-medium">
+                      {group.category ?? s.admin.groupBase}
+                    </span>
+                    <span className="text-xs text-muted">
+                      {group.category ? s.admin.groupOverlay : s.admin.groupBaseNote}
+                    </span>
+                    <span className="ml-auto text-xs tabular-nums text-muted">
+                      {group.issues > 0
+                        ? `${group.issues} ${s.admin.withIssues} · ${group.total}`
+                        : `${s.admin.groupClean} · ${group.total}`}
+                    </span>
+                  </div>
                 <TableWrap>
                   <thead>
                     <tr>
@@ -343,9 +378,7 @@ export default function Page() {
                     </tr>
                   </thead>
                   <tbody>
-                    {bank.questions
-                      .filter((q) => !onlyIssues || q.issues.length > 0)
-                      .map((q) => (
+                    {group.questions.map((q) => (
                         <tr
                           key={q.id}
                           className={`border-t border-line align-top ${
@@ -425,8 +458,11 @@ export default function Page() {
                       ))}
                   </tbody>
                 </TableWrap>
+                </div>
+                ))}
 
-                <div className="mt-3">
+                <div className="mt-4 rounded-lg border border-line p-3">
+                  <p className="mb-2 text-sm leading-relaxed text-muted">{s.admin.checkRelease}</p>
                   <Button onClick={() => void release(bank.id)} loading={busy === bank.id}>
                     {busy === bank.id ? s.admin.releasing : s.admin.release}
                   </Button>
@@ -438,4 +474,34 @@ export default function Page() {
       </Card>
     </div>
   );
+}
+
+/**
+ * De vragen per vragenset, algemene vragen eerst.
+ *
+ * Een bank beoordeel je per set en niet als één lijst: de algemene vragen
+ * gelden voor elk product, en daarna zie je per categorie wat er bovenop komt.
+ * Binnen een groep blijft de volgorde van `reviewBank` staan — het ergste
+ * bovenaan — zodat je per categorie meteen ziet waar het werk zit.
+ */
+function groupsOf(questions: ReviewedQuestion[], onlyIssues: boolean) {
+  const groups = new Map<string, { key: string; category?: string; questions: ReviewedQuestion[]; total: number; issues: number }>();
+
+  for (const question of questions) {
+    const key = question.category ?? '';
+    const group = groups.get(key) ?? { key, category: question.category, questions: [], total: 0, issues: 0 };
+    group.total++;
+    if (question.issues.length > 0) group.issues++;
+    if (!onlyIssues || question.issues.length > 0) group.questions.push(question);
+    groups.set(key, group);
+  }
+
+  return [...groups.values()]
+    .filter((group) => group.questions.length > 0)
+    // De algemene vragen voorop; de rest op naam, zodat de volgorde vastligt.
+    .sort((a, b) => {
+      if (a.category === undefined) return -1;
+      if (b.category === undefined) return 1;
+      return a.category.localeCompare(b.category);
+    });
 }
