@@ -240,6 +240,14 @@ function Report({
       {unanswered.length > 0 ? (
         <Card>
           <CardTitle sub={s.questionsBody}>{s.questionsTitle}</CardTitle>
+          {/* Een kop boven de kolom, want de uitleg erboven leest niemand twee
+              keer. Het getal moet op zichzelf te begrijpen zijn — zeker in een
+              pdf, waar je halverwege instapt. */}
+          <div className="flex items-baseline gap-x-3 border-b border-line pb-1.5 text-xs font-medium text-muted">
+            <span className="w-9 shrink-0">&nbsp;</span>
+            <span className="flex-1">{s.colQuestion}</span>
+            <span>{s.colAnswered}</span>
+          </div>
           <ul className="flex flex-col">
             {(result.questions ?? []).map((one) => {
               const ok = one.answered >= one.applicable && one.applicable > 0;
