@@ -8,7 +8,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { ChevronDown, Inbox, LayoutGrid, ListChecks, Settings, ArrowLeft } from 'lucide-react';
+import { ChevronDown, Inbox, LayoutGrid, ListChecks, Radar, Settings, ArrowLeft } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { STRINGS } from '../../src/i18n/strings';
 import { authHeader } from '../../src/auth/client';
@@ -21,6 +21,7 @@ const LINKS = [
   // Alleen zichtbaar voor beheerders. De pagina zelf beslist dat serverzijdig;
   // dit is navigatie en geen slot.
   { href: '/dashboard/aanvragen', key: 'requests', Icon: Inbox, admin: true },
+  { href: '/dashboard/winkelscan', key: 'shopScan', Icon: Radar, admin: true },
   { href: '/dashboard/instellingen', key: 'settings', Icon: Settings },
 ];
 
