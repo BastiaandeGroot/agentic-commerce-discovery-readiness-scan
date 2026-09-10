@@ -36,6 +36,8 @@ interface BankRow {
   panel: PanelSite[];
   grouping?: GroupingEntry[];
   summary?: BankSummary;
+  /** Opnieuw berekend door de lezer, niet de lijst van bij het afleveren. */
+  warnings?: string[];
   created_at: string;
   released_at?: string;
 }
@@ -225,16 +227,63 @@ function Detail({ bank, s, locale }: {
         )}
       </Card>
 
-      {bank.findings.length > 0 ? (
-        <Card>
-          <CardTitle>{s.findings}</CardTitle>
-          <ul className="flex flex-col gap-1.5">
-            {bank.findings.map((finding) => (
-              <li key={finding} className="text-sm leading-relaxed text-muted">{finding}</li>
-            ))}
-          </ul>
-        </Card>
-      ) : null}
+      {/* Twee heel verschillende dingen, en ze op één hoop gooien maakte dit
+          scherm onbruikbaar: honderd regels waar geen handeling uit volgt.
+          Bovenaan wat een mens moet wegen, daaronder wat de lezer opmerkt over
+          de vorm — en dat laatste staat per vraag al op het beoordeelscherm. */}
+      <Card>
+        <CardTitle sub={s.researchBody}>{s.research}</CardTitle>
+        <Findings items={research(bank.findings)} s={s} />
+      </Card>
+
+      <Card>
+        <CardTitle sub={s.readerBody}>{s.reader}</CardTitle>
+        {(bank.warnings ?? []).length === 0 ? (
+          <p className="text-sm leading-relaxed text-muted">{s.readerNone}</p>
+        ) : (
+          <Findings items={bank.warnings ?? []} s={s} />
+        )}
+      </Card>
     </div>
+  );
+}
+
+/**
+ * De bevindingen die uit het onderzoek komen, los van de vormfouten.
+ *
+ * De opgeslagen lijst is bij het afleveren vastgelegd en bevat allebei door
+ * elkaar. De vormfouten hebben een vaste aanhef ("vraag BAS-16: ...") en staan
+ * bovendien per vraag op het beoordeelscherm; wat overblijft is wat een mens
+ * moet lezen. Bij de eerste echte bank waren dat er 92 tegenover 107 regels
+ * ruis, en zonder deze scheiding las niemand die 92.
+ */
+function research(findings: string[]): string[] {
+  return findings.filter((finding) => !/^vraag\s+[A-Z0-9-]+:/.test(finding));
+}
+
+/** Een lijst die niet over het scherm heen loopt. */
+function Findings({ items, s }: { items: string[]; s: typeof STRINGS['nl']['bankList'] }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? items : items.slice(0, 6);
+
+  return (
+    <>
+      <ul className="flex flex-col gap-2">
+        {shown.map((item) => (
+          <li key={item} className="border-l-2 border-line pl-3 text-sm leading-relaxed text-muted">
+            {item}
+          </li>
+        ))}
+      </ul>
+      {items.length > 6 ? (
+        <button
+          type="button"
+          onClick={() => setAll(!all)}
+          className="mt-3 text-sm font-medium text-accent underline underline-offset-4"
+        >
+          {all ? s.showLess : `${s.showAll} (${items.length})`}
+        </button>
+      ) : null}
+    </>
   );
 }

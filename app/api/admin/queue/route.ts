@@ -75,6 +75,11 @@ export async function GET(request: Request) {
         ...rest,
         questions: read.bank ? reviewBank(read.bank) : [],
         summary: read.bank ? summariseBank(read.bank) : undefined,
+        // Opnieuw berekend en niet de opgeslagen lijst: die is vastgelegd bij
+        // het afleveren, en de lezer is sindsdien scherper geworden. Een bank
+        // beoordelen op meldingen die we inmiddels niet meer maken, kost een
+        // uur van jouw tijd aan iets wat we zelf al hebben opgelost.
+        warnings: read.warnings,
       };
     }),
   });
