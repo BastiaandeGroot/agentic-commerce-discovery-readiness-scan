@@ -45,8 +45,14 @@ const OBJECTIONS: QuestionIssue[] = [
   'no-attributes',
   'rule-without-source',
   'critical-without-basis',
-  'rule-not-computed',
 ];
+
+// `rule-not-computed` staat er bewust niet bij. Die zegt: er is een beslisregel
+// mét bron, maar de scan rekent er niet mee — hij kijkt of het kenmerk gevuld
+// is, niet of de waarde boven de grens uitkomt. Dat is een eigenschap van de
+// scan en niet iets wat aan deze bank mankeert; er valt voor de beheerder niets
+// over te beslissen. Hij hoort er wel te staan, want de vraag wordt daardoor
+// soepeler gemeten dan hij bedoeld is, en dat moet je weten.
 
 /**
  * Is dit iets om over te beslissen, of alleen om te weten?
