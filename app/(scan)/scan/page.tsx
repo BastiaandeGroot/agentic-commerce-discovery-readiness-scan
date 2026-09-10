@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Dataset, QuestionSetState, ScanReport } from '../../../src/domain/types';
 import { generateQuestionSets } from '../../../src/questions/generate';
+import { importQuestionList } from '../../../src/questions/list';
 import type { Mapping } from '../../../src/questions/mapping';
 import { bankStore, LOCAL_ACCOUNT, type StoredBank } from '../../../src/storage/banks';
 import type { ScanClient } from '../../../src/worker/client';
@@ -21,7 +22,7 @@ import { useLocale } from '../../../src/i18n/useLocale';
 import { UploadStep } from '../../../components/UploadStep';
 import { SegmentStep } from '../../../components/SegmentStep';
 import { pathKey, pathsFromProducts, type PathKind, type Verdicts } from '../../../src/intake/facets';
-import { supabase } from '../../../src/auth/client';
+import { authHeader, supabase } from '../../../src/auth/client';
 import { NoVerdictStore, SupabaseVerdictStore, type VerdictStore } from '../../../src/storage/verdicts';
 // Het categoriepad kent de motor al; `facets` krijgt het als argument, zodat de
 // intake niet van de engine hoeft af te hangen.
@@ -204,6 +205,34 @@ export default function Home() {
     compose(next);
   }
 
+  /**
+   * De merchant herkent zijn markt in een lijst die er al ligt.
+   *
+   * Dan is er niets aan te vragen en niets te wachten: de bank hoort bij de
+   * markt en niet bij een winkel, dus de tweede merchant in woontextiel meet
+   * meteen. Hij komt binnen langs dezelfde weg als een lijst die hij zelf
+   * inleest — dezelfde lezer, dezelfde opslag, dezelfde controle.
+   */
+  async function handleChooseBank(id: string) {
+    try {
+      const response = await fetch(`/api/banks?id=${encodeURIComponent(id)}`, { headers: await authHeader() });
+      if (!response.ok) return;
+      const data = await response.json();
+      const read = importQuestionList([{ name: `${data.vertical}.csv`, text: String(data.csv ?? '') }]);
+      if (!read.bank) return;
+      await handleImport({
+        accountId: LOCAL_ACCOUNT,
+        savedAt: new Date().toISOString(),
+        source: `${data.vertical} v${data.version}`,
+        bank: read.bank,
+      });
+      setStep('mapping');
+    } catch {
+      // Mislukt inlezen laat het scherm staan zoals het stond; de merchant kan
+      // opnieuw kiezen of alsnog een lijst aanvragen.
+    }
+  }
+
   async function handleRemoveBank(vertical: string) {
     await bankStore.remove(LOCAL_ACCOUNT, vertical);
     const next = await bankStore.list(LOCAL_ACCOUNT);
@@ -289,10 +318,12 @@ export default function Home() {
             request={queued ? undefined : (
               <BankRequestForm
                 s={s}
+                locale={locale}
                 segments={segments}
                 accountId={accountId}
                 siteUrl={shopUrl}
                 onQueued={(joined) => setQueued(joined ? 'joined' : 'new')}
+                onChoose={(id) => void handleChooseBank(id)}
               />
             )}
             onContinue={() => setStep('mapping')}

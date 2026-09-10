@@ -28,8 +28,28 @@ export interface Segment {
 
 type Phase = 'idle' | 'busy' | { failed: string };
 
-export function BankRequestForm({ s, segments, accountId, siteUrl, onQueued }: {
+/** Lijkt deze marktnaam op wat de merchant invulde? Ruw, en dat is genoeg: het
+ *  bepaalt alleen de volgorde, nooit wat er wel of niet getoond wordt. */
+function matches(vertical: string, market: string): boolean {
+  const value = market.trim().toLowerCase();
+  if (value === '') return false;
+  const name = vertical.toLowerCase();
+  return name.includes(value) || value.includes(name);
+}
+
+/** Een vragenlijst die er al ligt, met een voorproefje van zijn vragen. */
+export interface BankOffer {
+  id: string;
+  vertical: string;
+  version: number;
+  questions: number;
+  categories: number;
+  sample: { nl: string; en: string }[];
+}
+
+export function BankRequestForm({ s, locale, segments, accountId, siteUrl, onQueued, onChoose }: {
   s: Strings;
+  locale: 'nl' | 'en';
   /** De marktsegmenten uit het categoriescherm, facetten er al uit. */
   segments: Segment[];
   /** Zonder account kan er niets bewaard worden en dus niets bericht. */
@@ -37,11 +57,34 @@ export function BankRequestForm({ s, segments, accountId, siteUrl, onQueued }: {
   /** De winkel van de merchant, als hij hem op het categoriescherm gaf. */
   siteUrl?: string;
   onQueued: (joined: boolean) => void;
+  /** De merchant herkent zijn markt in een lijst die er al ligt. */
+  onChoose: (id: string) => void;
 }) {
   const [market, setMarket] = useState('');
   const [guessing, setGuessing] = useState(false);
   const [panel, setPanel] = useState('');
   const [phase, setPhase] = useState<Phase>('idle');
+  const [offers, setOffers] = useState<BankOffer[] | undefined>();
+  /** De keuze: een bank-id, of `none` voor "geen van deze past". */
+  const [choice, setChoice] = useState<string>();
+
+  // Wat er al ligt. Een bank hoort bij een markt en niet bij een winkel, dus de
+  // tweede merchant in woontextiel hoeft niets aan te vragen — die kan meteen
+  // door. Dat is precies wat dit blok hem laat zien.
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      await Promise.resolve();
+      try {
+        const response = await fetch('/api/banks', { headers: await authHeader() });
+        const data = response.ok ? await response.json() : undefined;
+        if (alive) setOffers((data?.banks ?? []) as BankOffer[]);
+      } catch {
+        if (alive) setOffers([]);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   // Eén kleine aanroep over alleen de categorienamen. De merchant ziet het
   // voorstel staan en kan het overschrijven; hij beslist, wij stellen voor.
@@ -163,6 +206,86 @@ export function BankRequestForm({ s, segments, accountId, siteUrl, onQueued }: {
           onChange={setMarket}
         />
 
+        {/* Past er al een lijst op zijn markt? Dan is de rest van dit scherm
+            overbodig, en dat hoort hij te zien vóórdat hij een aanvraag invult
+            die hem twee werkdagen kost. */}
+        {offers === undefined ? (
+          <p className="text-sm text-muted">{s.waiting.matchBusy}</p>
+        ) : offers.length === 0 ? (
+          <p className="text-sm leading-relaxed text-muted">{s.waiting.matchEmpty}</p>
+        ) : (
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-sm font-medium">{s.waiting.matchHeading}</legend>
+            <p className="mb-1 text-xs leading-relaxed text-muted">{s.waiting.matchBody}</p>
+
+            {[...offers]
+              // De lijst die op zijn ingevulde markt lijkt bovenaan. Hij hoeft
+              // niet te zoeken naar het antwoord dat hij net zelf heeft gegeven.
+              .sort((a, b) => Number(matches(b.vertical, market)) - Number(matches(a.vertical, market)))
+              .map((offer) => (
+              <label
+                key={offer.id}
+                className={`flex cursor-pointer gap-3 rounded-lg border p-3 transition ${
+                  choice === offer.id ? 'border-accent bg-surface-2' : 'border-line'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="bank-choice"
+                  className="mt-1"
+                  checked={choice === offer.id}
+                  onChange={() => setChoice(offer.id)}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">{offer.vertical}</span>
+                  <span className="block text-xs text-muted">
+                    {offer.questions} {s.waiting.matchQuestions}
+                    {offer.categories > 0 ? ` · ${offer.categories} ${s.waiting.matchCategories}` : ''}
+                  </span>
+                  {offer.sample.length > 0 ? (
+                    <span className="mt-1.5 block text-xs leading-relaxed text-muted">
+                      <span className="font-medium">{s.waiting.matchSample}:</span>
+                      <span className="mt-0.5 block">
+                        {offer.sample.map((question) => (
+                          <span key={question.nl} className="block">— {question[locale]}</span>
+                        ))}
+                      </span>
+                    </span>
+                  ) : null}
+                </span>
+              </label>
+            ))}
+
+            <label
+              className={`flex cursor-pointer gap-3 rounded-lg border p-3 transition ${
+                choice === 'none' ? 'border-accent bg-surface-2' : 'border-line'
+              }`}
+            >
+              <input
+                type="radio"
+                name="bank-choice"
+                className="mt-1"
+                checked={choice === 'none'}
+                onChange={() => setChoice('none')}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">{s.waiting.matchNone}</span>
+                <span className="block text-xs leading-relaxed text-muted">{s.waiting.matchNoneHint}</span>
+              </span>
+            </label>
+          </fieldset>
+        )}
+
+        {choice !== undefined && choice !== 'none' ? (
+          <div>
+            <Button onClick={() => onChoose(choice)}>{s.waiting.matchUse}</Button>
+          </div>
+        ) : null}
+
+        {/* De aanvraag zelf: alleen als er niets past. Hem altijd tonen zou de
+            merchant een formulier laten invullen dat hij niet nodig heeft. */}
+        {offers !== undefined && (offers.length === 0 || choice === 'none') ? (
+        <>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="bank-panel" className="text-sm font-medium">{s.waiting.panelLabel}</label>
           <textarea
@@ -196,6 +319,8 @@ export function BankRequestForm({ s, segments, accountId, siteUrl, onQueued }: {
             {phase === 'busy' ? s.waiting.submitBusy : s.waiting.submit}
           </Button>
         </div>
+        </>
+        ) : null}
       </div>
     </Card>
   );
