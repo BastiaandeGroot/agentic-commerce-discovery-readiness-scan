@@ -24,8 +24,13 @@ const display = Fraunces({
 import { LocaleProvider } from '../src/i18n/useLocale';
 import { ToastProvider } from '../components/ui';
 import { AuthProvider } from '../components/auth/AuthProvider';
+import { SITE_URL } from '../src/site';
 
 export const metadata: Metadata = {
+  // Zonder dit blijven de afbeeldingen en adressen in de deelkaartjes relatief,
+  // en dan toont een gedeelde link niets. De losse pagina's zetten hun eigen
+  // titel en omschrijving; dit is het adres waar die aan hangen.
+  metadataBase: new URL(SITE_URL),
   title: 'Agentic Commerce Discovery Readiness Scan',
   description:
     'Meet of een productcatalogus de vragen beantwoordt die een koper in zijn markt stelt.',

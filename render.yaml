@@ -28,6 +28,17 @@ services:
         sync: false
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
         sync: false
+      # Wie het beheerscherm mag zien en dus een vragenbank mag vrijgeven.
+      # Stond alleen in het dashboard: deze service is blueprint managed, dus
+      # wat hier niet staat kan bij een volgende sync verdwijnen — en dan raakt
+      # de enige beheerder zijn toegang kwijt op het moment dat er een bank
+      # klaarstaat.
+      - key: ADMIN_EMAILS
+        sync: false
+      # Alleen nodig als de API-sleutel niet aan een workspace hangt. Leeg laten
+      # mag; de routes sturen de header dan niet mee.
+      - key: ANTHROPIC_WORKSPACE_ID
+        sync: false
 
   # De poller van de vragenbankgeneratie.
   #
