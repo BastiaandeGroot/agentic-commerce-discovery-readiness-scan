@@ -45,6 +45,7 @@ interface Result {
   notes: string[];
   attributes?: string[];
   categories?: { name: string; products: number }[];
+  pages?: { url: string; titel: string }[];
   funnel?: { total: number; avgAnswered: number; avgApplicable: number };
   questions?: QuestionLine[];
 }
@@ -269,6 +270,33 @@ function Report({
               <Badge key={key} tone="neutral">{key}</Badge>
             ))}
           </p>
+        </Card>
+      ) : null}
+
+      {result.pages && result.pages.length > 0 ? (
+        <Card>
+          <CardTitle sub={s.pagesBody}>{s.pagesTitle}</CardTitle>
+          <ol className="flex flex-col">
+            {result.pages.map((page, index) => (
+              <li key={page.url} className="flex gap-3 border-t border-line py-1.5 text-sm first:border-t-0">
+                <span className="w-6 shrink-0 tabular-nums text-muted">{index + 1}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{page.titel || page.url}</span>
+                  {/* Het adres erbij, want de titel alleen is niet na te lopen.
+                      Als pad en niet als volledige URL: het domein staat al
+                      bovenaan het rapport en herhalen maakt de lijst onleesbaar. */}
+                  <a
+                    href={page.url}
+                    className="block truncate text-xs text-muted underline underline-offset-2"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {page.url.replace(/^https?:\/\/[^/]+/, '')}
+                  </a>
+                </span>
+              </li>
+            ))}
+          </ol>
         </Card>
       ) : null}
 

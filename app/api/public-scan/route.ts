@@ -94,6 +94,10 @@ export async function POST(request: Request) {
       blockedBots: collected.blockedBots,
       notes: collected.notes,
       attributes: [...attributes].filter((key) => key !== 'url'),
+      // Welke pagina's er werkelijk bekeken zijn. Zonder deze lijst is de
+      // steekproef een bewering; met de lijst kan iemand hem zelf nalopen — en
+      // dat is precies wat dit rapport van een mening onderscheidt.
+      pages: collected.rows.map((row) => ({ url: row.url, titel: row.titel ?? '' })),
       categories: report.categories
         .filter((one) => one.subcategory === undefined)
         .map((one) => ({ name: one.category, products: one.total })),
