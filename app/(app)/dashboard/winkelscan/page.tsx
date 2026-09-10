@@ -49,7 +49,10 @@ interface Result {
   pages?: {
     url: string; titel: string; categorie: string;
     answered: number; applicable: number;
-    questions: { id: string; label: Bilingual; answered: boolean; importance: string }[];
+    questions: {
+      id: string; label: Bilingual; answered: boolean; importance: string;
+      found: { field: string; value: string }[];
+    }[];
   }[];
   funnel?: { total: number; avgAnswered: number; avgApplicable: number };
   questions?: QuestionLine[];
@@ -392,7 +395,18 @@ function PageLine({ page, index, s, locale }: {
                 <li key={one.id} className="flex items-baseline gap-2 text-xs">
                   {/* Teken én tekst, niet alleen kleur: dit wordt afgedrukt. */}
                   <span className="w-3 shrink-0 text-muted">{one.answered ? '\u2713' : '\u2014'}</span>
-                  <span className={one.answered ? '' : 'text-muted'}>{one.label[locale]}</span>
+                  <span className={one.answered ? '' : 'text-muted'}>
+                    {one.label[locale]}
+                    {/* Waar het antwoord vandaan komt. Zonder dit is een vinkje
+                        iets wat de merchant moet geloven; met de kolom en de
+                        waarde erbij kan hij het op zijn eigen pagina nakijken. */}
+                    {one.answered && one.found.length > 0 ? (
+                      <span className="block text-muted">
+                        {s.pageFound}{' '}
+                        {one.found.map((entry) => `${entry.field}: ${entry.value}`).join(' \u00b7 ')}
+                      </span>
+                    ) : null}
+                  </span>
                 </li>
               ))}
             </ul>

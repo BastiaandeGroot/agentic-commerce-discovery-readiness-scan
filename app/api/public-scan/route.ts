@@ -58,6 +58,43 @@ function mergeQuestions(coverage: ReturnType<typeof runScan>['questionCoverage']
   return [...merged.values()];
 }
 
+/**
+ * Van een veldsleutel naar wat er op de pagina stond.
+ *
+ * Een vinkje zonder herkomst is een oordeel dat de merchant moet geloven. Met de
+ * kolom én de waarde erbij kan hij het nakijken op zijn eigen productpagina, en
+ * dan is het geen bewering meer maar een waarneming.
+ *
+ * De motor werkt in canonieke sleutels (`material`) of in patronen (`attr:...`);
+ * de winkel publiceert onder zijn eigen naam. Deze functie legt die twee op
+ * elkaar via de kolomherkenning die de intake al deed.
+ */
+function foundIn(
+  keys: string[],
+  row: Record<string, string> | undefined,
+  columnOf: Map<string, string>,
+  columns: string[],
+): { field: string; value: string }[] {
+  if (!row) return [];
+  const out: { field: string; value: string }[] = [];
+
+  for (const key of keys) {
+    const column = key.startsWith('attr:')
+      ? columns.find((one) => new RegExp(key.slice(5), 'i').test(one))
+      : columnOf.get(key) ?? (key in row ? key : undefined);
+    if (!column) continue;
+
+    const value = row[column];
+    if (!value) continue;
+    if (out.some((entry) => entry.field === column)) continue;
+
+    // Ingekort: een omschrijving van tweehonderd woorden hoort niet in een
+    // regel die laat zien wáár het antwoord vandaan komt.
+    out.push({ field: column, value: value.length > 120 ? `${value.slice(0, 120)}…` : value });
+  }
+  return out;
+}
+
 export async function POST(request: Request) {
   if (!(await isAdmin(request))) {
     return NextResponse.json({ error: 'Geen beheerder.' }, { status: 403 });
@@ -121,6 +158,12 @@ export async function POST(request: Request) {
     const questions = generateQuestionSets(catalog, banks);
     const report = runScan(catalog, questions, { scannedAt: new Date().toISOString() });
 
+    // Canonieke sleutel → de kolomnaam waaronder deze winkel hem publiceert.
+    const columnOf = new Map<string, string>();
+    for (const [column, key] of Object.entries(catalog.mapping)) {
+      if (!columnOf.has(key)) columnOf.set(key, column);
+    }
+
     const attributes = new Set<string>();
     for (const row of collected.rows) for (const key of Object.keys(row)) attributes.add(key);
 
@@ -157,6 +200,9 @@ export async function POST(request: Request) {
             label: one.label,
             answered: one.answered,
             importance: one.importance,
+            found: one.answered
+              ? foundIn(one.found, collected.rows[index], columnOf, catalog.columns)
+              : [],
           })),
       })),
       categories: report.categories

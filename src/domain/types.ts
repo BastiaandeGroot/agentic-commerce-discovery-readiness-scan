@@ -332,6 +332,14 @@ export interface QuestionOutcome {
   answered: boolean;
   /** Bij onbeantwoord: welke velden ontbraken. */
   missing: string[];
+  /**
+   * Bij beantwoord: welke velden het antwoord droegen.
+   *
+   * De tegenhanger van `missing`, en even nodig. Een vinkje zonder herkomst is
+   * een oordeel dat de merchant moet geloven; met de velden erbij kan hij het
+   * nakijken — en dat is precies het verschil waar dit product op rust.
+   */
+  found: string[];
   /** Het gewicht van deze vraag; 0 als hij buiten de score valt. */
   weight: number;
   /**
