@@ -94,10 +94,31 @@ export async function POST(request: Request) {
       blockedBots: collected.blockedBots,
       notes: collected.notes,
       attributes: [...attributes].filter((key) => key !== 'url'),
-      // Welke pagina's er werkelijk bekeken zijn. Zonder deze lijst is de
-      // steekproef een bewering; met de lijst kan iemand hem zelf nalopen — en
-      // dat is precies wat dit rapport van een mening onderscheidt.
-      pages: collected.rows.map((row) => ({ url: row.url, titel: row.titel ?? '' })),
+      // Welke pagina's er werkelijk bekeken zijn, met per pagina de vragen die
+      // eroverheen gingen. Zonder deze lijst is de steekproef een bewering; met
+      // de lijst kan iemand hem zelf nalopen — en dat is precies wat dit rapport
+      // van een mening onderscheidt.
+      //
+      // Per pagina en niet alleen als totaal, want een merchant herkent zijn
+      // eigen product. "Gemiddeld 2,9 van de 14" is statistiek; "op deze stof
+      // kan een agent niet zien of hij tegen een hond kan" is zijn winkel.
+      // Op volgorde teruggekoppeld aan de opgehaalde rij: `product.key` is de
+      // sku en niet het adres, en de motor houdt de volgorde van de invoer aan.
+      pages: report.products.map((product, index) => ({
+        url: collected.rows[index]?.url ?? '',
+        titel: product.title ?? '',
+        categorie: product.category ?? '',
+        answered: product.questions.filter((one) => one.scored && one.answered).length,
+        applicable: product.questions.filter((one) => one.scored).length,
+        questions: product.questions
+          .filter((one) => one.scored)
+          .map((one) => ({
+            id: one.questionId,
+            label: one.label,
+            answered: one.answered,
+            importance: one.importance,
+          })),
+      })),
       categories: report.categories
         .filter((one) => one.subcategory === undefined)
         .map((one) => ({ name: one.category, products: one.total })),

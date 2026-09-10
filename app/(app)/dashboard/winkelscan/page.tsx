@@ -45,7 +45,11 @@ interface Result {
   notes: string[];
   attributes?: string[];
   categories?: { name: string; products: number }[];
-  pages?: { url: string; titel: string }[];
+  pages?: {
+    url: string; titel: string; categorie: string;
+    answered: number; applicable: number;
+    questions: { id: string; label: Bilingual; answered: boolean; importance: string }[];
+  }[];
   funnel?: { total: number; avgAnswered: number; avgApplicable: number };
   questions?: QuestionLine[];
 }
@@ -296,23 +300,7 @@ function Report({
           <CardTitle sub={s.pagesBody}>{s.pagesTitle}</CardTitle>
           <ol className="flex flex-col">
             {result.pages.map((page, index) => (
-              <li key={page.url} className="flex gap-3 border-t border-line py-1.5 text-sm first:border-t-0">
-                <span className="w-6 shrink-0 tabular-nums text-muted">{index + 1}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate">{page.titel || page.url}</span>
-                  {/* Het adres erbij, want de titel alleen is niet na te lopen.
-                      Als pad en niet als volledige URL: het domein staat al
-                      bovenaan het rapport en herhalen maakt de lijst onleesbaar. */}
-                  <a
-                    href={page.url}
-                    className="block truncate text-xs text-muted underline underline-offset-2"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {page.url.replace(/^https?:\/\/[^/]+/, '')}
-                  </a>
-                </span>
-              </li>
+              <PageLine key={page.url || index} page={page} index={index} s={s} locale={locale} />
             ))}
           </ol>
         </Card>
@@ -341,5 +329,76 @@ function Report({
         ) : null}
       </Card>
     </div>
+  );
+}
+
+/**
+ * Eén bekeken pagina, met wat een agent er wel en niet uit haalt.
+ *
+ * Standaard alleen wat onbeantwoord blijft, want dat is het bruikbare deel en
+ * het houdt de pdf leesbaar: vierentwintig pagina's maal veertien vragen is
+ * driehonderd regels die niemand leest. Uitklappen geeft de volledige lijst, en
+ * wat uitgeklapt staat gaat mee in de afdruk.
+ */
+function PageLine({ page, index, s, locale }: {
+  page: NonNullable<Result['pages']>[number];
+  index: number;
+  s: typeof STRINGS['nl']['shopScan'];
+  locale: 'nl' | 'en';
+}) {
+  const [open, setOpen] = useState(false);
+  const missing = page.questions.filter((one) => !one.answered);
+
+  return (
+    <li className="border-t border-line py-2.5 first:border-t-0">
+      <div className="flex gap-3">
+        <span className="w-6 shrink-0 tabular-nums text-sm text-muted">{index + 1}</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="flex-1 text-sm font-medium">{page.titel || page.url}</span>
+            <span className="text-sm tabular-nums text-muted">
+              {page.answered}/{page.applicable} {s.pageAnswered}
+            </span>
+          </div>
+          <a
+            href={page.url}
+            target="_blank"
+            rel="noreferrer"
+            className="block truncate text-xs text-muted underline underline-offset-2"
+          >
+            {page.url.replace(/^https?:\/\/[^/]+/, '')}
+          </a>
+
+          {missing.length === 0 ? (
+            <p className="mt-1.5 text-xs text-muted">{s.pageAllAnswered}</p>
+          ) : (
+            <p className="mt-1.5 text-xs leading-relaxed text-muted">
+              <span className="font-medium">{s.pageMissing}:</span>{' '}
+              {missing.map((one) => one.label[locale]).join(' \u00b7 ')}
+            </p>
+          )}
+
+          {open ? (
+            <ul className="mt-2 flex flex-col gap-1 border-l border-line pl-3">
+              {page.questions.map((one) => (
+                <li key={one.id} className="flex items-baseline gap-2 text-xs">
+                  {/* Teken én tekst, niet alleen kleur: dit wordt afgedrukt. */}
+                  <span className="w-3 shrink-0 text-muted">{one.answered ? '\u2713' : '\u2014'}</span>
+                  <span className={one.answered ? '' : 'text-muted'}>{one.label[locale]}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            className="mt-1.5 text-xs font-medium text-accent underline underline-offset-2"
+          >
+            {open ? s.pageHideAll : s.pageShowAll}
+          </button>
+        </div>
+      </div>
+    </li>
   );
 }
