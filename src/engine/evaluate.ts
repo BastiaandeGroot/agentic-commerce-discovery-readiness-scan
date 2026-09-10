@@ -132,6 +132,8 @@ function answersQuestion(product: ProductRecord, question: Question) {
     answered,
     fields,
     missing: answered ? [] : fields.filter((field) => !satisfies(product, field)),
+    /** Wat het antwoord droeg. Dezelfde berekening, andere kant op. */
+    found: fields.filter((field) => satisfies(product, field)),
     /** Er staat iets, maar niet genoeg: onvolledig in plaats van ontbrekend. */
     partial: !answered && fields.some((field) => satisfies(product, field)),
     /** Gevuld maar te mager om een antwoord te heten. */
@@ -238,6 +240,7 @@ export function evaluateProduct(
         state,
         answered: state === 'answered',
         missing: outcome.missing,
+        found: outcome.found,
         weight: weightOf(question),
         scored: isScored(question),
         // Reist mee tot op het rapport: daar hoort te staan of een onbeantwoorde

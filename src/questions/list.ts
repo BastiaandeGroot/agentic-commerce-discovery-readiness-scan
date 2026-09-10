@@ -256,6 +256,7 @@ function same(value: string): Bilingual {
 /** Voorvoegsels waarop losse meldingen aan het eind worden samengevoegd. */
 const WEIGHT_MISMATCH = '\u0000weight:';
 const COUNT_MISMATCH = '\u0000count:';
+const NO_EVIDENCE = '\u0000evidence:';
 
 /**
  * Eén melding per soort in plaats van één per rij.
@@ -271,15 +272,21 @@ function fold(warnings: string[]): string[] {
 
   const weight = ids(WEIGHT_MISMATCH);
   const count = ids(COUNT_MISMATCH);
-  const rest = warnings.filter(
-    (warning) => !warning.startsWith(WEIGHT_MISMATCH) && !warning.startsWith(COUNT_MISMATCH),
-  );
+  const evidence = ids(NO_EVIDENCE);
+  const rest = warnings.filter((warning) => (
+    !warning.startsWith(WEIGHT_MISMATCH)
+    && !warning.startsWith(COUNT_MISMATCH)
+    && !warning.startsWith(NO_EVIDENCE)
+  ));
 
   if (weight.length > 0) {
     rest.push(`Bij ${weight.length} vra${weight.length === 1 ? 'ag' : 'gen'} wijkt de kolom \`gewicht\` af van het belang ernaast. De scan gebruikt de weging uit de methode (kritiek 5, hoog 3, middel 2, laag 1), zodat merchants onderling vergelijkbaar blijven. Het gaat om: ${weight.slice(0, 8).join(', ')}${weight.length > 8 ? ` en ${weight.length - 8} meer` : ''}.`);
   }
   if (count.length > 0) {
     rest.push(`Bij ${count.length} vra${count.length === 1 ? 'ag' : 'gen'} klopt \`aantal_attributen\` niet met wat er in \`benodigde_attributen\` staat. De lijst met namen is leidend. Het gaat om: ${count.slice(0, 8).join(', ')}${count.length > 8 ? ` en ${count.length - 8} meer` : ''}.`);
+  }
+  if (evidence.length > 0) {
+    rest.push(`${evidence.length} vra${evidence.length === 1 ? 'ag draagt' : 'gen dragen'} geen benodigde attributen en ${evidence.length === 1 ? 'is' : 'zijn'} dus uit geen enkel veld te beantwoorden, terwijl de lijst ${evidence.length === 1 ? 'hem' : 'ze'} wél als beantwoordbaar opgeeft. Zet er attributen bij, of markeer ${evidence.length === 1 ? 'hem' : 'ze'} als procesvraag zodat ${evidence.length === 1 ? 'hij' : 'ze'} buiten de score valt. Het gaat om: ${evidence.slice(0, 8).join(', ')}${evidence.length > 8 ? ` en ${evidence.length - 8} meer` : ''}.`);
   }
   return foldWarnings(rest);
 }
@@ -609,20 +616,26 @@ function toQuestion(row: Row, id: string, columns: ColumnMap, warnings: string[]
     warnings.push(`${WEIGHT_MISMATCH}${id}`);
   }
 
-  const evidence = splitList(cell(row, columns, 'evidence'));
-  if (evidence.length === 0) {
-    warnings.push(`vraag ${id}: geen benodigde attributen; hij is uit geen enkel veld te beantwoorden.`);
-  }
-  const declaredCount = cell(row, columns, 'evidenceCount');
-  if (declaredCount !== '' && Number(declaredCount) !== evidence.length) {
-    warnings.push(`${COUNT_MISMATCH}${id}`);
-  }
-
   const scored = cell(row, columns, 'scored');
   const answerableRaw = cell(row, columns, 'answerable').toLowerCase();
   const answerable: Answerability = NO.test(scored) || NO.test(answerableRaw)
     ? 'no'
     : answerableRaw === 'gedeeltelijk' || answerableRaw === 'partial' ? 'partial' : 'yes';
+
+  const evidence = splitList(cell(row, columns, 'evidence'));
+  // Geen attributen is alleen een gebrek als de lijst wél beweert dat de vraag
+  // uit de data te beantwoorden is. Een procesvraag — "kan ik een staal
+  // krijgen" — hóórt er geen te hebben; dat schrijft de methode voor, en hem
+  // daarvoor waarschuwen maakte de bevindingenlijst onbruikbaar: bij de eerste
+  // echte bank waren 107 van de 200 meldingen precies dit, en dan leest niemand
+  // de 92 die er wél toe deden.
+  if (evidence.length === 0 && answerable !== 'no') {
+    warnings.push(`${NO_EVIDENCE}${id}`);
+  }
+  const declaredCount = cell(row, columns, 'evidenceCount');
+  if (declaredCount !== '' && Number(declaredCount) !== evidence.length) {
+    warnings.push(`${COUNT_MISMATCH}${id}`);
+  }
 
   const coverageRaw = cell(row, columns, 'coverage');
   const coverage = coverageRaw !== '' && Number.isFinite(Number(coverageRaw)) ? Number(coverageRaw) : null;

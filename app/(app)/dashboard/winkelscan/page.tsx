@@ -19,6 +19,7 @@ import {
 import { STRINGS } from '../../../../src/i18n/strings';
 import { useLocale } from '../../../../src/i18n/useLocale';
 import { authHeader } from '../../../../src/auth/client';
+import { useAuth } from '../../../../components/auth/AuthProvider';
 
 interface BankOption { id: string; vertical: string; version: number; status: string }
 
@@ -45,6 +46,14 @@ interface Result {
   notes: string[];
   attributes?: string[];
   categories?: { name: string; products: number }[];
+  pages?: {
+    url: string; titel: string; categorie: string;
+    answered: number; applicable: number;
+    questions: {
+      id: string; label: Bilingual; answered: boolean; importance: string;
+      found: { field: string; value: string }[];
+    }[];
+  }[];
   funnel?: { total: number; avgAnswered: number; avgApplicable: number };
   questions?: QuestionLine[];
 }
@@ -58,6 +67,7 @@ type State =
 
 export default function Page() {
   const [locale] = useLocale();
+  const { user } = useAuth();
   const s = STRINGS[locale].shopScan;
 
   const [banks, setBanks] = useState<BankOption[]>([]);
@@ -80,8 +90,14 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    // Pas ophalen als we weten wie er is. Vroeger gaat het verzoek zonder token
+    // de deur uit, komt er 403 terug, en blijft het scherm op "alleen voor
+    // beheerders" staan terwijl je gewoon ingelogd bent. Dat gebeurt alleen bij
+    // een harde herlaad op dit scherm — precies het geval dat je zelf niet
+    // tegenkomt en een ander wel.
+    if (user === undefined) return;
     void (async () => { await Promise.resolve(); await load(); })();
-  }, [load]);
+  }, [load, user]);
 
   async function measure() {
     setState({ kind: 'running' });
@@ -119,34 +135,38 @@ export default function Page() {
       </div>
 
       <Card>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <Input
-              id="winkel-url"
-              label={s.url}
-              hint={s.urlHint}
-              value={url}
-              onChange={setUrl}
-              placeholder="winkel.nl"
-            />
+        {/* Drie kolommen die op de invoerregel uitlijnen, niet op de onderkant:
+            het adresveld draagt een toelichting eronder en zou de rest anders
+            omhoog duwen. De knop krijgt daarom een lege labelregel boven zich. */}
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_18rem_auto] sm:items-start">
+          <Input
+            id="winkel-url"
+            label={s.url}
+            hint={s.urlHint}
+            value={url}
+            onChange={setUrl}
+            placeholder="winkel.nl"
+          />
+          <Select
+            stacked
+            id="winkel-bank"
+            label={s.bank}
+            value={bankId}
+            onChange={setBankId}
+            options={[
+              { value: '', label: s.bankNone },
+              ...banks.map((bank) => ({
+                value: bank.id,
+                label: `${bank.vertical} v${bank.version}${bank.status === 'review' ? ' (review)' : ''}`,
+              })),
+            ]}
+          />
+          <div className="flex flex-col gap-1.5">
+            <span aria-hidden className="hidden text-sm font-medium sm:block">&nbsp;</span>
+            <Button onClick={() => void measure()} disabled={url.trim() === ''} loading={state.kind === 'running'}>
+              {s.start}
+            </Button>
           </div>
-          <div className="sm:w-72">
-            <Select
-              label={s.bank}
-              value={bankId}
-              onChange={setBankId}
-              options={[
-                { value: '', label: s.bankNone },
-                ...banks.map((bank) => ({
-                  value: bank.id,
-                  label: `${bank.vertical} v${bank.version}${bank.status === 'review' ? ' (review)' : ''}`,
-                })),
-              ]}
-            />
-          </div>
-          <Button onClick={() => void measure()} disabled={url.trim() === ''} loading={state.kind === 'running'}>
-            {s.start}
-          </Button>
         </div>
       </Card>
 
@@ -234,7 +254,15 @@ function Report({
 
       {unanswered.length > 0 ? (
         <Card>
-          <CardTitle>{s.questionsTitle}</CardTitle>
+          <CardTitle sub={s.questionsBody}>{s.questionsTitle}</CardTitle>
+          {/* Een kop boven de kolom, want de uitleg erboven leest niemand twee
+              keer. Het getal moet op zichzelf te begrijpen zijn — zeker in een
+              pdf, waar je halverwege instapt. */}
+          <div className="flex items-baseline gap-x-3 border-b border-line pb-1.5 text-xs font-medium text-muted">
+            <span className="w-9 shrink-0">&nbsp;</span>
+            <span className="flex-1">{s.colQuestion}</span>
+            <span>{s.colAnswered}</span>
+          </div>
           <ul className="flex flex-col">
             {(result.questions ?? []).map((one) => {
               const ok = one.answered >= one.applicable && one.applicable > 0;
@@ -245,7 +273,13 @@ function Report({
                         alleen de betekenis, en dit rapport wordt afgedrukt. */}
                     <Badge tone={ok ? 'ok' : 'warn'}>{ok ? '✓' : '—'}</Badge>
                     <span className="flex-1 text-sm">{one.label[locale]}</span>
-                    <span className="text-sm tabular-nums text-muted">
+                    {/* Met een titel erop, want los gelezen is "0/8" een raadsel
+                        — en dit rapport wordt afgedrukt en doorgestuurd, dus er
+                        staat niemand naast om het uit te leggen. */}
+                    <span
+                      className="text-sm tabular-nums text-muted"
+                      title={`${s.answeredOn} ${one.answered} ${STRINGS[locale].segments.of} ${one.applicable} ${s.ofProducts}`}
+                    >
                       {one.answered}/{one.applicable}
                     </span>
                   </div>
@@ -272,6 +306,17 @@ function Report({
         </Card>
       ) : null}
 
+      {result.pages && result.pages.length > 0 ? (
+        <Card>
+          <CardTitle sub={s.pagesBody}>{s.pagesTitle}</CardTitle>
+          <ol className="flex flex-col">
+            {result.pages.map((page, index) => (
+              <PageLine key={page.url || index} page={page} index={index} s={s} locale={locale} />
+            ))}
+          </ol>
+        </Card>
+      ) : null}
+
       {result.blockedBots.length > 0 ? (
         <Card>
           <CardTitle sub={s.botsBody}>{s.botsTitle}</CardTitle>
@@ -295,5 +340,87 @@ function Report({
         ) : null}
       </Card>
     </div>
+  );
+}
+
+/**
+ * Eén bekeken pagina, met wat een agent er wel en niet uit haalt.
+ *
+ * Standaard alleen wat onbeantwoord blijft, want dat is het bruikbare deel en
+ * het houdt de pdf leesbaar: vierentwintig pagina's maal veertien vragen is
+ * driehonderd regels die niemand leest. Uitklappen geeft de volledige lijst, en
+ * wat uitgeklapt staat gaat mee in de afdruk.
+ */
+function PageLine({ page, index, s, locale }: {
+  page: NonNullable<Result['pages']>[number];
+  index: number;
+  s: typeof STRINGS['nl']['shopScan'];
+  locale: 'nl' | 'en';
+}) {
+  const [open, setOpen] = useState(false);
+  const missing = page.questions.filter((one) => !one.answered);
+
+  return (
+    <li className="border-t border-line py-2.5 first:border-t-0">
+      <div className="flex gap-3">
+        <span className="w-6 shrink-0 tabular-nums text-sm text-muted">{index + 1}</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="flex-1 text-sm font-medium">{page.titel || page.url}</span>
+            <span className="text-sm tabular-nums text-muted">
+              {page.answered}/{page.applicable} {s.pageAnswered}
+            </span>
+          </div>
+          <a
+            href={page.url}
+            target="_blank"
+            rel="noreferrer"
+            className="block truncate text-xs text-muted underline underline-offset-2"
+          >
+            {page.url.replace(/^https?:\/\/[^/]+/, '')}
+          </a>
+
+          {missing.length === 0 ? (
+            <p className="mt-1.5 text-xs text-muted">{s.pageAllAnswered}</p>
+          ) : (
+            <p className="mt-1.5 text-xs leading-relaxed text-muted">
+              <span className="font-medium">{s.pageMissing}:</span>{' '}
+              {missing.map((one) => one.label[locale]).join(' \u00b7 ')}
+            </p>
+          )}
+
+          {open ? (
+            <ul className="mt-2 flex flex-col gap-1 border-l border-line pl-3">
+              {page.questions.map((one) => (
+                <li key={one.id} className="flex items-baseline gap-2 text-xs">
+                  {/* Teken én tekst, niet alleen kleur: dit wordt afgedrukt. */}
+                  <span className="w-3 shrink-0 text-muted">{one.answered ? '\u2713' : '\u2014'}</span>
+                  <span className={one.answered ? '' : 'text-muted'}>
+                    {one.label[locale]}
+                    {/* Waar het antwoord vandaan komt. Zonder dit is een vinkje
+                        iets wat de merchant moet geloven; met de kolom en de
+                        waarde erbij kan hij het op zijn eigen pagina nakijken. */}
+                    {one.answered && one.found.length > 0 ? (
+                      <span className="block text-muted">
+                        {s.pageFound}{' '}
+                        {one.found.map((entry) => `${entry.field}: ${entry.value}`).join(' \u00b7 ')}
+                      </span>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            className="mt-1.5 text-xs font-medium text-accent underline underline-offset-2"
+          >
+            {open ? s.pageHideAll : s.pageShowAll}
+          </button>
+        </div>
+      </div>
+    </li>
   );
 }

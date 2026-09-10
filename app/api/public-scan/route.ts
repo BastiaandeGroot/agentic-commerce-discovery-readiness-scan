@@ -18,6 +18,83 @@ import { generateQuestionSets } from '../../../src/questions/generate';
 import { runScan } from '../../../src/engine/report';
 import type { QuestionBank } from '../../../src/questions/bank';
 
+/**
+ * Dezelfde vraag over alle vragensets heen optellen.
+ *
+ * `questionCoverage` telt per vragenset, dus een algemene vraag komt net zo vaak
+ * terug als er categorieën zijn. In een rapport is dat verwarrend — dezelfde
+ * vraag vier keer onder elkaar, met vier verschillende noemers — en in het
+ * scherm gaf het bovendien twee elementen met dezelfde sleutel.
+ *
+ * Voor een merchant is er één vraag: "kan mijn data hem beantwoorden, en op
+ * hoeveel van mijn producten". Dat is de som.
+ */
+function mergeQuestions(coverage: ReturnType<typeof runScan>['questionCoverage']) {
+  const merged = new Map<string, {
+    id: string;
+    label: { nl: string; en: string };
+    importance: string;
+    answered: number;
+    applicable: number;
+    evidence: { nl: string; en: string }[];
+  }>();
+
+  for (const one of coverage) {
+    const existing = merged.get(one.questionId);
+    if (existing) {
+      existing.answered += one.answered;
+      existing.applicable += one.applicable;
+      continue;
+    }
+    merged.set(one.questionId, {
+      id: one.questionId,
+      label: one.label,
+      importance: one.importance,
+      answered: one.answered,
+      applicable: one.applicable,
+      evidence: (one.evidence ?? []).map((entry) => entry.label),
+    });
+  }
+  return [...merged.values()];
+}
+
+/**
+ * Van een veldsleutel naar wat er op de pagina stond.
+ *
+ * Een vinkje zonder herkomst is een oordeel dat de merchant moet geloven. Met de
+ * kolom én de waarde erbij kan hij het nakijken op zijn eigen productpagina, en
+ * dan is het geen bewering meer maar een waarneming.
+ *
+ * De motor werkt in canonieke sleutels (`material`) of in patronen (`attr:...`);
+ * de winkel publiceert onder zijn eigen naam. Deze functie legt die twee op
+ * elkaar via de kolomherkenning die de intake al deed.
+ */
+function foundIn(
+  keys: string[],
+  row: Record<string, string> | undefined,
+  columnOf: Map<string, string>,
+  columns: string[],
+): { field: string; value: string }[] {
+  if (!row) return [];
+  const out: { field: string; value: string }[] = [];
+
+  for (const key of keys) {
+    const column = key.startsWith('attr:')
+      ? columns.find((one) => new RegExp(key.slice(5), 'i').test(one))
+      : columnOf.get(key) ?? (key in row ? key : undefined);
+    if (!column) continue;
+
+    const value = row[column];
+    if (!value) continue;
+    if (out.some((entry) => entry.field === column)) continue;
+
+    // Ingekort: een omschrijving van tweehonderd woorden hoort niet in een
+    // regel die laat zien wáár het antwoord vandaan komt.
+    out.push({ field: column, value: value.length > 120 ? `${value.slice(0, 120)}…` : value });
+  }
+  return out;
+}
+
 export async function POST(request: Request) {
   if (!(await isAdmin(request))) {
     return NextResponse.json({ error: 'Geen beheerder.' }, { status: 403 });
@@ -81,6 +158,12 @@ export async function POST(request: Request) {
     const questions = generateQuestionSets(catalog, banks);
     const report = runScan(catalog, questions, { scannedAt: new Date().toISOString() });
 
+    // Canonieke sleutel → de kolomnaam waaronder deze winkel hem publiceert.
+    const columnOf = new Map<string, string>();
+    for (const [column, key] of Object.entries(catalog.mapping)) {
+      if (!columnOf.has(key)) columnOf.set(key, column);
+    }
+
     const attributes = new Set<string>();
     for (const row of collected.rows) for (const key of Object.keys(row)) attributes.add(key);
 
@@ -94,6 +177,34 @@ export async function POST(request: Request) {
       blockedBots: collected.blockedBots,
       notes: collected.notes,
       attributes: [...attributes].filter((key) => key !== 'url'),
+      // Welke pagina's er werkelijk bekeken zijn, met per pagina de vragen die
+      // eroverheen gingen. Zonder deze lijst is de steekproef een bewering; met
+      // de lijst kan iemand hem zelf nalopen — en dat is precies wat dit rapport
+      // van een mening onderscheidt.
+      //
+      // Per pagina en niet alleen als totaal, want een merchant herkent zijn
+      // eigen product. "Gemiddeld 2,9 van de 14" is statistiek; "op deze stof
+      // kan een agent niet zien of hij tegen een hond kan" is zijn winkel.
+      // Op volgorde teruggekoppeld aan de opgehaalde rij: `product.key` is de
+      // sku en niet het adres, en de motor houdt de volgorde van de invoer aan.
+      pages: report.products.map((product, index) => ({
+        url: collected.rows[index]?.url ?? '',
+        titel: product.title ?? '',
+        categorie: product.category ?? '',
+        answered: product.questions.filter((one) => one.scored && one.answered).length,
+        applicable: product.questions.filter((one) => one.scored).length,
+        questions: product.questions
+          .filter((one) => one.scored)
+          .map((one) => ({
+            id: one.questionId,
+            label: one.label,
+            answered: one.answered,
+            importance: one.importance,
+            found: one.answered
+              ? foundIn(one.found, collected.rows[index], columnOf, catalog.columns)
+              : [],
+          })),
+      })),
       categories: report.categories
         .filter((one) => one.subcategory === undefined)
         .map((one) => ({ name: one.category, products: one.total })),
@@ -101,16 +212,7 @@ export async function POST(request: Request) {
       // Per vraag: kan de winkel hem beantwoorden uit wat hij publiceert. Dat is
       // wat een merchant wil zien — een lijst velden zegt hem niets, een lijst
       // vragen die onbeantwoord blijft wel.
-      questions: report.questionCoverage
-        .filter((one) => one.scored)
-        .map((one) => ({
-          id: one.questionId,
-          label: one.label,
-          importance: one.importance,
-          answered: one.answered,
-          applicable: one.applicable,
-          evidence: (one.evidence ?? []).map((entry) => entry.label),
-        })),
+      questions: mergeQuestions(report.questionCoverage.filter((one) => one.scored)),
     });
   } catch (caught) {
     if (caught instanceof CollectError) {
