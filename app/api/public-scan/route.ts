@@ -18,6 +18,46 @@ import { generateQuestionSets } from '../../../src/questions/generate';
 import { runScan } from '../../../src/engine/report';
 import type { QuestionBank } from '../../../src/questions/bank';
 
+/**
+ * Dezelfde vraag over alle vragensets heen optellen.
+ *
+ * `questionCoverage` telt per vragenset, dus een algemene vraag komt net zo vaak
+ * terug als er categorieën zijn. In een rapport is dat verwarrend — dezelfde
+ * vraag vier keer onder elkaar, met vier verschillende noemers — en in het
+ * scherm gaf het bovendien twee elementen met dezelfde sleutel.
+ *
+ * Voor een merchant is er één vraag: "kan mijn data hem beantwoorden, en op
+ * hoeveel van mijn producten". Dat is de som.
+ */
+function mergeQuestions(coverage: ReturnType<typeof runScan>['questionCoverage']) {
+  const merged = new Map<string, {
+    id: string;
+    label: { nl: string; en: string };
+    importance: string;
+    answered: number;
+    applicable: number;
+    evidence: { nl: string; en: string }[];
+  }>();
+
+  for (const one of coverage) {
+    const existing = merged.get(one.questionId);
+    if (existing) {
+      existing.answered += one.answered;
+      existing.applicable += one.applicable;
+      continue;
+    }
+    merged.set(one.questionId, {
+      id: one.questionId,
+      label: one.label,
+      importance: one.importance,
+      answered: one.answered,
+      applicable: one.applicable,
+      evidence: (one.evidence ?? []).map((entry) => entry.label),
+    });
+  }
+  return [...merged.values()];
+}
+
 export async function POST(request: Request) {
   if (!(await isAdmin(request))) {
     return NextResponse.json({ error: 'Geen beheerder.' }, { status: 403 });
@@ -126,16 +166,7 @@ export async function POST(request: Request) {
       // Per vraag: kan de winkel hem beantwoorden uit wat hij publiceert. Dat is
       // wat een merchant wil zien — een lijst velden zegt hem niets, een lijst
       // vragen die onbeantwoord blijft wel.
-      questions: report.questionCoverage
-        .filter((one) => one.scored)
-        .map((one) => ({
-          id: one.questionId,
-          label: one.label,
-          importance: one.importance,
-          answered: one.answered,
-          applicable: one.applicable,
-          evidence: (one.evidence ?? []).map((entry) => entry.label),
-        })),
+      questions: mergeQuestions(report.questionCoverage.filter((one) => one.scored)),
     });
   } catch (caught) {
     if (caught instanceof CollectError) {

@@ -16,6 +16,7 @@ import { Badge, Card, CardTitle, EmptyState, ErrorState, SkeletonLines, TableWra
 import { STRINGS } from '../../../../src/i18n/strings';
 import { useLocale } from '../../../../src/i18n/useLocale';
 import { authHeader } from '../../../../src/auth/client';
+import { useAuth } from '../../../../components/auth/AuthProvider';
 
 interface GroupingEntry { category: string; count: number; kind: string; parent?: string; reason?: string }
 
@@ -51,6 +52,7 @@ const TONE: Record<string, 'ok' | 'warn' | 'neutral'> = {
 
 export default function Page() {
   const [locale] = useLocale();
+  const { user } = useAuth();
   const s = STRINGS[locale].bankList;
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [open, setOpen] = useState<string>();
@@ -68,8 +70,14 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    // Pas ophalen als we weten wie er is. Vroeger gaat het verzoek zonder token
+    // de deur uit, komt er 403 terug, en blijft het scherm op "alleen voor
+    // beheerders" staan terwijl je gewoon ingelogd bent. Dat gebeurt alleen bij
+    // een harde herlaad op dit scherm — precies het geval dat je zelf niet
+    // tegenkomt en een ander wel.
+    if (user === undefined) return;
     void (async () => { await Promise.resolve(); await load(); })();
-  }, [load]);
+  }, [load, user]);
 
   const date = (raw?: string) =>
     raw ? new Date(raw).toLocaleDateString(locale === 'nl' ? 'nl-NL' : 'en-GB', {

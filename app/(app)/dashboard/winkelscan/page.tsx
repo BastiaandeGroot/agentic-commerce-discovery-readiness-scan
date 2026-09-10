@@ -19,6 +19,7 @@ import {
 import { STRINGS } from '../../../../src/i18n/strings';
 import { useLocale } from '../../../../src/i18n/useLocale';
 import { authHeader } from '../../../../src/auth/client';
+import { useAuth } from '../../../../components/auth/AuthProvider';
 
 interface BankOption { id: string; vertical: string; version: number; status: string }
 
@@ -63,6 +64,7 @@ type State =
 
 export default function Page() {
   const [locale] = useLocale();
+  const { user } = useAuth();
   const s = STRINGS[locale].shopScan;
 
   const [banks, setBanks] = useState<BankOption[]>([]);
@@ -85,8 +87,14 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    // Pas ophalen als we weten wie er is. Vroeger gaat het verzoek zonder token
+    // de deur uit, komt er 403 terug, en blijft het scherm op "alleen voor
+    // beheerders" staan terwijl je gewoon ingelogd bent. Dat gebeurt alleen bij
+    // een harde herlaad op dit scherm — precies het geval dat je zelf niet
+    // tegenkomt en een ander wel.
+    if (user === undefined) return;
     void (async () => { await Promise.resolve(); await load(); })();
-  }, [load]);
+  }, [load, user]);
 
   async function measure() {
     setState({ kind: 'running' });
