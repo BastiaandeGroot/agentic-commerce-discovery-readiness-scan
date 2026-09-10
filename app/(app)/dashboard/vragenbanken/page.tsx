@@ -18,7 +18,11 @@ import { useLocale } from '../../../../src/i18n/useLocale';
 import { authHeader } from '../../../../src/auth/client';
 import { useAuth } from '../../../../components/auth/AuthProvider';
 
-interface GroupingEntry { category: string; count: number; kind: string; parent?: string; reason?: string }
+interface GroupingEntry {
+  category: string; count: number; kind: string; parent?: string; reason?: string;
+  /** Bij een overlay: de vragen die alleen hier gesteld worden. De onderbouwing. */
+  distinct?: string[];
+}
 
 interface PanelSite { name?: string; url?: string; type?: string; consultedAt?: string }
 

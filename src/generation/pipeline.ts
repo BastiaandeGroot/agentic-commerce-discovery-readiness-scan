@@ -159,9 +159,56 @@ function readGrouping(raw: unknown, state: RunState): GroupingEntry[] {
         kind: kind as GroupingEntry['kind'],
         parent: asString(source.parent) || undefined,
         reason: asString(source.reason),
+        distinct: kind === 'overlay' ? asStrings(source.distinct).slice(0, 5) : undefined,
       };
     })
     .filter((one): one is GroupingEntry => one !== null);
+}
+
+/** Hoeveel eigen vragen een categorie moet noemen om een eigen vragenset te krijgen. */
+const OVERLAY_BAR = 3;
+
+/**
+ * De lat voor een overlay, nagerekend in plaats van geloofd.
+ *
+ * De prompt vraagt om drie vragen die in deze categorie gesteld worden en in
+ * geen enkele andere. Noemt hij er geen enkele, dan is de toets niet afgelegd
+ * en wordt het een toepassingsprofiel — dezelfde vragen, andere drempels, en
+ * dat is bijna altijd het juiste antwoord. Noemt hij er één of twee, dan blijft
+ * het een overlay maar staat het als bevinding op het scherm: dat is een
+ * grensgeval en daar hoort een mens naar te kijken.
+ *
+ * Dat onderscheid — omzetten bij nul, melden bij te weinig — komt voort uit wat
+ * er misgaat als je het fout doet. Een overlay ten onrechte omzetten kost een
+ * markt zijn eigen vragen; een profiel ten onrechte laten staan kost een rij in
+ * het rapport die niets onderscheidt. Het eerste is erger, dus we grijpen alleen
+ * in waar het model niets heeft aan te voeren.
+ */
+function applyOverlayBar(grouping: GroupingEntry[]): { grouping: GroupingEntry[]; findings: string[] } {
+  const findings: string[] = [];
+
+  const next = grouping.map((entry) => {
+    if (entry.kind !== 'overlay') return entry;
+    const distinct = entry.distinct ?? [];
+
+    if (distinct.length === 0) {
+      findings.push(
+        `${entry.category} kreeg geen eigen vragenset: er is geen enkele vraag genoemd die hier gesteld wordt en nergens anders. `
+        + 'Hij telt nu als toepassingsprofiel — dezelfde vragen, andere drempels.',
+      );
+      return { ...entry, kind: 'profiel' as const };
+    }
+
+    if (distinct.length < OVERLAY_BAR) {
+      findings.push(
+        `${entry.category} kreeg een eigen vragenset op ${distinct.length} eigen vra${distinct.length === 1 ? 'ag' : 'gen'} `
+        + `in plaats van ${OVERLAY_BAR}: ${distinct.join(' · ')}. Kijk na of dat werkelijk een eigen vragenset rechtvaardigt.`,
+      );
+    }
+    return entry;
+  });
+
+  return { grouping: next, findings };
 }
 
 /**
@@ -267,7 +314,36 @@ const findingsOf = (source: Record<string, unknown>): string[] => asStrings(sour
  * argument en niet uit een klok, om dezelfde reden als bij de motor: anders
  * geeft dezelfde invoer twee keer een andere uitkomst.
  */
+/**
+ * Wat deze fase aan het model zou vragen, zonder het te vragen.
+ *
+ * Apart van het verwerken, want er zijn twee manieren om een antwoord te
+ * krijgen: meteen, of via de batch-API die er een uur over doet en de helft
+ * kost. Die tweede kan alleen als de vraag en de verwerking los van elkaar
+ * staan — je stelt hem nu en verwerkt hem straks, in een ander verzoek en
+ * misschien op een ander proces.
+ *
+ * `null` betekent: deze stap heeft geen model nodig.
+ */
+export function taskFor(state: RunState, phase: Phase): AskTask | null {
+  if (phase.kind === 'assemble' || phase.kind === 'done') return null;
+  const { prompt, model, web, maxTokens } = promptFor(phase, state);
+  return { phase: encodePhase(phase), model, system: SYSTEM, prompt, web, maxTokens };
+}
+
 export async function advance(state: RunState, phase: Phase, ask: Ask, at: string): Promise<Advanced> {
+  const task = taskFor(state, phase);
+  if (task === null) return applyReply(state, phase, undefined, at);
+  return applyReply(state, phase, await ask(task), at);
+}
+
+/** Het antwoord opnemen en zeggen welke stap volgt. */
+export function applyReply(
+  state: RunState,
+  phase: Phase,
+  reply: AskReply | undefined,
+  at: string,
+): Advanced {
   // Samenstellen is de enige stap zonder model: op dit punt is alles besloten.
   if (phase.kind === 'assemble') {
     const findings = checkDraft(state);
@@ -279,10 +355,8 @@ export async function advance(state: RunState, phase: Phase, ask: Ask, at: strin
     return { state: next, next: { kind: 'done' }, usage: NO_USAGE };
   }
 
-  if (phase.kind === 'done') return { state, next: phase, usage: NO_USAGE };
+  if (phase.kind === 'done' || reply === undefined) return { state, next: phase, usage: NO_USAGE };
 
-  const { prompt, model, web, maxTokens } = promptFor(phase, state);
-  const reply = await ask({ phase: encodePhase(phase), model, system: SYSTEM, prompt, web, maxTokens });
   const answer = asObject(reply.json);
 
   let updated: RunState;
@@ -307,7 +381,8 @@ export async function advance(state: RunState, phase: Phase, ask: Ask, at: strin
         .slice(0, 8);
 
       const read = readGrouping(answer.grouping, state);
-      const completed = completeGrouping(read, state);
+      const barred = applyOverlayBar(read);
+      const completed = completeGrouping(barred.grouping, state);
 
       updated = {
         ...state,
@@ -322,6 +397,7 @@ export async function advance(state: RunState, phase: Phase, ask: Ask, at: strin
         findings: [
           ...state.findings,
           ...findingsOf(answer),
+          ...barred.findings,
           ...completed.findings,
           ...(panel.length < 5
             ? [`Het panel telt ${panel.length} sites in plaats van vijf. De dekking per vraag is daarmee grover dan de methode aanneemt.`]

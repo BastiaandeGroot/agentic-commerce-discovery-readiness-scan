@@ -52,8 +52,14 @@ function antwoord(phase: string): unknown {
         legal: [],
       },
       grouping: [
-        { category: 'Meubelstoffen', kind: 'overlay', reason: 'eigen slijtvragen' },
-        { category: 'Gordijnstoffen', kind: 'overlay', reason: 'eigen lichtvragen' },
+        {
+          category: 'Meubelstoffen', kind: 'overlay', reason: 'eigen slijtvragen',
+          distinct: ['Hoeveel slijtage kan het hebben?', 'Kan het tegen huisdieren?', 'Hoe stevig is de naad?'],
+        },
+        {
+          category: 'Gordijnstoffen', kind: 'overlay', reason: 'eigen lichtvragen',
+          distinct: ['Hoeveel licht laat het door?', 'Hoe valt de plooi?', 'Krimpt het na wassen?'],
+        },
         { category: 'Eetkamerstoelen', kind: 'profiel', parent: 'Meubelstoffen', reason: 'zelfde vragen, andere drempel' },
         { category: 'Vlekwerend', kind: 'facet', reason: 'is een eigenschap' },
       ],
@@ -236,4 +242,33 @@ test('het JSON-object komt ook uit een antwoord met een zin ervoor', () => {
   assert.deepEqual(extractJson('Prima. {"a": {"b": "}"}} en dat was het'), { a: { b: '}' } });
   assert.throws(() => extractJson('geen object'), /geen JSON-object/);
   assert.throws(() => extractJson('{"a": 1'), /niet afgesloten/);
+});
+
+test('een overlay zonder eigen vragen wordt een toepassingsprofiel', async () => {
+  // De prompt vraagt om drie vragen die hier gesteld worden en nergens anders.
+  // Een reden is altijd te vinden; dit is de toets die je kunt zakken. Noemt
+  // het model er geen enkele, dan is de toets niet afgelegd — en dan is
+  // "profiel" bijna altijd het juiste antwoord.
+  const ask: Ask = async (task) => {
+    if (task.phase !== 'panel') return { json: antwoord(task.phase), usage: { input: 0, output: 0, cached: 0 } };
+    const panel = antwoord('panel') as { grouping: { category: string; distinct?: string[] }[] };
+    return {
+      json: {
+        ...panel,
+        grouping: panel.grouping.map((entry) => (
+          entry.category === 'Gordijnstoffen' ? { ...entry, distinct: [] } : entry
+        )),
+      },
+      usage: { input: 0, output: 0, cached: 0 },
+    };
+  };
+
+  const result = await advance(emptyState(BRIEF), FIRST_PHASE, ask, '2026-09-10');
+  const gordijn = result.state.grouping.find((entry) => entry.category === 'Gordijnstoffen');
+
+  assert.equal(gordijn?.kind, 'profiel');
+  assert.ok(
+    result.state.findings.some((finding) => finding.includes('Gordijnstoffen')),
+    'en het staat als bevinding op het scherm',
+  );
 });

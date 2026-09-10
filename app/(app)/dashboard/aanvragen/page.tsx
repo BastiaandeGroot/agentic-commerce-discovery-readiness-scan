@@ -20,6 +20,8 @@ import { hasObjection } from '../../../../src/questions/review';
 
 interface GroupingEntry {
   category: string; count: number; kind: string; parent?: string; reason?: string;
+  /** Bij een overlay: de vragen die alleen hier gesteld worden. De onderbouwing. */
+  distinct?: string[];
 }
 
 /** Hoe ver de generatie is. Ontbreekt bij een bank die van buiten kwam. */
@@ -266,6 +268,16 @@ export default function Page() {
                             </span>
                             {entry.reason ? (
                               <span className="block text-xs leading-relaxed text-muted">{entry.reason}</span>
+                            ) : null}
+                            {/* De onderbouwing van een eigen vragenset: drie
+                                vragen die hier gesteld worden en nergens anders.
+                                Een reden is altijd te vinden; dit is wat je kunt
+                                nakijken. */}
+                            {entry.distinct && entry.distinct.length > 0 ? (
+                              <span className="mt-0.5 block text-xs leading-relaxed text-muted">
+                                <span className="font-medium">{s.admin.groupingDistinct}:</span>{' '}
+                                {entry.distinct.join(' · ')}
+                              </span>
                             ) : null}
                           </li>
                         ))}

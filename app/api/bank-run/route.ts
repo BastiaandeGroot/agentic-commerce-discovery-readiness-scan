@@ -21,9 +21,9 @@
 
 import { after, NextResponse } from 'next/server';
 import { isExecutor, isRefusal, serviceClient } from '../../../src/server/executor';
-import { makeAsk, PhaseFailure } from '../../../src/server/generator';
+import { batchable, collectBatch, makeAsk, PhaseFailure, submitBatch } from '../../../src/server/generator';
 import { deliverBank } from '../../../src/server/deliver';
-import { advance } from '../../../src/generation/pipeline';
+import { advance, applyReply, taskFor } from '../../../src/generation/pipeline';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   decodePhase,
@@ -32,6 +32,7 @@ import {
   FIRST_PHASE,
   phaseNumber,
   totalPhases,
+  type Phase,
   type RunBrief,
   type RunState,
 } from '../../../src/generation/state';
@@ -69,6 +70,8 @@ interface RunRow {
   state: RunState;
   attempts: number;
   leased_until: string | null;
+  /** Loopt er een batch voor deze fase? Dan wachten we op de uitkomst. */
+  batch_id: string | null;
   input_tokens: number;
   output_tokens: number;
   cached_tokens: number;
@@ -116,7 +119,7 @@ export async function POST(request: Request) {
   for (const row of (open.data ?? []) as RequestRow[]) {
     const existing = await supabase
       .from('bank_runs')
-      .select('id, request_id, phase, state, attempts, leased_until, input_tokens, output_tokens, cached_tokens, updated_at')
+      .select('id, request_id, phase, state, attempts, leased_until, batch_id, input_tokens, output_tokens, cached_tokens, updated_at')
       .eq('request_id', row.id)
       .maybeSingle();
 
@@ -135,7 +138,7 @@ export async function POST(request: Request) {
           state: emptyState(briefOf(row)),
           leased_until: new Date(now.getTime() + LEASE_MINUTES * 60_000).toISOString(),
         })
-        .select('id, request_id, phase, state, attempts, leased_until, input_tokens, output_tokens, cached_tokens, updated_at')
+        .select('id, request_id, phase, state, attempts, leased_until, batch_id, input_tokens, output_tokens, cached_tokens, updated_at')
         .single();
 
       if (created.error || !created.data) continue;
@@ -201,7 +204,16 @@ async function runPhase(
   const state: RunState = { ...emptyState(briefOf(row)), ...(run.state ?? {}) };
 
   try {
-    const result = await advance(state, phase, makeAsk(), now.toISOString().slice(0, 10));
+    const result = await work(supabase, run, state, phase, now);
+    // Nog niets te verwerken: de batch loopt. De grendel gaat eraf zodat een
+    // volgende beurt kan kijken of hij intussen klaar is.
+    if (result === null) {
+      await supabase
+        .from('bank_runs')
+        .update({ leased_until: null, updated_at: new Date().toISOString() })
+        .eq('id', run.id);
+      return;
+    }
 
     await supabase
       .from('bank_runs')
@@ -262,4 +274,46 @@ async function runPhase(
 
     console.error('bank-run', row.vertical, run.phase, failure);
   }
+}
+
+/**
+ * Het werk van deze fase, langs de goedkope weg als dat kan.
+ *
+ * Drie toestanden. Loopt er al een batch, dan kijken we of hij klaar is —
+ * `null` betekent dat hij nog bezig is en dat deze beurt niets te doen heeft.
+ * Kan de fase in een batch, dan dienen we hem in en wachten we tot een volgende
+ * beurt. Kan hij dat niet — de fasen die het web op gaan — dan gaat hij zoals
+ * altijd meteen.
+ *
+ * De batch kost de helft: zelfde model, zelfde prompt, zelfde antwoord, alleen
+ * later. Dat is precies wat je kunt missen bij werk dat toch uren duurt en waar
+ * de merchant één tot twee werkdagen voor krijgt beloofd.
+ */
+async function work(
+  supabase: SupabaseClient,
+  run: RunRow,
+  state: RunState,
+  phase: Phase,
+  now: Date,
+) {
+  const at = now.toISOString().slice(0, 10);
+
+  if (run.batch_id) {
+    const reply = await collectBatch(run.batch_id);
+    if (reply === null) return null;
+    return applyReply(state, phase, reply, at);
+  }
+
+  const task = taskFor(state, phase);
+  if (task !== null && batchable(task)) {
+    const batchId = await submitBatch(task);
+    await supabase
+      .from('bank_runs')
+      .update({ batch_id: batchId, batch_at: now.toISOString() })
+      .eq('id', run.id);
+    console.log('bank-run batch ingediend', run.phase, batchId);
+    return null;
+  }
+
+  return advance(state, phase, makeAsk(), at);
 }

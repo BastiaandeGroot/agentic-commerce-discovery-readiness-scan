@@ -123,6 +123,15 @@ export interface GroupingEntry {
   /** Bij `profiel`: onder welke overlay hij hangt. */
   parent?: string;
   reason: string;
+  /**
+   * Bij `overlay`: de vragen die alleen hier gesteld worden.
+   *
+   * De onderbouwing van de keuze, en tegelijk de toets erop. Een reden is
+   * altijd te vinden; drie vragen die nergens anders voorkomen is iets wat je
+   * kunt zakken. Ze staan op het beoordeelscherm, zodat jij kunt nakijken of
+   * ze werkelijk uniek zijn voor deze categorie.
+   */
+  distinct?: string[];
 }
 
 /** De ruwe oogst van één site. Fase 2 van de methode. */

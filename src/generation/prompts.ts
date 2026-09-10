@@ -17,7 +17,7 @@
 import type { GroupingEntry, Phase, RunState, Topic } from './state';
 
 /** Omhoog zodra een prompt de uitkomst op dezelfde markt kan verschuiven. */
-export const GENERATION_VERSION = '1.1.0';
+export const GENERATION_VERSION = '1.2.0';
 
 /**
  * De regels die in élke fase gelden.
@@ -168,10 +168,21 @@ Per categorie kies je één van drie:
 - "facet": geen categorie maar een eigenschap die een attribuutwaarde hoort te
   zijn (Vlekwerend, Duurzaam, Effen, Vlamvertragend).
 
-Wees streng op "overlay". Een eigen overlay is alleen terecht als de vragen
-verschillen, niet als de producten verschillen; anders is het dezelfde meting op
-minder producten en suggereert het rapport een onderscheid dat de vragenlijst
-niet maakt.
+**De toets voor een overlay.** Een eigen vragenset is alleen terecht als je
+minstens DRIE vragen kunt noemen die in deze categorie gesteld worden en in geen
+enkele andere categorie van deze markt. Zet die drie in "distinct". Lukt dat
+niet, dan is het een toepassingsprofiel: dezelfde vragen, andere drempels.
+
+Die toets is er omdat een reden altijd te vinden is en dit de duurste fout is
+die je kunt maken. Een overlay die geen eigen vragen heeft, geeft de producten
+eronder een dúnnere vragenset dan wanneer ze bij hun moedercategorie hadden
+gehoord — ze erven dan niet de rijke vragenset van die categorie — en het rapport
+krijgt een rij die een onderscheid suggereert dat de vragenlijst niet maakt.
+
+Een lampenkapstof lijkt een eigen soort, maar stelt dezelfde vragen als een
+gordijnstof met een andere drempel voor lichtdoorlatendheid: profiel. Naaigaren
+stelt werkelijk andere vragen — dikte, treksterkte, en niets over slijtage of
+licht: overlay, of het hoort niet in deze markt thuis.
 
 Antwoord met dit JSON-object:
 {
@@ -182,7 +193,7 @@ Antwoord met dit JSON-object:
     "standards": ["ETIM, ISO/EN-normen, ... — alleen wat je kunt onderbouwen"],
     "legal": ["alleen echte verplichtingen"]
   },
-  "grouping": [{"category": "exact zoals hierboven", "count": 0, "kind": "overlay|profiel|facet", "parent": "alleen bij profiel", "reason": "in één zin"}],
+  "grouping": [{"category": "exact zoals hierboven", "count": 0, "kind": "overlay|profiel|facet", "parent": "alleen bij profiel", "reason": "in één zin", "distinct": ["alleen bij overlay: drie vragen die hier gesteld worden en nergens anders"]}],
   "findings": ["wat een mens hierover moet weten voordat hij dit vaststelt"]
 }`,
       };
