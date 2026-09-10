@@ -239,7 +239,7 @@ function Report({
 
       {unanswered.length > 0 ? (
         <Card>
-          <CardTitle>{s.questionsTitle}</CardTitle>
+          <CardTitle sub={s.questionsBody}>{s.questionsTitle}</CardTitle>
           <ul className="flex flex-col">
             {(result.questions ?? []).map((one) => {
               const ok = one.answered >= one.applicable && one.applicable > 0;
@@ -250,7 +250,13 @@ function Report({
                         alleen de betekenis, en dit rapport wordt afgedrukt. */}
                     <Badge tone={ok ? 'ok' : 'warn'}>{ok ? '✓' : '—'}</Badge>
                     <span className="flex-1 text-sm">{one.label[locale]}</span>
-                    <span className="text-sm tabular-nums text-muted">
+                    {/* Met een titel erop, want los gelezen is "0/8" een raadsel
+                        — en dit rapport wordt afgedrukt en doorgestuurd, dus er
+                        staat niemand naast om het uit te leggen. */}
+                    <span
+                      className="text-sm tabular-nums text-muted"
+                      title={`${s.answeredOn} ${one.answered} ${STRINGS[locale].segments.of} ${one.applicable} ${s.ofProducts}`}
+                    >
                       {one.answered}/{one.applicable}
                     </span>
                   </div>
