@@ -6,7 +6,7 @@ Techniek staat er alleen in voor zover die uit die vraag volgt.
 - Hoe het gebouwd is → `CLAUDE.md` (regels) en `NOTES.md` (stand en beslissingen)
 - Hoe het eruitziet → `DESIGN.md`
 
-Laatst bijgewerkt: 8 september 2026.
+Laatst bijgewerkt: 10 september 2026.
 
 ---
 
@@ -70,22 +70,25 @@ aan kolommen koppelen → vragensets bevestigen → rapport, plus een uitlegpagi
 op `/methode`. Tweetalig NL/EN. Gemeten: een export van 20 MB met duizenden
 producten scant in 1,4 seconde.
 
+Daaromheen staat sinds 9 september de rest van het product: **accounts en
+opslag** op Supabase, met scheiding per account; een **wachtrij** voor markten
+die nog geen vragenbank hebben; en de **generatie zelf**, die de methode als
+vaste reeks fasen draait en de uitkomst voorlegt ter vrijgave.
+
 ## Wat er nog moet gebeuren
 
 In deze volgorde, want ze bouwen op elkaar.
 
-1. **Accounts en opslag** — nu wordt niets bewaard. Een merchant die morgen
-   terugkomt begint opnieuw, en de koppeling die hij maakte is weg. Zonder dit
-   is er geen product om voor te betalen, en geen achtergrondproces mogelijk:
-   een taak die doorloopt nadat de browser dicht gaat vereist een server en een
-   wachtrij. De database-migratie ligt klaar, inclusief scheiding per account.
-2. **Markt herkennen na de upload** — één kleine modelaanroep over alleen de
-   categorienamen stelt de markt voor; de merchant bevestigt of wijzigt. Zelfde
-   patroon als het koppelscherm: het model stelt voor, de mens beslist.
-3. **Vragenbanken die vanzelf ontstaan** — zie de volgende paragraaf. Vervangt
-   het handmatig uploaden van een vragenlijst.
-4. **Prijs en betaling** — de bedragen staan nog niet vast en er is nog geen
-   betaalprovider gekozen. Die keuze komt pas als 1 tot en met 3 staan.
+1. **De vrijgegeven bank terug bij de merchant** — een bank die is vrijgegeven
+   staat in de database, maar niets aan de merchantkant leest hem. Hij levert
+   zijn vragenlijst vandaag nog zelf aan. Dit is het laatste gat in de keten.
+2. **Bericht als de bank klaar is** — het wachtscherm belooft dat hij het hoort,
+   en dat gebeurt nu niet. `notified_at` ligt klaar; een mailprovider ontbreekt.
+3. **Prijs en betaling** — de bedragen staan nog niet vast en er is nog geen
+   betaalprovider gekozen. Die keuze komt pas als 1 en 2 staan.
+
+*Punten die hier stonden en inmiddels af zijn: accounts en opslag, de markt
+herkennen na de upload, en vragenbanken die vanzelf ontstaan.*
 
 ## Vragenbanken die vanzelf ontstaan
 
@@ -145,7 +148,7 @@ onder hetzelfde id.
 | Analyse in de browser | de privacybelofte is een productkenmerk, geen implementatiedetail |
 | Vijf dependencies | minder om te onderhouden en minder dat onverwacht breekt |
 | Render als hosting | elke merge naar `main` deployt vanzelf |
-| Supabase (voorzien) | database met scheiding per account; nog niet aangesloten |
+| Supabase | database met scheiding per account, aangesloten sinds 9 september |
 | Betaalprovider | nog niet gekozen — bewust uitgesteld |
 
 ## Bewust niet

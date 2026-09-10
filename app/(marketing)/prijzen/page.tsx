@@ -2,7 +2,7 @@
 
 import { STRINGS } from '../../../src/i18n/strings';
 import { useLocale } from '../../../src/i18n/useLocale';
-import { Badge, Card, CardTitle } from '../../../components/ui';
+import { Card, CardTitle } from '../../../components/ui';
 
 export default function PricingPage() {
   const [locale] = useLocale();
@@ -28,10 +28,7 @@ export default function PricingPage() {
 
       {/* Geen verzonnen bedragen; wat we niet weten laten we open staan. */}
       <Card>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="warn">TODO</Badge>
-          <p className="text-sm text-muted">{s.pages.pricing.todo}</p>
-        </div>
+        <p className="text-sm leading-relaxed text-muted">{s.pages.pricing.pending}</p>
       </Card>
     </div>
   );

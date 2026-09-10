@@ -125,7 +125,7 @@ export const STRINGS = {
         paidTitle: 'Met account',
         paidBody:
           'Rapporten bewaren, historie opbouwen, twee scans naast elkaar leggen, delen met je team, en grotere bestanden serverzijdig laten draaien.',
-        todo: 'TODO — bedragen en de exacte bestandsgrens moeten nog vastgesteld worden.',
+        pending: 'De bedragen staan nog niet vast. Zolang dat zo is kun je alles gebruiken wat hierboven onder Gratis staat, zonder account en zonder betaling.',
       },
       about: {
         title: 'Over deze scan',
@@ -137,7 +137,17 @@ export const STRINGS = {
           'De gratis scan draait in je browser. Je catalogus verlaat je apparaat niet en wordt nergens opgeslagen.',
         promise:
           'Wat de scan niet doet: voorspellen hoe een agent rangschikt. Dat is een uitspraak over andermans systeem. Wat hier staat gaat over je eigen data en is daarmee meetbaar en weerlegbaar.',
-        todo: 'TODO — wie hierachter zit en hoe je contact opneemt.',
+      },
+      notFound: {
+        title: 'Deze pagina bestaat niet',
+        body: 'Het adres klopt niet, of de pagina is verplaatst. Er is niets stukgegaan aan je kant.',
+        action: 'Naar de startpagina',
+      },
+      error: {
+        title: 'Er ging iets mis',
+        body: 'Deze pagina kon niet geladen worden. Je scan en je bewaarde rapporten zijn hier niet door geraakt — die staan los van dit scherm.',
+        action: 'Probeer het opnieuw',
+        home: 'Naar de startpagina',
       },
       dashboard: {
         title: 'Overzicht',
@@ -973,7 +983,7 @@ export const STRINGS = {
         paidTitle: 'With an account',
         paidBody:
           'Keep reports, build up history, put two scans side by side, share with your team, and run larger files server-side.',
-        todo: 'TODO — amounts and the exact file-size threshold still need to be decided.',
+        pending: 'The amounts have not been set yet. Until they are, everything listed under Free above is yours to use, with no account and no payment.',
       },
       about: {
         title: 'About this scan',
@@ -985,7 +995,17 @@ export const STRINGS = {
           'The free scan runs in your browser. Your catalogue never leaves your device and is not stored anywhere.',
         promise:
           'What the scan does not do: predict how an agent ranks. That would be a claim about somebody else\'s system. What stands here is about your own data, and is therefore measurable and contestable.',
-        todo: 'TODO — who is behind this and how to get in touch.',
+      },
+      notFound: {
+        title: 'This page does not exist',
+        body: 'The address is wrong, or the page has moved. Nothing broke on your end.',
+        action: 'Go to the start page',
+      },
+      error: {
+        title: 'Something went wrong',
+        body: 'This page could not be loaded. Your scan and your saved reports are untouched by this — they sit apart from this screen.',
+        action: 'Try again',
+        home: 'Go to the start page',
       },
       dashboard: {
         title: 'Overview',
