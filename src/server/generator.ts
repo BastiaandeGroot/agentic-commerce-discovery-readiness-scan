@@ -87,11 +87,16 @@ export { extractJson };
  * generatie doet twaalf tot vijftien aanroepen op diezelfde regels; zonder die
  * markering betaal je ze vijftien keer vol.
  */
-export function makeAsk(): Ask {
+/** Een sleutel die niet aan een workspace hangt moet die in een header meesturen. */
+function makeClient(): Anthropic {
   const workspace = process.env.ANTHROPIC_WORKSPACE_ID;
-  const client = new Anthropic(
+  return new Anthropic(
     workspace ? { defaultHeaders: { 'anthropic-workspace-id': workspace } } : {},
   );
+}
+
+export function makeAsk(): Ask {
+  const client = makeClient();
 
   return async function ask(task: AskTask): Promise<AskReply> {
     const messages: Anthropic.Messages.MessageParam[] = [{ role: 'user', content: task.prompt }];
@@ -151,6 +156,84 @@ export function makeAsk(): Ask {
     // het goedkopere einde.
     throw new PhaseFailure(`De stap ${task.phase} was na ${MAX_CONTINUATIONS} beurten nog niet klaar.`, usage);
   };
+}
+
+/**
+ * Kan deze stap via de batch-API?
+ *
+ * Alleen de fasen die niet het web op gaan. Niet omdat de batch-API dat niet
+ * zou kunnen — dat weet ik niet — maar omdat ik het niet op een echte markt wil
+ * uitproberen: een oogstfase die stil faalt kost een herkansing van tien
+ * minuten. De besparing zit toch waar de dure fasen zitten: elf van de achttien
+ * stappen, allemaal op Opus, samen het leeuwendeel van de rekening.
+ */
+export function batchable(task: AskTask): boolean {
+  return !task.web;
+}
+
+/** De vraag zoals de API hem wil, voor beide wegen dezelfde. */
+function paramsFor(task: AskTask) {
+  return {
+    model: MODELS[task.model],
+    max_tokens: task.maxTokens,
+    system: [{ type: 'text' as const, text: task.system }],
+    thinking: { type: 'adaptive' as const },
+    output_config: { effort: EFFORT[task.model] },
+    messages: [{ role: 'user' as const, content: task.prompt }],
+  };
+}
+
+/** Eén fase indienen ter verwerking. Geeft het batch-id terug. */
+export async function submitBatch(task: AskTask): Promise<string> {
+  const client = makeClient();
+  const batch = await client.messages.batches.create({
+    requests: [{
+      custom_id: 'phase',
+      // De typering van de batch-API kent `output_config` en `thinking` niet in
+      // deze combinatie; de API zelf wel. Eén cast op één plek, met de reden
+      // erbij, is beter dan de vorm hier uitschrijven en laten verlopen.
+      params: paramsFor(task) as unknown as Anthropic.Messages.BatchCreateParams.Request['params'],
+    }],
+  });
+  return batch.id;
+}
+
+/**
+ * Het antwoord ophalen, als het er is.
+ *
+ * `null` betekent: nog bezig. Dat is geen fout maar de normale toestand van een
+ * batch die net is ingediend, en de beller hoort er niets anders mee te doen
+ * dan later terugkomen.
+ */
+export async function collectBatch(batchId: string): Promise<AskReply | null> {
+  const client = makeClient();
+  const batch = await client.messages.batches.retrieve(batchId);
+  if (batch.processing_status !== 'ended') return null;
+
+  for await (const entry of await client.messages.batches.results(batchId)) {
+    if (entry.result.type === 'succeeded') {
+      const message = entry.result.message;
+      const text = message.content
+        .filter((block): block is Anthropic.Messages.TextBlock => block.type === 'text')
+        .map((block) => block.text)
+        .join('\n');
+      const usage = usageOf(message.usage);
+      if (message.stop_reason === 'max_tokens') {
+        throw new PhaseFailure('Het antwoord liep tegen de tokenlimiet aan en is daarmee afgekapt.', usage);
+      }
+      try {
+        return { json: extractJson(text), usage };
+      } catch (caught) {
+        throw new PhaseFailure(caught instanceof Error ? caught.message : 'Onleesbaar antwoord.', usage);
+      }
+    }
+    if (entry.result.type === 'expired') {
+      throw new PhaseFailure('De batch is verlopen zonder antwoord.', { input: 0, output: 0, cached: 0 });
+    }
+    throw new PhaseFailure('De batch kwam terug met een fout.', { input: 0, output: 0, cached: 0 });
+  }
+
+  throw new PhaseFailure('De batch leverde geen uitkomst op.', { input: 0, output: 0, cached: 0 });
 }
 
 /** Wat een stap ongeveer kostte, in dollarcenten. Voor het beheerscherm. */
