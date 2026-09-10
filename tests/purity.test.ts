@@ -10,7 +10,7 @@ import { join } from 'node:path';
 // `src/generation` staat er ook in. De pijplijn moet met vaste antwoorden na te
 // spelen zijn zonder netwerk en zonder klok; wat er wél naar buiten praat staat
 // in `src/server/generator.ts` en valt hier bewust buiten.
-const MOTOR = ['src/intake', 'src/spec', 'src/questions', 'src/engine', 'src/generation'];
+const MOTOR = ['src/intake', 'src/spec', 'src/questions', 'src/engine', 'src/generation', 'src/collect'];
 
 const VERBODEN: [RegExp, string][] = [
   [/\bnew Date\(\)/, 'new Date() — geef de tijd mee als argument'],
