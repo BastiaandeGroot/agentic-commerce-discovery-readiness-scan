@@ -104,6 +104,7 @@ function readQuestion(raw: unknown, fallbackId: string): DraftQuestion | null {
     evidence: asStrings(source.evidence).map((one) => one.toLowerCase().replace(/\s+/g, '_')),
     synonyms: asStrings(source.synonyms),
     rule: asString(source.rule) || undefined,
+    ruleSource: asString(source.ruleSource) || undefined,
     answerType: asString(source.answerType) || 'tekst',
     answerable: answerable === 'false' || answerable === 'gedeeltelijk' ? answerable : 'true',
     mode: mode === 'alle' || mode === 'een' ? (mode as 'alle' | 'een') : undefined,

@@ -159,6 +159,15 @@ export interface DraftQuestion {
   evidence: string[];
   synonyms: string[];
   rule?: string;
+  /**
+   * Waar de drempel van die regel vandaan komt: de site die hem publiceert.
+   *
+   * Zonder dit blijft elke regel "beredeneerd" en telt hij niet mee in de score
+   * — de veilige aanname, maar bij de eerste echte bank betekende het dat 105
+   * vragen als bezwaar op het beoordeelscherm stonden met één oorzaak. De
+   * oogst kent die bron: hij neemt drempeltabellen letterlijk over mét URL.
+   */
+  ruleSource?: string;
   answerType: string;
   answerable: 'true' | 'gedeeltelijk' | 'false';
   mode?: 'alle' | 'een';

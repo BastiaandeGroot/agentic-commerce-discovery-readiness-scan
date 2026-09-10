@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 
 import { breadcrumb, extractProduct, jsonLdBlocks, specTable } from '../src/collect/extract';
 import { linksFrom, productUrlsFromItemList, spread, urlsFromSitemap } from '../src/collect/discover';
+import { importQuestionList } from '../src/questions/list';
 
 const PRODUCT = `<html><head>
 <script type="application/ld+json">
@@ -99,4 +100,25 @@ test('links buiten het domein tellen niet mee', () => {
 test('een sitemap levert zijn adressen', () => {
   const xml = '<urlset><url><loc>https://winkel.nl/a</loc></url><url><loc>https://winkel.nl/b</loc></url></urlset>';
   assert.deepEqual(urlsFromSitemap(xml), ['https://winkel.nl/a', 'https://winkel.nl/b']);
+});
+
+test('een drempel met bron telt als gepubliceerd, zonder bron als beredeneerd', () => {
+  // Dit was de oorzaak van 105 bezwaren op één bank: de tabel had geen plek
+  // voor de herkomst van een drempel, dus zette de lezer élke regel op
+  // "beredeneerd" en stond elke vraag met een regel als bezwaar op het scherm.
+  const csv = [
+    'id,vraag,belang,benodigde_attributen,beslisregel,beslisregel_bron',
+    'A-01,Is dit sterk genoeg?,hoog,schuurweerstand,martindale_bank,https://voorbeeld.nl/advies',
+    'A-02,Hoeveel heb ik nodig?,hoog,baanbreedte,meterage,',
+  ].join('\n');
+
+  const read = importQuestionList([{ name: 'markt.csv', text: csv }]);
+  const rules = new Map((read.bank?.rules ?? []).map((rule) => [rule.id, rule]));
+
+  assert.equal(rules.get('martindale_bank')?.source.kind, 'published');
+  assert.equal(rules.get('martindale_bank')?.source.url, 'https://voorbeeld.nl/advies');
+  assert.equal(rules.get('meterage')?.source.kind, 'reasoned');
+
+  // En de waarschuwing telt alleen wat werkelijk zonder bron staat.
+  assert.ok(read.warnings.some((warning) => warning.includes('1 beslisregel zonder bron')));
 });

@@ -76,6 +76,20 @@ const COLUMNS = {
   ],
   evidenceCount: ['aantal_attributen', 'attribute_count', 'aantal_attributes'],
   rule: ['beslisregel', 'decision_rule', 'rule', 'regel'],
+  /**
+   * Waar de drempel van deze regel vandaan komt: de site die hem publiceert.
+   *
+   * Zonder deze kolom kon een tabel geen enkele gepubliceerde drempel dragen —
+   * `collectRules` zette elke regel op "beredeneerd", en dan staat élke vraag
+   * met een regel als bezwaar op het beoordeelscherm. Bij de eerste echte bank
+   * waren dat er 105, met één oorzaak en geen enkele die per vraag te
+   * verhelpen was.
+   *
+   * Wat erin hoort is de bron zoals de methode hem eist: een sitenaam of een
+   * URL. Staat er niets, dan blijft de regel beredeneerd en telt hij niet mee
+   * in de score — dat is en blijft de veilige aanname.
+   */
+  ruleSource: ['beslisregel_bron', 'drempel_bron', 'rule_source', 'bron_drempel'],
   answerType: ['antwoordtype', 'answer_type', 'antwoord'],
   answerable: ['beantwoordbaar_uit_attributen', 'answerable_from_attributes', 'beantwoordbaar', 'answerable'],
   scored: ['telt_mee_in_score', 'counts_in_score', 'telt_mee', 'in_score', 'scored'],
@@ -726,20 +740,28 @@ function collectRules(rows: Row[], columns: ColumnMap, warnings: string[]): Deci
     const raw = cell(row, columns, 'rule');
     if (raw === '' || out.has(raw)) continue;
     const isCondition = /[<>=≥≤]/.test(raw);
+    // Een genoemde bron maakt de drempel gepubliceerd; zonder blijft hij
+    // beredeneerd en telt hij niet mee in de score. Een URL herkennen we als
+    // zodanig, want de methode wil hem kunnen nalopen.
+    const source = cell(row, columns, 'ruleSource');
+    const url = /^https?:\/\//i.test(source);
     out.set(raw, {
       id: raw,
       label: same(isCondition ? raw : capitalize(raw.replace(/_/g, ' '))),
-      source: { kind: 'reasoned' },
+      source: source === ''
+        ? { kind: 'reasoned' }
+        : { kind: 'published', site: url ? undefined : source, url: url ? source : undefined },
       rules: isCondition ? [same(raw)] : [],
     });
   }
-  if (out.size > 0) {
+  const unsourced = [...out.values()].filter((rule) => rule.source.kind !== 'published');
+  if (unsourced.length > 0) {
     // Onderscheid tussen "noemt een drempel" en "noemt alleen een naam": beide
     // missen hun bron, maar het zijn twee verschillende gebreken en de merchant
     // moet ze los kunnen herstellen.
-    const withThreshold = [...out.values()].filter((rule) => rule.rules.length > 0);
+    const withThreshold = unsourced.filter((rule) => rule.rules.length > 0);
     warnings.push(
-      `De lijst noemt ${out.size} beslisregel${out.size === 1 ? '' : 's'} zonder bron. `
+      `De lijst noemt ${unsourced.length} beslisregel${unsourced.length === 1 ? '' : 's'} zonder bron. `
       + (withThreshold.length > 0
         ? `${withThreshold.length} daarvan noem${withThreshold.length === 1 ? 't' : 'en'} een drempel (${withThreshold.slice(0, 2).map((rule) => rule.id).join(', ')}), de rest alleen een naam. `
         : 'Ze noemen alleen een naam en geen drempel. ')
