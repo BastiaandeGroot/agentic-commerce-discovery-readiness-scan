@@ -738,6 +738,7 @@ export const STRINGS = {
       coverageOn: 'komt voor op',
       coverageSites: 'van de onderzochte sites',
       coverageNone: 'dekking niet vastgelegd',
+      coverageZero: 'geen enkele onderzochte site behandelt dit \u2014 bewust toegevoegd uit vakkennis',
       questions: 'vragen',
       allFine: 'Hier zagen we niets mis mee',
       issues: {
@@ -1690,6 +1691,7 @@ export const STRINGS = {
       coverageOn: 'appears on',
       coverageSites: 'of the researched sites',
       coverageNone: 'coverage not recorded',
+      coverageZero: 'no researched site covers this \u2014 deliberately added from domain knowledge',
       questions: 'questions',
       allFine: 'We saw nothing wrong here',
       issues: {

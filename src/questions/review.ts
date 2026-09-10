@@ -28,6 +28,42 @@ export type QuestionIssue =
   | 'structure-question'
   | 'process-question';
 
+/**
+ * Welke bevindingen een bezwaar zijn, en welke een aantekening.
+ *
+ * Dat verschil moest ergens vastliggen en lag nergens: het scherm telde alles
+ * mee, dus bij de eerste echte bank stonden 115 van de 171 vragen als bezwaar
+ * terwijl het merendeel precies volgens de methode was opgeschreven. Een
+ * procesvraag is geen gebrek maar een eigenschap — hij hoort in de bank en
+ * buiten de score. Een structuurvraag evenmin: die wijst juist het verband aan
+ * dat deze scan hoort te vinden.
+ *
+ * Wat overblijft is wat een mens moet repareren of billijken voordat hij een
+ * bank vrijgeeft.
+ */
+const OBJECTIONS: QuestionIssue[] = [
+  'no-attributes',
+  'rule-without-source',
+  'critical-without-basis',
+  'rule-not-computed',
+];
+
+/**
+ * Is dit iets om over te beslissen, of alleen om te weten?
+ *
+ * Neemt een gewone string en niet het nauwe type: over de lijn naar het scherm
+ * is een bevinding een string, en een tweede lijst in de UI zou na één
+ * wijziging uit de pas lopen met deze.
+ */
+export function isObjection(issue: string): boolean {
+  return (OBJECTIONS as string[]).includes(issue);
+}
+
+/** Heeft deze vraag iets dat een mens moet wegen? */
+export function hasObjection(question: { issues: string[] }): boolean {
+  return question.issues.some(isObjection);
+}
+
 /** Hoe zwaar een bevinding weegt bij het sorteren. Hoger is eerder in beeld. */
 const WEIGHT: Record<QuestionIssue, number> = {
   'no-attributes': 50,
