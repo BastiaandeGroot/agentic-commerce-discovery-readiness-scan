@@ -120,34 +120,38 @@ export default function Page() {
       </div>
 
       <Card>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <Input
-              id="winkel-url"
-              label={s.url}
-              hint={s.urlHint}
-              value={url}
-              onChange={setUrl}
-              placeholder="winkel.nl"
-            />
+        {/* Drie kolommen die op de invoerregel uitlijnen, niet op de onderkant:
+            het adresveld draagt een toelichting eronder en zou de rest anders
+            omhoog duwen. De knop krijgt daarom een lege labelregel boven zich. */}
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_18rem_auto] sm:items-start">
+          <Input
+            id="winkel-url"
+            label={s.url}
+            hint={s.urlHint}
+            value={url}
+            onChange={setUrl}
+            placeholder="winkel.nl"
+          />
+          <Select
+            stacked
+            id="winkel-bank"
+            label={s.bank}
+            value={bankId}
+            onChange={setBankId}
+            options={[
+              { value: '', label: s.bankNone },
+              ...banks.map((bank) => ({
+                value: bank.id,
+                label: `${bank.vertical} v${bank.version}${bank.status === 'review' ? ' (review)' : ''}`,
+              })),
+            ]}
+          />
+          <div className="flex flex-col gap-1.5">
+            <span aria-hidden className="hidden text-sm font-medium sm:block">&nbsp;</span>
+            <Button onClick={() => void measure()} disabled={url.trim() === ''} loading={state.kind === 'running'}>
+              {s.start}
+            </Button>
           </div>
-          <div className="sm:w-72">
-            <Select
-              label={s.bank}
-              value={bankId}
-              onChange={setBankId}
-              options={[
-                { value: '', label: s.bankNone },
-                ...banks.map((bank) => ({
-                  value: bank.id,
-                  label: `${bank.vertical} v${bank.version}${bank.status === 'review' ? ' (review)' : ''}`,
-                })),
-              ]}
-            />
-          </div>
-          <Button onClick={() => void measure()} disabled={url.trim() === ''} loading={state.kind === 'running'}>
-            {s.start}
-          </Button>
         </div>
       </Card>
 
