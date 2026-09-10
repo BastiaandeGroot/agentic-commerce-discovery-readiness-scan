@@ -17,7 +17,7 @@
 import type { GroupingEntry, Phase, RunState, Topic } from './state';
 
 /** Omhoog zodra een prompt de uitkomst op dezelfde markt kan verschuiven. */
-export const GENERATION_VERSION = '1.0.0';
+export const GENERATION_VERSION = '1.1.0';
 
 /**
  * De regels die in élke fase gelden.
@@ -297,9 +297,10 @@ Per vraag:
 - antwoordtype: enum, getal, boolean, tekst, relatie, proces of afgeleid
 - beantwoordbaar: true, gedeeltelijk of false. Zet false bij proces-, structuur-
   en levenscyclusvragen; die tellen niet mee in de score.
-- beslisregel: alleen als er een deterministische regel bij hoort, met de bron
-  in "note". Een gepubliceerde drempel noemt zijn site; een beredeneerde zegt
-  dat hij beredeneerd is.
+- beslisregel: alleen als er een deterministische regel bij hoort. Noem in
+  "ruleSource" de site of de URL die de drempel publiceert. Laat dat veld leeg
+  als jij het getal zelf beredeneerd hebt — dan telt de drempel niet mee in de
+  score, en dat is de bedoeling. Een verzonnen bron is erger dan geen bron.
 
 Antwoord met dit JSON-object:
 {
@@ -308,7 +309,8 @@ Antwoord met dit JSON-object:
     "intent": "...", "importance": "kritiek|hoog|middel|laag",
     "coverage": 0, "coverageSites": ["..."], "sources": ["..."],
     "evidence": ["attribuut_naam"], "synonyms": ["naam op een site"],
-    "rule": "naam_van_regel of weglaten", "answerType": "...",
+    "rule": "naam_van_regel of weglaten", "ruleSource": "site of URL die de drempel publiceert, of weglaten",
+    "answerType": "...",
     "answerable": "true|gedeeltelijk|false", "mode": "alle|een",
     "note": "bron van de drempel, of waarom het belang afwijkt van de dekking"
   }],
