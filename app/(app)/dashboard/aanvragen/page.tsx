@@ -16,6 +16,7 @@ import { Badge, Button, Card, CardTitle, EmptyState, ErrorState, SkeletonLines, 
 import { STRINGS } from '../../../../src/i18n/strings';
 import { useLocale } from '../../../../src/i18n/useLocale';
 import { authHeader } from '../../../../src/auth/client';
+import { hasObjection } from '../../../../src/questions/review';
 
 interface GroupingEntry {
   category: string; count: number; kind: string; parent?: string; reason?: string;
@@ -342,7 +343,7 @@ export default function Page() {
                     {onlyIssues ? s.admin.onlyIssues : s.admin.showAll}
                     <span className="text-muted">
                       {onlyIssues
-                        ? bank.questions.filter((q) => q.issues.length > 0).length
+                        ? bank.questions.filter(hasObjection).length
                         : bank.questions.length}
                     </span>
                   </Button>
@@ -393,9 +394,19 @@ export default function Page() {
                               {q.attributes.length > 0
                                 ? ` · ${q.attributes.map((a) => a.key).join(', ')}`
                                 : ''}
-                              {q.coverage !== null
-                                ? ` · ${s.admin.coverageOn} ${q.coverage} ${s.admin.coverageSites}`
-                                : ` · ${s.admin.coverageNone}`}
+                              {/* Nul is iets anders dan niet-onderzocht, en dat
+                                  verschil is het punt: dekking 0 betekent dat
+                                  géén enkele site dit behandelt. Dat is volgens
+                                  de methode een vondst en geen gebrek — juist
+                                  daar zit het onderscheidend vermogen, want wie
+                                  alleen oogst wat sites publiceren reproduceert
+                                  de blinde vlekken van de hele branche. Als "0
+                                  van de 5" leest het als een fout. */}
+                              {q.coverage === null
+                                ? ` · ${s.admin.coverageNone}`
+                                : q.coverage === 0
+                                  ? ` · ${s.admin.coverageZero}`
+                                  : ` · ${s.admin.coverageOn} ${q.coverage} ${s.admin.coverageSites}`}
                             </span>
                           </Td>
                           <Td>
@@ -491,8 +502,8 @@ function groupsOf(questions: ReviewedQuestion[], onlyIssues: boolean) {
     const key = question.category ?? '';
     const group = groups.get(key) ?? { key, category: question.category, questions: [], total: 0, issues: 0 };
     group.total++;
-    if (question.issues.length > 0) group.issues++;
-    if (!onlyIssues || question.issues.length > 0) group.questions.push(question);
+    if (hasObjection(question)) group.issues++;
+    if (!onlyIssues || hasObjection(question)) group.questions.push(question);
     groups.set(key, group);
   }
 
