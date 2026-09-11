@@ -23,7 +23,7 @@ import { after, NextResponse } from 'next/server';
 import { isExecutor, isRefusal, serviceClient } from '../../../src/server/executor';
 import { batchable, collectBatch, makeAsk, PhaseFailure, submitBatch } from '../../../src/server/generator';
 import { deliverBank } from '../../../src/server/deliver';
-import { advance, applyReply, taskFor } from '../../../src/generation/pipeline';
+import { advance, applyReply, EmptyPhase, taskFor } from '../../../src/generation/pipeline';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   decodePhase,
@@ -223,6 +223,12 @@ async function runPhase(
         attempts: 0,
         failure: null,
         leased_until: null,
+        // De batch is opgenomen en hoort bij de fase die nu voorbij is. Blijft
+        // het nummer staan, dan haalt elke volgende fase dit antwoord opnieuw
+        // op: zo leverde de eerste batchrun negen lege categorieën en een lege
+        // bank op, allemaal met de uitkomst van de samenvoegstap.
+        batch_id: null,
+        batch_at: null,
         input_tokens: run.input_tokens + result.usage.input,
         output_tokens: run.output_tokens + result.usage.output,
         cached_tokens: run.cached_tokens + result.usage.cached,
@@ -248,7 +254,9 @@ async function runPhase(
     const attempts = run.attempts + 1;
     const failure = caught instanceof Error ? caught.message : 'Onbekende fout.';
     // Wat een gestrande fase kostte telt gewoon mee: die tokens zijn betaald.
-    const spent = caught instanceof PhaseFailure ? caught.usage : { input: 0, output: 0, cached: 0 };
+    const spent = caught instanceof PhaseFailure || caught instanceof EmptyPhase
+      ? caught.usage
+      : { input: 0, output: 0, cached: 0 };
 
     await supabase
       .from('bank_runs')
@@ -256,6 +264,10 @@ async function runPhase(
         attempts,
         failure,
         leased_until: null,
+        // Een mislukte batch opnieuw ophalen geeft dezelfde fout; de herkansing
+        // hoort een nieuwe in te dienen.
+        batch_id: null,
+        batch_at: null,
         input_tokens: run.input_tokens + spent.input,
         output_tokens: run.output_tokens + spent.output,
         cached_tokens: run.cached_tokens + spent.cached,
@@ -299,7 +311,7 @@ async function work(
   const at = now.toISOString().slice(0, 10);
 
   if (run.batch_id) {
-    const reply = await collectBatch(run.batch_id);
+    const reply = await collectBatch(run.batch_id, run.phase);
     if (reply === null) return null;
     return applyReply(state, phase, reply, at);
   }

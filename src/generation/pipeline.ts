@@ -305,6 +305,24 @@ function readFacets(raw: unknown): FacetEntry[] {
 
 const findingsOf = (source: Record<string, unknown>): string[] => asStrings(source.findings).slice(0, 40);
 
+/**
+ * Een fase die had moeten schrijven en niets opleverde.
+ *
+ * Een lezer die niet struikelt is goed zolang er íets binnenkomt. Maar een
+ * basislaag of een categorie zonder één vraag is geen magere uitkomst, het is
+ * een kapotte stap — en doorlopen verplaatst de fout naar het eind van de reeks,
+ * waar hij pas na elf betaalde stappen opvalt als een lege tabel. Dat is precies
+ * wat de eerste batchrun deed. Nu faalt de stap zelf en telt hij als poging.
+ *
+ * De tokens reizen mee, want die zijn betaald.
+ */
+export class EmptyPhase extends Error {
+  constructor(message: string, readonly usage: Usage) {
+    super(message);
+    this.name = 'EmptyPhase';
+  }
+}
+
 // --- De stap zelf ------------------------------------------------------------
 
 /**
@@ -435,13 +453,18 @@ export function applyReply(
       break;
     }
 
-    case 'base':
+    case 'base': {
+      const questions = readQuestions(answer.questions, 'BAS', takenIds(state));
+      if (questions.length === 0) {
+        throw new EmptyPhase('De basislaag kwam terug zonder één vraag.', reply.usage);
+      }
       updated = {
         ...state,
-        base: { category: '', questions: readQuestions(answer.questions, 'BAS', takenIds(state)), reweight: [] },
+        base: { category: '', questions, reweight: [] },
         findings: [...state.findings, ...findingsOf(answer)],
       };
       break;
+    }
 
     case 'overlay': {
       const category = overlayCategories(state)[phase.index] ?? '';
@@ -457,11 +480,18 @@ export function applyReply(
         })
         .filter((entry) => entry.id !== '');
 
+      // Een overlay bestaat omdat hij eigen vragen heeft; dat is de lat die hij
+      // bij het panel haalde. Zonder één vraag is de stap mislukt.
+      const questions = readQuestions(answer.questions, prefix, takenIds(state));
+      if (questions.length === 0) {
+        throw new EmptyPhase(`De categorie ${category} kwam terug zonder één eigen vraag.`, reply.usage);
+      }
+
       updated = {
         ...state,
         overlays: [
           ...state.overlays,
-          { category, questions: readQuestions(answer.questions, prefix, takenIds(state)), reweight },
+          { category, questions, reweight },
         ],
         findings: [...state.findings, ...findingsOf(answer)],
       };
