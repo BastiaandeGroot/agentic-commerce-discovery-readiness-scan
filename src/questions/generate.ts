@@ -24,9 +24,10 @@
 import type { Bilingual, Dataset, Question, QuestionSet, QuestionSetState } from '../domain/types';
 import type { AttributeDef, QuestionBank } from './bank';
 import { bankFor, resolveBanks } from './banks';
-import { composeSet, overlayFor } from './compose';
+import { composeSet, ownOverlayFor } from './compose';
 import { str } from '../intake/normalize';
-import { mainCategory, segmentLevel, subCategory } from '../engine/join';
+import { categoryMemberships, expandFacets, segmentAt, segmentLevel, withoutFacets } from '../engine/join';
+import { normalizeName } from '../intake/facets';
 import { catalogKnows } from '../engine/evaluate';
 import { matchAttributes, type AttributeMatch } from '../spec/match';
 import { applyMapping, requirementFor, type Mapping } from './mapping';
@@ -46,40 +47,76 @@ export interface CategoryStat {
  * waarom de catalogus de bron is en niet een kanaalfeed: die vlakt de boom af.
  * Bij de testmerchant werd "Outdoorstoffen > Gestreept" onderweg tot los
  * "Gestreept" en verdween een hele hoofdcategorie.
- */
-/**
- * De subcategorieën per hoofdcategorie, zoals ze in de catalogus staan.
  *
- * Niet om er vragensets van te maken — dat zou je filters meten in plaats van je
- * markt — maar om te kunnen bepalen of de vragenlijst er iets over te zeggen
- * heeft.
+ * Een product telt mee in élke categorie waar het hangt. Een stof die als
+ * meubelstof én als gordijnstof verkocht wordt, hoort bij allebei; alleen de
+ * eerste tellen maakte de kleinste markt stelselmatig te klein — en welke de
+ * eerste was, besliste het alfabet.
  */
-export function deriveSubcategories(catalog: Dataset, segments: string[] = []): Map<string, string[]> {
-  const out = new Map<string, Set<string>>();
-  // Hetzelfde niveau als de scan gebruikt; anders bouwt de generator sets op een
-  // andere laag dan er gemeten wordt en matcht er niets.
-  const level = segmentLevel(catalog.products, segments);
-  for (const product of catalog.products) {
-    const main = mainCategory(product, level);
-    const sub = subCategory(product, level);
-    if (!main || !sub) continue;
-    const set = out.get(main) ?? new Set<string>();
-    set.add(sub);
-    out.set(main, set);
-  }
-  return new Map([...out.entries()].map(([main, subs]) => [main, [...subs].sort()]));
-}
-
-export function deriveCategories(catalog: Dataset, segments: string[] = []): CategoryStat[] {
+export function deriveCategories(
+  catalog: Dataset,
+  segments: string[] = [],
+  /** Paden die een kenmerk zijn; zie `expandFacets`. */
+  facets: ReadonlySet<string> = new Set(),
+  level = segmentLevel(catalog.products, segments),
+): CategoryStat[] {
   const counts = new Map<string, number>();
-  const level = segmentLevel(catalog.products, segments);
   for (const product of catalog.products) {
-    const category = mainCategory(product, level);
-    if (!category) continue;
-    counts.set(category, (counts.get(category) ?? 0) + 1);
+    const seen = new Set<string>();
+    for (const path of withoutFacets(categoryMemberships(product), facets)) {
+      const name = segmentAt(path, level);
+      if (seen.has(name)) continue;
+      seen.add(name);
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
   }
   return [...counts.entries()]
     .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+
+/** Een subcategorie waar de vragenlijst een eigen vragenset voor kent. */
+interface Subcategory { name: string; parent: string; count: number }
+
+/**
+ * De subcategorieën met een eigen vragenset in de lijst.
+ *
+ * Alleen die: een subcategorie zonder eigen vragen is dezelfde meting op minder
+ * producten. En alleen op de volle naam — "Kussenpanelen" is geen "Paneel", en
+ * een halve match zou een product de vragen van een andere categorie geven.
+ */
+function deriveSubcategories(
+  catalog: Dataset,
+  banks: QuestionBank[],
+  facets: ReadonlySet<string>,
+  level: number,
+): Subcategory[] {
+  const counts = new Map<string, { name: string; count: number; parents: Map<string, number> }>();
+  for (const product of catalog.products) {
+    const seen = new Set<string>();
+    for (const path of withoutFacets(categoryMemberships(product), facets)) {
+      const top = Math.min(level, path.length - 1);
+      const parent = path[top];
+      const bank = bankFor(parent, banks);
+      for (let depth = top + 1; depth < path.length; depth++) {
+        const name = path[depth];
+        if (!ownOverlayFor(bank, name)) continue;
+        const key = normalizeName(name);
+        const entry = counts.get(key) ?? { name, count: 0, parents: new Map<string, number>() };
+        if (!seen.has(key)) { entry.count += 1; seen.add(key); }
+        entry.parents.set(parent, (entry.parents.get(parent) ?? 0) + 1);
+        counts.set(key, entry);
+      }
+    }
+  }
+  return [...counts.values()]
+    .map((entry) => ({
+      name: entry.name,
+      // Hangt dezelfde naam onder twee takken, dan de tak waar hij het vaakst
+      // hangt. Dezelfde naam met dezelfde vragen is één set, niet twee.
+      parent: [...entry.parents.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0],
+      count: entry.count,
+    }))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
@@ -180,6 +217,14 @@ export function generateQuestionSets(
    * niet in, dan beslist de regex zoals altijd.
    */
   chosenOverlays: Record<string, string | null> = {},
+  /**
+   * Wat het categoriescherm als kenmerk liet staan, als padsleutels.
+   *
+   * Zo'n pad krijgt geen vragenset: "Motieven > Lente" is een eigenschap van de
+   * stof en geen markt, en hem een set geven betekent dat buitenkussens de
+   * algemene vragen krijgen omdat ze toevallig een motief hebben.
+   */
+  options: { facets?: string[] } = {},
 ): QuestionSetState {
   const mapped = new Map<string, AttributeMatch[]>();
   const banks = resolveBanks(imported).map((bank) => {
@@ -195,14 +240,16 @@ export function generateQuestionSets(
     ...bank.overlays.map((overlay) => overlay.label.en),
     ...bank.overlays.map((overlay) => overlay.id),
   ]);
-  const categories = deriveCategories(catalog, segments);
+  const level = segmentLevel(catalog.products, segments);
+  const facetPaths = expandFacets(catalog.products, options.facets ?? []);
+  const facets = new Set(facetPaths);
+  const categories = deriveCategories(catalog, segments, facets, level);
   // Vragen die in deze catalogus niets te vragen hebben, laten we weg in plaats
   // van ze als permanent gat te laten staan.
   const askCondition = sellsNonNew(catalog);
   const applicable = (question: Question) =>
     askCondition || !question.requires.includes('condition');
 
-  const subcategories = deriveSubcategories(catalog, segments);
   const named = categories.slice(0, MAX_SETS);
   const tail = categories.slice(MAX_SETS);
   const used = new Map<string, QuestionBank>();
@@ -215,19 +262,37 @@ export function generateQuestionSets(
       { id: slug(category.name), name: category.name, count: category.count },
       category.name in chosenOverlays ? chosenOverlays[category.name] : undefined,
     );
-    // Welke subcategorieën kent de vragenlijst als eigen categorie? Alleen die
-    // verdienen een eigen niveau; de rest krijgt dezelfde vragen en is dus
-    // dezelfde meting op minder producten.
-    const distinguishes = (subcategories.get(category.name) ?? []).filter((sub) => {
-      const own = overlayFor(bank, sub);
-      return own !== undefined && own.id !== set.overlayId;
-    });
-    return {
-      ...set,
-      questions: set.questions.filter(applicable),
-      distinguishes: distinguishes.length > 0 ? distinguishes : undefined,
-    };
+    return { ...set, questions: set.questions.filter(applicable) };
   });
+
+  // Een eigen set voor elke subcategorie waar de lijst eigen vragen voor heeft:
+  // lampenkapstoffen horen de lampenkapvragen te krijgen en niet de algemene
+  // decoratievragen. Kiest de merchant voor zo'n subcategorie dezelfde set als
+  // voor de categorie erboven, of kent de lijst er dezelfde vragen voor, dan is
+  // het dezelfde meting en krijgt hij geen eigen rij.
+  const taken = new Set(sets.map((set) => set.id));
+  for (const sub of deriveSubcategories(catalog, banks, facets, level)) {
+    const parentSet = sets.find((set) => set.category === sub.parent);
+    const bank = bankFor(sub.parent, banks);
+    const chosen = sub.name in chosenOverlays ? chosenOverlays[sub.name] : undefined;
+    const own = chosen === undefined ? ownOverlayFor(bank, sub.name)?.id : chosen;
+    if (own !== null && own === parentSet?.overlayId) continue;
+    if (sets.some((set) => set.category !== undefined && normalizeName(set.category) === normalizeName(sub.name))) continue;
+
+    let id = slug(`${sub.parent} ${sub.name}`);
+    while (taken.has(id)) id = `${id}-2`;
+    taken.add(id);
+    used.set(bank.meta.vertical, bank);
+    const set = composeSet(bank, { id, name: sub.name, count: sub.count }, own);
+    sets.push({ ...set, parent: sub.parent, questions: set.questions.filter(applicable) });
+  }
+
+  // Elke subcategorie direct onder haar categorie, zodat het koppelscherm de
+  // boom laat zien in plaats van een lijst waar de subcategorieën onderaan
+  // bungelen.
+  const mains = sets.filter((set) => !set.parent);
+  const ordered = mains.flatMap((main) => [main, ...sets.filter((set) => set.parent === main.category)]);
+  sets.splice(0, sets.length, ...ordered, ...sets.filter((set) => set.parent && !ordered.includes(set)));
 
   // De staart van kleine categorieen deelt een vangnet-set, zodat die producten
   // wel gescoord worden maar de lijst hanteerbaar blijft.
@@ -269,6 +334,8 @@ export function generateQuestionSets(
     version: 1,
     sets,
     changeLog: [],
+    facetPaths: facetPaths.length > 0 ? facetPaths : undefined,
+    segmentLevel: level,
     blindAttributes: [...blind.values()],
     // Wat de koppeling wél opleverde. Dit is een gok van de app en geen uitspraak
     // van de merchant, dus het hoort controleerbaar in beeld: een verkeerd

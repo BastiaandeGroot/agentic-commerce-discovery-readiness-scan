@@ -31,6 +31,22 @@ export function overlayFor(bank: QuestionBank, category: string): Overlay | unde
   return undefined;
 }
 
+/**
+ * De overlay die precies deze categorie noemt, en geen die er alleen op lijkt.
+ *
+ * Voor subcategorieën, waar een halve match gevaarlijk is: onder een categorie
+ * staan vaak kenmerken en toepassingen, en een naam die toevallig een stuk van
+ * een overlay bevat zou een product de vragen van een andere markt geven. Op
+ * hoofdniveau blijft `overlayFor` ruimer, omdat de merchant daar elke koppeling
+ * ziet en kan wijzigen.
+ */
+export function ownOverlayFor(bank: QuestionBank, category: string): Overlay | undefined {
+  for (const overlay of bank.overlays) {
+    if (new RegExp(`^(?:${overlay.match})$`, 'i').test(category.trim())) return overlay;
+  }
+  return undefined;
+}
+
 /** De toepassingsprofielen die op deze categorie van toepassing zijn. */
 export function profilesFor(overlay: Overlay | undefined, category: string): string[] {
   return (overlay?.profiles ?? [])

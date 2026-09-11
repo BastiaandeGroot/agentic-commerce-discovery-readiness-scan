@@ -343,6 +343,9 @@ export function MappingStep({
             {s.mapping.setsHeading}
           </p>
           <p className="mt-1 text-xs leading-relaxed text-muted">{s.mapping.setsNote}</p>
+          {state.sets.some((set) => set.parent) ? (
+            <p className="mt-1 text-xs leading-relaxed text-muted">{s.mapping.setSubNote}</p>
+          ) : null}
           {matchingSets ? (
             <p className="mt-1.5 text-xs text-muted">{s.mapping.setsMatching}</p>
           ) : setsBy ? (
@@ -359,8 +362,13 @@ export function MappingStep({
                 key={set.id}
                 className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-2 first:border-t-0"
               >
-                <span className="min-w-0 flex-1 truncate text-sm">
+                <span className={`min-w-0 flex-1 truncate text-sm ${set.parent ? 'pl-4' : ''}`}>
                   {set.category}
+                  {/* Een subcategorie noemt haar tak: "Lampenkapstoffen" zegt
+                      zonder "onder Decoratiestoffen" niet waar ze in de boom zit. */}
+                  {set.parent ? (
+                    <span className="ml-1.5 text-xs text-muted">{s.mapping.setUnder} {set.parent}</span>
+                  ) : null}
                   <span className="ml-2 text-xs text-muted">
                     {set.questions.filter((q) => q.layer === 'category').length > 0
                       ? `${set.questions.length} ${s.mapping.setQuestions}`

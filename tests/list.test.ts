@@ -17,6 +17,7 @@ import {
 import type { QuestionSetState } from '../src/domain/types';
 import { ingest } from '../src/intake/index';
 import { generateQuestionSets } from '../src/questions/generate';
+import { runScan } from '../src/engine/report';
 import { catalogKnows, fieldState } from '../src/engine/evaluate';
 import { buildMappingRequest, parseMappingAnswer, renderMappingRequest } from '../src/spec/mapping';
 
@@ -577,9 +578,19 @@ test('een subcategorie krijgt alleen een eigen niveau als de lijst hem kent', ()
   ].join('\n'));
 
   const state = generateQuestionSets(catalogus, [bank!], {}, { Meubelstoffen: 'meubelstoffen' });
-  const set = state.sets.find((entry) => entry.category === 'Meubelstoffen');
-  assert.deepEqual(set?.distinguishes, ['Naaigarens']);
-  assert.equal(set?.distinguishes?.includes('Effen'), false);
+
+  // Naaigarens krijgt een eigen set, onder zijn categorie, met zijn eigen vragen.
+  const garen = state.sets.find((entry) => entry.category === 'Naaigarens');
+  assert.equal(garen?.parent, 'Meubelstoffen');
+  assert.notEqual(garen?.overlayId, state.sets.find((entry) => entry.category === 'Meubelstoffen')?.overlayId);
+  // Effen niet: dat zou dezelfde meting zijn op minder producten.
+  assert.equal(state.sets.some((entry) => entry.category === 'Effen'), false);
+
+  // En de scan volgt dat: garens komen in hun eigen rij, met hun eigen vragen.
+  const report = runScan(catalogus, state, { scannedAt: '2026-01-01T00:00:00Z' });
+  const rij = report.categories.find((row) => row.subcategory === 'Naaigarens');
+  assert.equal(rij?.category, 'Meubelstoffen');
+  assert.equal(rij?.total, 2);
 });
 
 test('een lijst mag beide talen dragen, in één bestand', () => {

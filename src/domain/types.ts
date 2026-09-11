@@ -209,15 +209,15 @@ export interface QuestionSet {
   /** Toepassingsprofielen die binnen deze categorie gelden. */
   profileIds?: string[];
   /**
-   * Subcategorieën waarvoor de vragenlijst eigen vragen kent.
+   * De categorie waar deze set onder hangt, als het een subcategorie is.
    *
-   * Alleen deze mogen als apart niveau getoond worden. Een subcategorie die
-   * dezelfde vragen krijgt als zijn categorie is geen tweede meting maar
-   * dezelfde meting op minder producten; hem als eigen rij tonen suggereert een
-   * onderscheid dat de vragenlijst niet maakt. Het aggregatieniveau volgt de
-   * vragen, niet de categorieboom.
+   * Een subcategorie krijgt alleen een eigen set als de vragenlijst er een
+   * ándere vragenset voor kent — "Lampenkapstoffen" onder "Decoratiestoffen".
+   * Een subcategorie met dezelfde vragen is geen tweede meting maar dezelfde
+   * meting op minder producten. Het aggregatieniveau volgt de vragen, niet de
+   * categorieboom.
    */
-  distinguishes?: string[];
+  parent?: string;
 }
 
 export type ChangeLogAction = 'edited' | 'disabled' | 'enabled' | 'added' | 'removed';
@@ -285,6 +285,24 @@ export interface QuestionSetState {
    * hoort niemand zelf te moeten ontdekken uit een lager cijfer.
    */
   categoriesWithoutOverlay: string[];
+  /**
+   * De categoriepaden die een kenmerk zijn en geen markt, als genormaliseerde
+   * padsleutel.
+   *
+   * Wat de merchant op het categoriescherm als kenmerk liet staan, plus de
+   * takken die daardoor niets meer dragen (zie `expandFacets`). Staat in de
+   * sets en niet los ernaast, omdat de scan er dezelfde beslissing mee moet
+   * nemen als het samenstellen deed: anders telt het koppelscherm vier
+   * categorieën en meet de scan er vijf.
+   */
+  facetPaths?: string[];
+  /**
+   * Op welk niveau van de categorieboom de markt begint (zie `segmentLevel`).
+   *
+   * Vastgelegd bij het samenstellen, zodat de scan hem niet opnieuw afleidt uit
+   * iets anders en op een andere laag uitkomt dan de sets gebouwd zijn.
+   */
+  segmentLevel?: number;
 }
 
 // --- Bevindingen en rapport ------------------------------------------------
@@ -355,14 +373,29 @@ export interface ProductResult {
   key: string;
   title?: string;
   category?: string;
-  /** Tweede segment van het categoriepad; een doorsnede, geen eigen vragenset. */
+  /** De subcategorie waar zijn vragenset aan hangt, als die dieper ligt dan de markt. */
   subcategory?: string;
   /** Hoofdafbeelding; een product zonder is zelf een bevinding. */
   image?: string;
   /** Toegepaste vragenset, of undefined als het product nergens op matchte. */
   setId?: string;
+  /**
+   * Alle sets waar het product onder valt, als dat er meer dan één is.
+   *
+   * Een stof die onder gordijnstoffen én meubelstoffen hangt, wordt op beide
+   * vragenlijsten gemeten. `setId` is de voorste en bepaalt de rij in het rapport.
+   */
+  setIds?: string[];
   /** Product zonder categorie: geflagd en geteld, niet gescoord. */
   unmatched: boolean;
+  /**
+   * Hing het product alleen onder paden die een kenmerk zijn?
+   *
+   * Dan is het wel een product met een categorie in de export, maar niet één
+   * die een markt noemt ("Motieven > Lente"). Telt als `unmatched`; los
+   * vastgelegd omdat het een ander gesprek is dan een ontbrekende categorie.
+   */
+  facetOnly?: boolean;
   /** Alle vragen van de categorie beantwoord. */
   findable: boolean;
   /**

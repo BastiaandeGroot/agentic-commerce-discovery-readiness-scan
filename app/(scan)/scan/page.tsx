@@ -107,6 +107,8 @@ export default function Home() {
    * "Effen" en "Premium" als marktsegment staan.
    */
   const [segments, setSegments] = useState<{ name: string; count: number }[]>([]);
+  /** De paden die hij als kenmerk liet staan; die krijgen geen vragenset. */
+  const [facets, setFacets] = useState<string[]>([]);
   /** Zijn eigen winkel; wordt één van de panelsites, nooit de enige. */
   const [shopUrl, setShopUrl] = useState<string>();
   const [report, setReport] = useState<ScanReport>();
@@ -148,6 +150,7 @@ export default function Home() {
     nextCatalog = catalog,
     nextMapping = mapping,
     nextCategories = categories,
+    nextFacets = facets,
   ) {
     if (!nextCatalog) return;
     setQuestionState(generateQuestionSets(
@@ -155,6 +158,7 @@ export default function Home() {
       nextBanks.map((entry) => entry.bank),
       nextMapping,
       nextCategories,
+      { facets: nextFacets },
     ));
   }
 
@@ -303,8 +307,11 @@ export default function Home() {
             verdicts={verdicts}
             onDecide={decideCategory}
             onSegments={setSegments}
+            onFacets={setFacets}
             onSite={setShopUrl}
-            onContinue={() => setStep('bank')}
+            // Pas hier opnieuw samenstellen: nu staat vast welke paden een
+            // kenmerk zijn, en daar hangt af welke vragensets er komen.
+            onContinue={() => { compose(banks); setStep('bank'); }}
           />
         ) : null}
 

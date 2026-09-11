@@ -43,6 +43,20 @@ rapport**, plus een uitlegpagina op `/methode` in merchant-taal.
 
 Deze zijn met de opdrachtgever doorgesproken. Niet terugdraaien zonder overleg.
 
+**Een product wordt gemeten op elke plek waar het hangt (11 september 2026,
+scanversie 5.0.0).** Tot dan kreeg een product de vragen van zijn eerste
+hoofdcategorie. In de Magento-export van De Groot staan alle categorieën van een
+product op alfabet in één cel, dus "eerste" betekende "alfabetisch eerste": 1.371
+stoffen werden als decoratiestof gemeten omdat de D vóór de G komt, en de eigen
+vragen die de bank voor lampenkapstoffen, tafelkleedstoffen, schaduwdoek en
+naaigarens had, werden nooit gesteld. Nu: per tak de diepste categorie met een
+eigen vragenset, over takken heen allemaal (een stof die als gordijnstof én als
+lampenkapstof verkocht wordt beantwoordt beide lijsten), elke vraag één keer met
+het zwaarste gewicht. De rij in het rapport volgt de diepste set. Paden die op
+het categoriescherm als kenmerk staan krijgen geen set; een tak die daarna niets
+meer draagt ("Motieven") verdwijnt in zijn geheel. Op de testcatalogus met
+woontextiel v2: van 5 naar 9 vragensets, 1.523 producten op meer dan één lijst.
+
 **De catalogus is de enige bron.** Eén export, uit het systeem waar de merchant
 zijn productkennis werkelijk onderhoudt: zijn PIM of MDM, of anders Magento of
 Shopify. Een kanaalfeed is daar een afgeleide van en geeft een dunner beeld van
