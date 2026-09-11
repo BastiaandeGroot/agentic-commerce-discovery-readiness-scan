@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { breadcrumb, extractProduct, jsonLdBlocks, specTable } from '../src/collect/extract';
 import { linksFrom, productUrlsFromItemList, spread, urlsFromSitemap } from '../src/collect/discover';
 import { importQuestionList } from '../src/questions/list';
+import { excludeFromScore } from '../src/questions/bank';
 
 const PRODUCT = `<html><head>
 <script type="application/ld+json">
@@ -121,4 +122,20 @@ test('een drempel met bron telt als gepubliceerd, zonder bron als beredeneerd', 
 
   // En de waarschuwing telt alleen wat werkelijk zonder bron staat.
   assert.ok(read.warnings.some((warning) => warning.includes('1 beslisregel zonder bron')));
+});
+
+test('een overgeslagen vraag blijft in de bank maar telt niet mee', () => {
+  // Het beoordeelscherm belooft dit, en het werd nergens uitgevoerd: het
+  // overslaan stond in de database en de merchant mat er gewoon op.
+  const csv = [
+    'id,vraag,belang,benodigde_attributen',
+    'A-01,Hoe breed is de baan?,hoog,baanbreedte',
+    'A-02,Hoeveel meter heb ik nodig?,kritiek,',
+  ].join('\n');
+  const bank = importQuestionList([{ name: 'markt.csv', text: csv }]).bank!;
+  const after = excludeFromScore(bank, ['A-02']);
+
+  assert.equal(after.questions.length, 2, 'hij staat er nog');
+  assert.equal(after.questions.find((q) => q.id === 'A-02')?.answerable, 'no', 'maar buiten de score');
+  assert.notEqual(after.questions.find((q) => q.id === 'A-01')?.answerable, 'no', 'de rest blijft zoals hij was');
 });

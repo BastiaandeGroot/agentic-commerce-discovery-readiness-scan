@@ -16,7 +16,7 @@ import { importQuestionList } from '../../../src/questions/list';
 import { ingest } from '../../../src/intake/index';
 import { generateQuestionSets } from '../../../src/questions/generate';
 import { runScan } from '../../../src/engine/report';
-import type { QuestionBank } from '../../../src/questions/bank';
+import { excludeFromScore, type QuestionBank } from '../../../src/questions/bank';
 
 /**
  * Dezelfde vraag over alle vragensets heen optellen.
@@ -121,7 +121,7 @@ export async function POST(request: Request) {
     }
     const found = await supabase
       .from('question_banks')
-      .select('vertical, version, csv')
+      .select('vertical, version, csv, excluded')
       .eq('id', body.bankId)
       .maybeSingle();
 
@@ -133,7 +133,9 @@ export async function POST(request: Request) {
     if (!read.bank) {
       return NextResponse.json({ error: 'Deze vragenbank is niet in te lezen.' }, { status: 422 });
     }
-    banks = [read.bank];
+    // Wat de beheerder oversloeg telt hier net zomin mee als bij de merchant:
+    // het rapport dat een winkeleigenaar krijgt hoort op dezelfde lat te staan.
+    banks = [excludeFromScore(read.bank, (found.data.excluded as string[] | null) ?? [])];
     bankLabel = `${found.data.vertical} v${found.data.version}`;
   }
 

@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 
   const found = await supabase
     .from('question_banks')
-    .select('id, vertical, version, status, csv, created_at')
+    .select('id, vertical, version, status, csv, excluded, created_at, released_at')
     .order('created_at', { ascending: false });
 
   if (found.error) {
@@ -58,30 +58,43 @@ export async function GET(request: Request) {
       vertical: bank.vertical,
       version: bank.version,
       csv: String(bank.csv ?? ''),
+      // Wat de beheerder oversloeg. Het staat los van de tabel omdat de tabel
+      // is wat de generatie opleverde, en het overslaan een oordeel erna.
+      excluded: (bank.excluded as string[] | null) ?? [],
     });
   }
 
   // Alleen de nieuwste versie per markt. Een oudere versie aanbieden zou hem
   // laten kiezen tussen twee meetlatten zonder dat hij het verschil kan zien.
+  // Op versienummer en niet op aanmaakdatum: een herziening die eerder klaar
+  // was maar later is vrijgegeven, blijft de nieuwere meetlat.
   const newest = new Map<string, (typeof rows)[number]>();
   for (const row of rows) {
-    if (!newest.has(row.vertical)) newest.set(row.vertical, row);
+    const held = newest.get(row.vertical);
+    if (!held || row.version > held.version) newest.set(row.vertical, row);
   }
 
   const banks = [...newest.values()].map((row) => {
     const read = importQuestionList([
       { name: `${row.vertical}.csv`, text: String(row.csv ?? '') },
     ]);
+    const skipped = new Set((row.excluded as string[] | null) ?? []);
     return {
       id: row.id,
       vertical: row.vertical,
       version: row.version,
+      releasedAt: row.released_at ?? undefined,
       questions: read.bank?.questions.length ?? 0,
       categories: read.bank?.overlays.length ?? 0,
       // De algemene vragen, want die gelden voor élk product in zijn winkel. Een
       // categorie-eigen vraag zou hem laten oordelen over een categorie die hij
       // misschien niet eens voert.
-      sample: (read.bank?.questions ?? []).slice(0, SAMPLE).map((question) => question.label),
+      // Een overgeslagen vraag als voorproefje zou hem de vraag tonen die wij
+      // zelf hebben afgekeurd.
+      sample: (read.bank?.questions ?? [])
+        .filter((question) => !skipped.has(question.id))
+        .slice(0, SAMPLE)
+        .map((question) => question.label),
     };
   });
 

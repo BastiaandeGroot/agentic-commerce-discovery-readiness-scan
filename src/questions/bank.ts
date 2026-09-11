@@ -367,6 +367,31 @@ export interface QuestionBank {
 
 // --- Afgeleiden ------------------------------------------------------------
 
+/**
+ * De vragen die de beheerder oversloeg, buiten de score gezet.
+ *
+ * Ze blijven in de bank staan — dat belooft het beoordeelscherm, en het is ook
+ * juist: een overgeslagen vraag kan advies dragen waar een merchant iets aan
+ * heeft. Maar ze tellen niet mee. Dezelfde uitkomst als `uitgesloten_van_score`
+ * in de YAML, dus langs dezelfde weg: `answerable: 'no'`.
+ *
+ * Zonder deze stap werd het overslaan wél opgeslagen en nergens toegepast, en
+ * mat de merchant op precies de vragen die een mens had afgekeurd.
+ */
+export function excludeFromScore(bank: QuestionBank, ids: Iterable<string>): QuestionBank {
+  const skip = new Set(ids);
+  if (skip.size === 0) return bank;
+  const apply = (question: BankQuestion): BankQuestion =>
+    skip.has(question.id) ? { ...question, answerable: 'no' } : question;
+
+  return {
+    ...bank,
+    questions: bank.questions.map(apply),
+    overlays: bank.overlays.map((overlay) =>
+      overlay.questions ? { ...overlay, questions: overlay.questions.map(apply) } : overlay),
+  };
+}
+
 /** Alle attributen van een bank, basislaag plus overlays, op sleutel. */
 export function attributeIndex(bank: QuestionBank, overlay?: Overlay): Map<string, AttributeDef> {
   const index = new Map<string, AttributeDef>();

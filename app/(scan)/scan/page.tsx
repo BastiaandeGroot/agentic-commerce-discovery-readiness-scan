@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Dataset, QuestionSetState, ScanReport } from '../../../src/domain/types';
 import { generateQuestionSets } from '../../../src/questions/generate';
 import { importQuestionList } from '../../../src/questions/list';
+import { excludeFromScore } from '../../../src/questions/bank';
 import type { Mapping } from '../../../src/questions/mapping';
 import { bankStore, LOCAL_ACCOUNT, type StoredBank } from '../../../src/storage/banks';
 import type { ScanClient } from '../../../src/worker/client';
@@ -224,7 +225,9 @@ export default function Home() {
         accountId: LOCAL_ACCOUNT,
         savedAt: new Date().toISOString(),
         source: `${data.vertical} v${data.version}`,
-        bank: read.bank,
+        // Wat de beheerder bij het beoordelen oversloeg, blijft staan maar telt
+        // niet mee. Zo belooft het beoordeelscherm het.
+        bank: excludeFromScore(read.bank, Array.isArray(data.excluded) ? data.excluded : []),
       });
       setStep('mapping');
     } catch {
