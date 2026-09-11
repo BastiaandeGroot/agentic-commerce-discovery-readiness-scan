@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { advance, EmptyPhase, type Ask } from '../src/generation/pipeline';
+import { advance, EmptyPhase, taskFor, type Ask } from '../src/generation/pipeline';
 import { extractJson } from '../src/generation/json';
 import {
   decodePhase,
@@ -294,5 +294,51 @@ test('een stap die het antwoord van een andere stap krijgt, loopt niet stil door
   await assert.rejects(
     advance(state, phase, verkeerd, '2026-09-09'),
     (caught: unknown) => caught instanceof EmptyPhase && caught.usage.output === 50,
+  );
+});
+
+test('een categorie krijgt de vorm van een vraag voluit te zien, niet "zelfde als de basislaag"', async () => {
+  // Elke fase is een los gesprek. Bij woontextiel v3 kreeg de categoriestap
+  // alleen die verwijzing, en verzon het model negen keer een eigen vorm.
+  let state = emptyState(BRIEF);
+  let phase: Phase = FIRST_PHASE;
+  const ask: Ask = async (task) => ({ json: antwoord(task.phase), usage: { input: 1, output: 1, cached: 0 } });
+  while (phase.kind !== 'overlay') {
+    const result = await advance(state, phase, ask, '2026-09-09');
+    state = result.state;
+    phase = result.next;
+  }
+  const prompt = taskFor(state, phase)?.prompt ?? '';
+  assert.ok(prompt.includes('"evidence": ["kenmerk_naam"'), 'het veld staat erin');
+  assert.ok(prompt.includes('Geen zin'), 'en wat het níét is');
+  assert.ok(!prompt.includes('zelfde vorm als de basislaag'));
+});
+
+test('een categorie met zinnen in plaats van kenmerknamen is een mislukte stap', async () => {
+  // Zo kwam het terug bij v3: "evidence" als lijst van eisen in proza. Die als
+  // kenmerk overnemen levert vragen op die bij elke winkel zakken.
+  const zinnen: Ask = async (task) => {
+    if (!task.phase.startsWith('overlay')) return { json: antwoord(task.phase), usage: { input: 1, output: 1, cached: 0 } };
+    return {
+      json: {
+        questions: ['01', '02', '03'].map((n) => ({
+          id: `MEU-${n}`, questionNl: `Vraag ${n}?`, answerable: 'true',
+          evidence: ['Martindale-toerental per artikel (schuurtoeren), vermeld op de productpagina'],
+        })),
+      },
+      usage: { input: 1, output: 7, cached: 0 },
+    };
+  };
+
+  let state = emptyState(BRIEF);
+  let phase: Phase = FIRST_PHASE;
+  while (phase.kind !== 'overlay') {
+    const result = await advance(state, phase, zinnen, '2026-09-09');
+    state = result.state;
+    phase = result.next;
+  }
+  await assert.rejects(
+    advance(state, phase, zinnen, '2026-09-09'),
+    (caught: unknown) => caught instanceof EmptyPhase && /kenmerknaam/.test(caught.message) && caught.usage.output === 7,
   );
 });
