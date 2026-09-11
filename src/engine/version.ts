@@ -9,4 +9,4 @@
  *
  * Puur cosmetische wijzigingen aan teksten of opmaak raken dit nummer niet.
  */
-export const SCAN_VERSION = '4.2.0';
+export const SCAN_VERSION = '5.0.0';

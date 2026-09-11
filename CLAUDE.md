@@ -120,10 +120,18 @@ vragenlijst en niet om een bestandsformaat. Vier regels die altijd gelden:
   dingen onder hetzelfde id.
 
 Het **aggregatieniveau volgt de vragen**. Een subcategorie krijgt alleen een
-eigen rij in het rapport als de vragenlijst er een ándere vragenset voor kent
-(`QuestionSet.distinguishes`); anders is het dezelfde meting op minder producten
-en suggereert de rij een onderscheid dat de lijst niet maakt. Zelfde regel voor
-elk niveau dat je ooit toevoegt.
+eigen vragenset — en daarmee een eigen rij — als de vragenlijst er op de volle
+naam een ándere vragenset voor kent (`QuestionSet.parent`, `ownOverlayFor`);
+anders is het dezelfde meting op minder producten en suggereert de rij een
+onderscheid dat de lijst niet maakt. Zelfde regel voor elk niveau dat je ooit
+toevoegt.
+
+Een product wordt gemeten op **élke plek waar het hangt** (`placeProduct` in
+`src/engine/join.ts`): per tak de diepste categorie met een eigen set, over
+takken heen allemaal, elke vraag één keer. Nooit alleen de eerste categorie
+nemen — een export zet ze vaak op alfabet. Paden die de merchant als kenmerk
+liet staan krijgen geen set (`QuestionSetState.facetPaths`); een product dat
+alleen onder kenmerken hangt telt mee maar wordt niet gescoord.
 
 De **algemene vragen worden één keer bevestigd** (`QuestionSetState.baseValidated`),
 de categorie-eigen per categorie. Een algemene vraag bewerken werkt op élke

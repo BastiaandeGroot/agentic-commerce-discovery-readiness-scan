@@ -184,7 +184,7 @@ function Rows({ s, rows, onDecide }: {
   );
 }
 
-export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onSite, onContinue }: {
+export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onFacets, onSite, onContinue }: {
   s: Strings;
   paths: CategoryPath[];
   verdicts: Verdicts;
@@ -200,6 +200,15 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onSite, 
    * had weggezet.
    */
   onSegments: (segments: { name: string; count: number }[]) => void;
+  /**
+   * De paden die een kenmerk zijn, als padsleutel.
+   *
+   * Om dezelfde reden omhoog gegeven als de segmenten: alleen dít scherm kent
+   * het bewijs van de site en de voorstellen van het model. Zonder dit kreeg
+   * "Motieven" op het koppelscherm gewoon een vragenset, terwijl de merchant hem
+   * hier net als kenmerk had laten staan.
+   */
+  onFacets: (pathKeys: string[]) => void;
   /**
    * Het adres van zijn eigen winkel, zodra hij het invulde.
    *
@@ -271,6 +280,7 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onSite, 
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 40));
+    onFacets(rows.filter((row) => row.kind === 'facet').map((row) => pathKey(row.segments)).sort());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows]);
 

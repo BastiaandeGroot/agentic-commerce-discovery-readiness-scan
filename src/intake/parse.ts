@@ -130,6 +130,20 @@ export function flatten(value: unknown, prefix = '', out: Record<string, string>
       // Alleen het aantal en het eerste item; genoeg om aanwezigheid vast te stellen.
       out[prefix] = String(value.length);
       flatten(value[0], prefix ? `${prefix}.0` : '0', out, depth + 1);
+      // Behalve bij categorieën. Daar is het eerste item niet "een voorbeeld"
+      // maar één van de plekken waar het product hangt, en de rest weggooien
+      // bepaalt stilzwijgend in welke markt het gemeten wordt. Bij de testwinkel
+      // hing een product in negen categorieën en bleef er één over.
+      if (/categor/i.test(prefix)) {
+        const paths = value
+          .map((item) => (item !== null && typeof item === 'object'
+            ? (item as Record<string, unknown>).path
+              ?? (item as Record<string, unknown>).name
+              ?? (item as Record<string, unknown>).title
+            : undefined))
+          .filter((path): path is string => typeof path === 'string' && path.trim() !== '');
+        if (paths.length > 0) out[`${prefix}.paths`] = paths.join(' | ');
+      }
     }
     return out;
   }

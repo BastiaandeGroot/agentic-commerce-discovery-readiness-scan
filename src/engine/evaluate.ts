@@ -18,7 +18,7 @@ import type {
 import { CUSTOM_IMPORTANCE, isScored, weightOf } from '../questions/compose';
 import { FIELD_BY_KEY } from '../spec/fields';
 import { isBlank, isPlaceholder, isValidGtin, str } from '../intake/normalize';
-import { mainCategory, segmentLevel, subCategory } from './join';
+import { placeProduct } from './join';
 
 /**
  * Kwaliteitsdrempels. Aanwezigheid is niet hetzelfde als bruikbaarheid: een
@@ -162,21 +162,23 @@ function answerState(
 }
 
 /**
- * Kies de vragenset bij de eigen categorie van het product.
+ * De vragen die voor een product gelden, als het in meer dan één set valt.
  *
- * De generator groepeert op hoofdcategorie — het eerste segment van het pad —
- * dus daar matchen we ook op. Anders valt "Fietsbanden > Racefiets" buiten de
- * set die juist voor Fietsbanden is gemaakt.
+ * Elke vraag één keer: de algemene vragen staan in elke set, en een stof die
+ * onder twee takken hangt hoort ze niet twee keer te beantwoorden. Herweegt een
+ * van de sets een algemene vraag zwaarder, dan geldt het zwaarste gewicht — een
+ * agent die de stof voor een bank aanraadt, stelt de slijtagevraag als kritiek,
+ * ook als dezelfde stof ook als gordijn verkocht wordt.
  */
-export function pickSet(product: ProductRecord, sets: QuestionSet[], level = 0): QuestionSet | undefined {
-  const category = mainCategory(product, level);
-  if (!category) return undefined; // geen categorie -> geflagd en geteld, niet gescoord
-
+function questionsFor(sets: QuestionSet[]): Question[] {
+  const byId = new Map<string, Question>();
   for (const set of sets) {
-    if (!set.match) continue;
-    if (new RegExp(set.match, 'i').test(category)) return set;
+    for (const question of set.questions) {
+      const held = byId.get(question.id);
+      if (!held || weightOf(question) > weightOf(held)) byId.set(question.id, question);
+    }
   }
-  return sets.find((s) => !s.match); // de vangnet-set voor de kleine categorieën
+  return [...byId.values()];
 }
 
 /**
@@ -224,13 +226,16 @@ export function evaluateProduct(
   catalog: Dataset,
   /** Op welk niveau van de categorieboom de segmenten zitten; zie segmentLevel. */
   level = 0,
+  /** De paden die een kenmerk zijn en geen categorie; zie expandFacets. */
+  facets: ReadonlySet<string> = new Set(),
 ): ProductResult {
-  const set = pickSet(product, sets, level);
+  const placement = placeProduct(product, sets, level, facets);
+  const set = placement.sets[0];
   const questions: QuestionOutcome[] = [];
   const gaps = new Map<string, Gap>();
 
   if (set) {
-    for (const question of set.questions) {
+    for (const question of questionsFor(placement.sets)) {
       if (question.disabled) continue;
       const outcome = answersQuestion(product, question);
       const state = answerState(outcome, catalog);
@@ -278,9 +283,13 @@ export function evaluateProduct(
     key: product.key,
     title: str(product.values.title),
     image: str(product.values.image),
-    category: mainCategory(product, level),
-    subcategory: subCategory(product, level),
+    category: placement.category,
+    subcategory: placement.subcategory,
     setId: set?.id,
+    // Alle sets waar hij onder valt, de voorste eerst. De rij in het rapport
+    // volgt de voorste; welke vragen gesteld zijn volgt ze allemaal.
+    setIds: placement.sets.length > 1 ? placement.sets.map((one) => one.id) : undefined,
+    facetOnly: placement.facetOnly || undefined,
     unmatched: set === undefined,
     findable: set !== undefined && scored.length > 0 && scored.every((q) => q.answered),
     // Kent een set geen kritieke vragen, dan is deze trede leeg en zegt het

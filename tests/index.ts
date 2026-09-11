@@ -18,3 +18,4 @@ import './review.test';
 import './sitescan.test';
 import './generation.test';
 import './collect.test';
+import './categories.test';

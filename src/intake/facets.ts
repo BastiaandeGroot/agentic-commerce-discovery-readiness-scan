@@ -180,8 +180,15 @@ export function segmentsToResearch(classified: ClassifiedPath[]): string[] {
  * categorie-id als naam meelevert, levert anders een vragenset "235" op.
  */
 export function splitMemberships(raw: string): string[][] {
+  // WooCommerce scheidt categorieën met een komma: "Kleding > Shirts, Kleding >
+  // Truien". Alleen als er geen ander scheidingsteken is én er een pad in staat,
+  // want een komma in een gewone naam ("Tafels, stoelen") is geen tweede
+  // categorie.
+  const separator = !/[|\n;]/.test(raw) && /[>/›»]/.test(raw) && /,\s/.test(raw)
+    ? /\s*,\s+/
+    : /\s*[|\n;]\s*/;
   return raw
-    .split(/\s*[|\n;]\s*/)
+    .split(separator)
     .map((one) => one.trim())
     .filter((one) => one !== '')
     .map((one) => one

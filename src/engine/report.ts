@@ -117,11 +117,13 @@ function summarise(
 }
 
 /**
- * Per categorie een rij, en per subcategorie die er is nog een.
+ * Per vragenset een rij.
  *
- * De subcategorierijen dragen hetzelfde `setId`: ze zijn een dóórsnede van
- * dezelfde vragenset en geen eigen meting. Zou een subcategorie zijn eigen set
- * krijgen, dan meet je je filters in plaats van je markt.
+ * Een subcategorie heeft alleen een eigen rij als ze een eigen vragenset heeft
+ * — "Lampenkapstoffen" onder "Decoratiestoffen" — en staat dan onder haar
+ * categorie. Een subcategorie met dezelfde vragen zou dezelfde meting op minder
+ * producten zijn, en een rij suggereert een onderscheid dat de vragenlijst niet
+ * maakt. Het aggregatieniveau volgt de vragen en niet de categorieboom.
  */
 function buildCategoryReports(
   results: ProductResult[],
@@ -138,29 +140,10 @@ function buildCategoryReports(
   const out: CategoryReport[] = [];
   for (const [setId, members] of grouped) {
     const set = questionState.sets.find((s) => s.id === setId);
-    const category = set?.category ?? set?.label.nl ?? setId;
-    out.push(summarise(setId, category, members));
-
-    // Alleen de subcategorieën waarover de vragenlijst iets eigens te zeggen
-    // heeft. Een subcategorie die dezelfde vragen krijgt is geen tweede meting
-    // maar dezelfde meting op minder producten; hem als eigen rij tonen zou een
-    // onderscheid suggereren dat de lijst niet maakt. Het aggregatieniveau volgt
-    // de vragen en niet de categorieboom.
-    const distinguished = new Set(set?.distinguishes ?? []);
-    if (distinguished.size === 0) continue;
-
-    const subs = new Map<string, ProductResult[]>();
-    for (const member of members) {
-      if (!member.subcategory || !distinguished.has(member.subcategory)) continue;
-      const list = subs.get(member.subcategory) ?? [];
-      list.push(member);
-      subs.set(member.subcategory, list);
-    }
-    // Eén product is geen doorsnede; zo'n rij zegt alleen iets over dat product.
-    for (const [name, list] of [...subs.entries()].sort((a, b) => b[1].length - a[1].length)) {
-      if (list.length < 2) continue;
-      out.push(summarise(setId, category, list, name));
-    }
+    const name = set?.category ?? set?.label.nl ?? setId;
+    out.push(set?.parent
+      ? summarise(setId, set.parent, members, name)
+      : summarise(setId, name, members));
   }
 
   return out.sort((a, b) =>
@@ -178,9 +161,15 @@ export function runScan(
 ): ScanReport {
   // Eén keer bepalen voor de hele catalogus, niet per product: het niveau is een
   // eigenschap van de boom en niet van een rij.
-  const level = segmentLevel(catalog.products, questionState.sets.map((set) => set.category ?? ''));
+  // Alleen de sets op marktniveau: een subcategorie zegt niets over waar de
+  // markt in de boom begint.
+  const level = questionState.segmentLevel ?? segmentLevel(
+    catalog.products,
+    questionState.sets.filter((set) => !set.parent).map((set) => set.category ?? ''),
+  );
+  const facets = new Set(questionState.facetPaths ?? []);
   const products = catalog.products.map(
-    (product) => evaluateProduct(product, questionState.sets, catalog, level),
+    (product) => evaluateProduct(product, questionState.sets, catalog, level, facets),
   );
   const scored = products.filter((r) => !r.unmatched);
 
