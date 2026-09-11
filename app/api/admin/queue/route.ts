@@ -144,11 +144,16 @@ export async function POST(request: Request) {
   // Iedereen die op deze markt wachtte hoort nu bericht te krijgen. De mail zelf
   // bestaat nog niet; dit zet de aanvragen op klaar zodat het scherm de stand
   // toont en de mail er straks op kan aanhaken.
+  //
+  // Niet `running`: daar wordt op dit moment een versie gegenereerd, en die op
+  // klaar zetten legt de generatie stil zonder dat iemand het merkt. Zo stond
+  // woontextiel v3 een uur op stap 13 van 19, omdat v2 werd vrijgegeven terwijl
+  // v3 liep — dezelfde aanvraag, en de wachtrij pakt alleen open aanvragen op.
   await supabase
     .from('bank_requests')
     .update({ status: 'ready' })
     .eq('vertical', bank.data.vertical)
-    .in('status', ['review', 'running', 'queued']);
+    .in('status', ['review', 'queued']);
 
   return NextResponse.json({ released: bank.data });
 }
