@@ -137,7 +137,9 @@ export function flatten(value: unknown, prefix = '', out: Record<string, string>
       if (/categor/i.test(prefix)) {
         const paths = value
           .map((item) => (item !== null && typeof item === 'object'
-            ? (item as Record<string, unknown>).path ?? (item as Record<string, unknown>).name
+            ? (item as Record<string, unknown>).path
+              ?? (item as Record<string, unknown>).name
+              ?? (item as Record<string, unknown>).title
             : undefined))
           .filter((path): path is string => typeof path === 'string' && path.trim() !== '');
         if (paths.length > 0) out[`${prefix}.paths`] = paths.join(' | ');

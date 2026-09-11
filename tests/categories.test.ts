@@ -139,3 +139,42 @@ test('een JSON-export bewaart alle categorieën van een product, niet alleen de 
     ['Gordijnstoffen', 'Gesloten'],
   ]);
 });
+
+test('elk platform schrijft zijn categorieën anders, en ze komen allemaal binnen', () => {
+  // Niets hierboven mag afhangen van één winkel of één markt. Dezelfde regel
+  // moet werken voor een fietsenwinkel op WooCommerce en een tuinwinkel op
+  // Shopify: de namen komen uit de catalogus en de vragenlijst, nooit uit de code.
+  const memberships = (raw: string) =>
+    categoryMemberships({ key: '1', values: {}, unmapped: { categories: raw } });
+
+  // Magento: pijp tussen categorieën, schuine streep tussen niveaus.
+  assert.deepEqual(memberships('Fietsen | Fietsen/E-bikes'), [['Fietsen'], ['Fietsen', 'E-bikes']]);
+  // WooCommerce: komma tussen categorieën, pijltje tussen niveaus.
+  assert.deepEqual(memberships('Fietsen > E-bikes, Onderdelen > Accu\'s'), [
+    ['Fietsen', 'E-bikes'], ['Onderdelen', 'Accu\'s'],
+  ]);
+  // Een komma in een gewone naam is geen tweede categorie.
+  assert.deepEqual(memberships('Tafels, stoelen en banken'), [['Tafels, stoelen en banken']]);
+});
+
+test('een tuinwinkel krijgt zijn subcategorievragen net zo goed als een stoffenwinkel', () => {
+  const lijst = importQuestionList([{ name: 'tuin.csv', text: [
+    'id,vraag,laag,categorie,belang,benodigde_attributen',
+    'BAS-01,Wat zijn de afmetingen?,basis,,hoog,afmetingen',
+    'LOU-01,Is de bekleding waterafstotend?,overlay,Loungesets,kritiek,waterafstotend',
+  ].join('\n') }]).bank!;
+  const data = ingest('tuin.csv', [
+    'sku;title;category',
+    '1;Set A;Tuinmeubelen > Loungesets',
+    '2;Tafel;Tuinmeubelen > Tuintafels',
+    '3;Parasol;Schaduw > Parasols',
+  ].join('\n'));
+  const state = generateQuestionSets(data, [lijst]);
+  const report = runScan(data, state, vast);
+
+  assert.equal(state.sets.find((set) => set.category === 'Loungesets')?.parent, 'Tuinmeubelen');
+  const set = report.products.find((product) => product.key === '1');
+  assert.ok(set?.questions.some((question) => question.questionId === 'LOU-01'));
+  // De tafel heeft geen eigen lijst en valt onder zijn categorie.
+  assert.equal(report.products.find((product) => product.key === '2')?.category, 'Tuinmeubelen');
+});
