@@ -3,9 +3,12 @@
 Hoe een merchant die zijn catalogus aanlevert uiteindelijk een scan krijgt die op
 de vragen van zíjn markt meet, zonder dat hij ooit een vragenlijst uploadt.
 
-Status: grotendeels gebouwd. Geschreven op 8 september 2026; op 9 september
+Status: gebouwd, op de mail na. Geschreven op 8 september 2026; op 9 september
 bijgewerkt toen de generatie zelf in de app kwam te draaien — zie paragraaf 3a,
-die de keuze voor uitvoerder A en B vervangt.
+die de keuze voor uitvoerder A en B vervangt. Op 11 september bijgewerkt na de
+eerste echte markt: paragraaf 3a (hoe de reeks werkelijk draait, de batchroute,
+de lat voor een overlay), 3b (wat er bij de merchant gebeurt) en 6 (wat er in
+de eerste week misging).
 
 ---
 
@@ -19,9 +22,11 @@ die de keuze voor uitvoerder A en B vervangt.
 | Inloggen, registreren, wachtwoord vergeten | **werkt** tegen het echte Supabase-project |
 | Wachtscherm in plaats van uploadvraag | **werkt** |
 | Wachtrij: tabel en route | **werkt** |
-| De generatie zelf | **gebouwd als pijplijn in de app** — zie paragraaf 3a |
-| Beheerscherm met vrijgeven | **werkt**, inclusief de indeling van de categorieën |
-| Resultaat terug bij de merchant | **bestaat niet** — niets client-side leest `question_banks` |
+| De generatie zelf | **werkt**, als vaste reeks in de app — zie paragraaf 3a. Woontextiel v1 en v2 zijn zo gemaakt. |
+| Beheerscherm met vrijgeven | **werkt**, per categorie en per vraag te beoordelen |
+| Overzicht van alle banken | **werkt**, per markt en versie |
+| Resultaat terug bij de merchant | **werkt** — hij kiest een vrijgegeven bank na het categoriescherm, zie 3b |
+| Aansturing zonder laptop | **beschreven, niet aan** — staat in `render.yaml`, maar is niet aangemaakt in Render; zie 3a |
 | Mail naar de merchant | **bestaat niet** |
 
 ---
@@ -181,9 +186,9 @@ onderzoeksopdracht maar een vaste reeks van acht stappen**. Zoiets hoef je niet
 aan een agent uit te besteden; dat kun je zelf draaien.
 
 Sinds 9 september doet de app dat. `POST /api/bank-run` zet **één fase** en stopt
-dan: panel, oogst per site, consolidatie, basislaag, overlay per categorie,
-facetanalyse, samenstellen. Een markt is daarmee twaalf tot vijftien beurten van
-elk een paar minuten. Een cron op Render belt elk kwartier aan.
+dan: panel, oogst per site (vijf), consolidatie, basislaag, overlay per
+categorie, facetanalyse, samenstellen. Met negen overlays is een markt negentien
+stappen.
 
 Waarom één fase per beurt en niet één lange aanroep:
 
@@ -197,16 +202,63 @@ Waarom één fase per beurt en niet één lange aanroep:
   geen modelaanroep. Dat was de denkfout in de eerste opzet: elk kwartier een
   cloud-sessie starten om te concluderen dat er niets te doen is.
 
-Wat er níét verandert: de poorten. Wat de pijplijn oplevert gaat door dezelfde
-`deliverBank` als een bank van een uitvoerder van buiten — dezelfde lezer,
-dezelfde degradatie van drempels zonder bron, dezelfde `review`-status. De app
-gelooft haar eigen pijplijn net zomin op haar woord, en dat is geen wantrouwen
-maar het verschil tussen een uitvoerder die je kunt aanspreken en een pijplijn die
-dezelfde fout bij elke markt opnieuw maakt.
+### Hoe een beurt werkelijk loopt
 
-`GET /api/bank-queue` en `POST /api/bank-result` blijven bestaan. Een uitvoerder
-van buiten kan nog steeds een bank aanleveren, en dat is de terugval als de
-pijplijn op een markt vastloopt.
+- **Antwoord eerst, werk daarna.** De route antwoordt meteen en doet de fase in
+  `after()`. Een fase die vijf minuten duurt, werd anders door de proxy van
+  Render na een minuut afgekapt met een 502.
+- **Een grendel per run.** `leased_until` in `bank_runs` zegt dat er een beurt
+  loopt; een tweede beurt die tegelijk aankomt pakt hem niet. De grendel staat los
+  van `updated_at`, anders wachtte elke fase twintig minuten op de vorige.
+- **Drie keer dezelfde fase stuk** zet de aanvraag op `blocked`: dan hoort er een
+  mens naar te kijken in plaats van dat het model het een vierde keer probeert.
+
+### De batchroute: de helft van de prijs
+
+Elke fase die niet het web op hoeft — consolidatie, basislaag, elke overlay en de
+facetanalyse — gaat via de batch-API van Anthropic. Zelfde model, zelfde prompt,
+zelfde antwoord, voor de halve prijs, alleen later: meestal binnen een paar
+minuten, soms een uur. Dat is precies wat je kunt missen bij werk waar de
+merchant één tot twee werkdagen voor krijgt.
+
+De fasen die wel het web op gaan (panel en oogst) lopen direct. Niet omdat de
+batch dat niet kan, maar omdat een oogstfase die stil faalt een herkansing kost
+die we niet op een echte markt wilden uitproberen.
+
+Hoe het loopt: de beurt dient de fase in en schrijft `batch_id` weg; volgende
+beurten kijken of hij klaar is en antwoorden intussen `{"request":null}`. Is hij
+klaar, dan wordt het antwoord opgenomen, gaat `batch_id` eraf en volgt de
+volgende fase. Twee regels die elk een echte fout vangen (zie paragraaf 6):
+
+- De batch draagt **de naam van zijn fase** als label. Een antwoord met een ander
+  label is een fout en wordt nooit stil opgenomen.
+- Een basislaag of overlay die zonder één vraag terugkomt, is een **mislukte
+  stap** en geen magere uitkomst.
+
+### De lat voor een eigen vragenset
+
+Het model moet voor elke categorie die het een eigen vragenset wil geven
+(`overlay`) **drie vragen noemen die daar gesteld worden en in geen enkele andere
+categorie van de markt**. Noemt het er geen, dan wordt het een toepassingsprofiel
+— dezelfde vragen, andere drempels. Noemt het er één of twee, dan blijft het een
+overlay maar staat het als bevinding op het beoordeelscherm. Die drie vragen
+staan erbij, zodat de beheerder kan zien waarop de keuze rust.
+
+De reden: een overlay zonder eigen vragen geeft de producten eronder een
+dúnnere vragenset dan hun moedercategorie, en het rapport krijgt een rij die een
+onderscheid suggereert dat er niet is. Het is ook de grootste kostenpost: elke
+overlay is een stap op Opus.
+
+### Wie de reeks aanstuurt
+
+Bedoeld is een geplande taak op Render die elk kwartier aanbelt. Hij staat
+beschreven in `render.yaml` (`vragenbank-generator`, op het `starter`-plan), maar
+cron jobs zitten niet in het gratis plan en hij is voor zover bekend nooit
+aangemaakt. De reeks wordt nu aangestuurd door een lus in een terminal op de
+laptop van de beheerder, die elke minuut aanbelt. Slaapt de laptop, dan staat de
+reeks stil; er gaat niets verloren, want elke stap staat in de database, maar het
+kost tijd. De taak in Render aanzetten (een paar dollar per maand, plus
+`APP_URL` en `BANK_EXECUTOR_KEY` in het dashboard) lost dat op.
 
 ### De indeling is wat je vaststelt
 
@@ -243,6 +295,10 @@ hem vrij. Staat hij op `ready`, dan is die stap al gedaan.
 
 Vrijgeven is één handeling en die veroorzaakt stap 7.
 
+Vrijgeven zet de aanvragen voor die markt op `ready` — behalve een aanvraag
+waarvoor op dat moment een nieuwe versie loopt (`running`). Die raakte het
+vrijgeven eerst wel, en dan legde het de lopende generatie stil, zie paragraaf 6.
+
 ### Stap 7 — De merchant krijgt bericht
 
 Alleen accounts met een **openstaande aanvraag** voor deze markt krijgen een
@@ -259,6 +315,33 @@ opnieuw verstuurd kan worden zonder de taak te herstarten.
 
 Hij logt in, de app vindt de bank op zijn markt, en de keten loopt verder waar
 hij hem verliet: kenmerken koppelen, vragensets bevestigen, rapport.
+
+## 3b. Wat er bij de merchant gebeurt met een vrijgegeven bank
+
+Na het categoriescherm ziet hij de banken die er al liggen (`GET /api/banks`, op
+zijn eigen token, dus row level security bepaalt wat hij ziet: alleen wat is
+vrijgegeven). Per markt alleen de nieuwste versie, op versienummer, met vijf
+algemene vragen als voorproefje. Kiest hij er één, dan komt die binnen langs
+dezelfde weg als een lijst die hij zelf inleest: dezelfde lezer, dezelfde
+opslag.
+
+**Wat de beheerder oversloeg, blijft staan maar telt niet mee.** Het
+beoordeelscherm belooft dat, en `excludeFromScore` doet het: de overgeslagen
+vragen krijgen `answerable: 'no'`, bij de merchant én bij winkel doormeten. Tot
+11 september werd het overslaan wel opgeslagen en nergens toegepast.
+
+**Hoe de bank op zijn boom landt.** Een product wordt gemeten op elke plek waar
+het hangt, per plek zo specifiek als de bank het kent: een subcategorie met een
+eigen vragenset in de bank ("Lampenkapstoffen" onder "Decoratiestoffen") krijgt
+die vragen, een subcategorie zonder eigen vragen valt onder haar categorie. Zie
+`placeProduct` in `src/engine/join.ts` en de beslissing van 11 september in
+`NOTES.md`.
+
+**Wat de bank niet meestuurt: de indeling.** De bank bepaalt ook welke categorie
+een toepassingsprofiel is van welke overlay ("Windscherm" hoort bij
+"Schaduwdoek"). Dat staat in `question_banks.grouping` maar niet in de tabel die
+bij de merchant aankomt, dus een profiel valt nu onder zijn plek in de boom en
+niet onder de overlay waar de bank hem bij zette. Open punt.
 
 ---
 
@@ -379,6 +462,18 @@ een URL. Het type kan niet meer dragen en er staat een test op.
 | **Twee werkdagen verstreken** | Mail naar de merchant: het duurt langer dan verwacht, er wordt aan gewerkt, hij hoort het zodra het klaar is. Eén keer, niet elke dag opnieuw. |
 | Geplande taak draait niet omdat de app dicht is | Geen taak gemist maar uitgesteld: hij draait bij de eerstvolgende start. De vertragingsmails hierboven vangen dit op — dat is precies waarvoor ze er zijn. |
 
+**Wat er in de eerste week werkelijk misging**, en wat er nu staat:
+
+| Wat | Wat er nu gebeurt |
+|---|---|
+| Het antwoord van de panelfase liep tegen de tokenlimiet | Limieten per fase opgehoogd; een afgekapt antwoord is een mislukte stap met de betaalde tokens erbij. |
+| Een lange fase kreeg een 502 van de proxy | De route antwoordt meteen en werkt in `after()`. |
+| Een deploy tijdens een generatie brak de lopende fase af | Geen probleem meer dan één fase: de grendel verloopt en de volgende beurt pakt hem opnieuw. |
+| Twee overlays kozen hetzelfde vraag-id | Hernoemd bij het inlezen in plaats van de hele bank af te keuren op de laatste stap. |
+| Na een batch bleef `batch_id` staan, en elke volgende fase kreeg het antwoord van de consolidatie | `batch_id` gaat eraf na opnemen; een batch draagt het label van zijn fase; een lege stap faalt. De eerste batchrun leverde een lege bank op die bij het afleveren terecht werd geweigerd. |
+| Vrijgeven van v2 zette de aanvraag op `ready` terwijl v3 op dezelfde aanvraag liep | Vrijgeven raakt `running` niet meer. |
+| Elke regel stond als "beredeneerd" omdat de tabel geen plek had voor de bron van een drempel | Kolom `beslisregel_bron` erbij. |
+
 ---
 
 ## 7. Volgorde van bouwen
@@ -390,10 +485,12 @@ een URL. Het type kan niet meer dragen en er staat een test op.
    met jou als uitvoerder.
 4. **Het beheerscherm** met vrijgeven.
 5. **De mail.**
-6. *Later, als het volume erom vraagt:* het achtergrondproces op Render.
+6. **De geplande taak op Render aanzetten** die al in `render.yaml` staat, zodat
+   de reeks niet meer van een laptop afhangt.
 
-Stap 1 tot en met 3 maken de keten sluitend. Stap 4 en 5 maken hem bruikbaar voor
-iemand anders dan jij.
+Stap 1 tot en met 4 staan. De generatie loopt sinds 9 september in de app zelf
+en niet via de plugin; stap 3 is daarmee vervangen door paragraaf 3a.
+
 
 ---
 
@@ -403,10 +500,15 @@ iemand anders dan jij.
   hetzelfde en de beperking "alleen terwijl de app openstaat" staat er expliciet
   bij. Of Cowork dezelfde taken toont en beheert, weten we pas als de taak er
   staat. Besloten: we bouwen hem, met de risico's uit stap 4 op tafel.
-- **Hoeveel beurten heeft een generatie nodig?** Het onderzoek beslaat vijf à
-  acht sites. Of dat in één beurt past, weten we na de eerste echte markt. Past
-  het niet, dan moet de taak zijn werk kunnen hervatten in plaats van opnieuw te
-  beginnen — dat zit nog niet in het ontwerp.
+- **Wat een markt werkelijk kost.** Woontextiel v2 ging volledig direct en kostte
+  rond de zeven dollar. v3 is de eerste die via de batchroute loopt; de
+  verwachting is ongeveer de helft. Het echte getal staat in `bank_runs` zodra
+  hij klaar is.
+- **Kloppen de dekkingsgetallen?** "Komt voor op 3 van de onderzochte sites" is
+  een telling van het model. Elke gevonden vraag draagt het adres van de pagina,
+  maar niemand controleert of de vraag daar staat. Twee dingen zouden helpen: de
+  adressen tonen op het beoordeelscherm, en de app zelf laten nagaan of het
+  getal klopt met de genoemde sites.
 - **Wanneer is een markt "dezelfde markt"?** Twee merchants noemen hun markt
   misschien anders terwijl het er één is. De sleutel is nu een genormaliseerde
   naam; dat gaat een keer botsen. Bij de eerste echte proef gebeurde het meteen:

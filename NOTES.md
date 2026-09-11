@@ -1,7 +1,7 @@
 # Werknotities
 
 Sessiestand: wat er staat, wat er besloten is, wat er open is.
-Laatst bijgewerkt: 2026-09-08.
+Laatst bijgewerkt: 2026-09-11.
 
 Structurele regels die altijd gelden staan **niet** hier maar in `CLAUDE.md`.
 
@@ -19,8 +19,11 @@ Elke merge naar `main` deployt automatisch naar Render (gratis plan, koude start
 De service is *blueprint managed*: `render.yaml` is leidend, en een variabele met
 `sync: false` daarin haalt zijn waarde uit het dashboard onder Settings.
 
-De keten is: **catalogus aanleveren → vragenbank → vragensets valideren →
-rapport**, plus een uitlegpagina op `/methode` in merchant-taal.
+De keten is: **catalogus aanleveren → categorieën bevestigen → vragenbank
+kiezen of aanvragen → kenmerken koppelen → vragensets valideren → rapport**,
+plus een uitlegpagina op `/methode` in merchant-taal. Voor de beheerder daarnaast:
+banken beoordelen en vrijgeven, een overzicht van alle banken, en winkel
+doormeten (een meting van buitenaf, als pdf).
 
 ## Architectuur in het kort
 
@@ -29,8 +32,12 @@ rapport**, plus een uitlegpagina op `/methode` in merchant-taal.
 | `src/intake/` | formaatdetectie (CSV/TSV/JSON/NDJSON/XML) en kolomherkenning |
 | `src/semantic/` | het embeddingmodel in de browser en de voorstellen die het doet |
 | `src/spec/` | veldenregister: kolomaliassen en eigenaar per veld |
-| `src/questions/` | vragenbanken (model, banken, composer), generator, import, aanvraag |
-| `src/engine/` | join, evaluatie, checklists, rapportaggregatie |
+| `src/questions/` | vragenbanken (model, banken, composer), generator, import, aanvraag, beoordeling |
+| `src/engine/` | plaatsing van een product in de boom (`join.ts`), evaluatie, rapportaggregatie |
+| `src/generation/` | de generatie van een vragenbank als vaste reeks fasen; puur |
+| `src/collect/` | winkel doormeten: productgegevens en productadressen uit html en sitemaps halen; puur |
+| `src/server/` | alleen serverzijdig: modelaanroepen van de generatie (direct en batch), aanleveren van een bank, het ophalen van een winkel |
+| `app/api/` | de serverroutes, zie `CLAUDE.md` |
 | `src/i18n/` | alle teksten, NL en EN naast elkaar |
 | `src/storage/` | bewaarde scans en ingelezen banken achter een interface; nu de browser, later de server |
 | `src/worker/` | de zware kant van de scan, weg van de hoofddraad |
@@ -42,6 +49,42 @@ rapport**, plus een uitlegpagina op `/methode` in merchant-taal.
 ## Genomen beslissingen
 
 Deze zijn met de opdrachtgever doorgesproken. Niet terugdraaien zonder overleg.
+
+**Het verdienmodel is een dienst (10 september 2026).** Een meting van de
+catalogus met een rapport en een gesprek, voor €950 tot €1.500 per winkel. Niet
+een scan van €295 in zelfbediening: een webshop-eigenaar koopt geen lijst gaten
+maar weten wat hij eerst moet doen, en het gesprek is waar dat gebeurt. De
+aanleiding waarop we ze aanspreken: ze weten dat agentic commerce eraan komt,
+niet dat hun productdata daardoor zwaarder gaat wegen dan hun productpagina.
+
+**Winkel doormeten is de opening, niet de meting (10 september 2026).** Een
+agent leest in de praktijk een productfeed of de gestructureerde data van een
+productpagina, en die laatste is het enige wat we zonder de merchant kunnen zien.
+Het beheerscherm leest een steekproef van productpagina's (robots.txt en
+sitemap, alleen wat de winkel toestaat; een pagina telt pas als product met
+`og:type=product`, een Offer of JSON-LD Product), meet die op een gekozen bank
+en maakt er een pdf van. Wat de catalogus zegt, meet alleen de catalogus; dit is
+het gesprek daarvoor. Afgevallen alternatief: een gratis URL-check voor iedereen
+op robots.txt — dat meet iets anders dan de kwaliteit van de data.
+
+**De generatie loopt via de batch-API waar dat kan (11 september 2026).** De
+fasen zonder web (consolidatie, basislaag, overlays, facetten) gaan via de
+batch-API voor de halve prijs; panel en oogst lopen direct. Promptcaching was
+eerst genoemd als grootste besparing en dat klopte niet: het systeemdeel is
+~1.200 tokens, onder de minimale cachegrootte. Zie `ONTWERP-vragenbank-keten.md`
+paragraaf 3a.
+
+**Een overlay moet drie eigen vragen noemen (11 september 2026).** Het model
+geeft een categorie alleen een eigen vragenset als het drie vragen noemt die
+nergens anders in de markt gesteld worden. Nul: het wordt een profiel. Eén of
+twee: het blijft een overlay met een bevinding. Minder overlays is niet minder
+kwaliteit; een overlay zonder eigen vragen geeft zijn producten juist een
+dunnere set dan de moedercategorie.
+
+**Overgeslagen vragen blijven in de bank en tellen nergens mee (11 september
+2026).** `excludeFromScore` zet ze op `answerable: 'no'`, bij de merchant en bij
+winkel doormeten. Weghalen zou advies weggooien dat een merchant kan gebruiken;
+laten meetellen zou meten op vragen die een mens heeft afgekeurd.
 
 **Een product wordt gemeten op elke plek waar het hangt (11 september 2026,
 scanversie 5.0.0).** Tot dan kreeg een product de vragen van zijn eerste
@@ -394,49 +437,51 @@ Niet opnieuw voorstellen zonder dat er iets veranderd is.
 
 ## Open
 
-**Echte vragenbanken** — de grootste. Alles eromheen staat: het model, de
-composer, de import met validatie, de aanvraag, en de schermen. Sinds 9 september
-staat de generatie er ook: `src/generation/` draait de methode als vaste reeks
-fasen, aangestuurd door `/api/bank-run`. Wat ontbreekt is de eerste echte markt
-erdoorheen, en de domeinreview blijft mensenwerk. De vijf meegeleverde banken zijn `provisional` en dragen bewust geen
-drempels; ze houden de zelfbedieningsscan overeind en meer niet. Eerste kandidaat
-is woontextiel, want daar ligt de merchant en is de onomkeerbare fout scherp.
+**De generatie hangt aan een laptop** — 11 september. De geplande taak staat in
+`render.yaml` (`vragenbank-generator`, `starter`-plan), maar cron zit niet in het
+gratis plan en hij is voor zover bekend nooit aangemaakt. De reeks wordt nu
+aangestuurd door een lus in een terminal die elke minuut `POST /api/bank-run`
+doet. Slaapt de laptop, dan staat de reeks stil. Oplossing: de taak in Render
+aanzetten (betaald; `APP_URL` en `BANK_EXECUTOR_KEY` in het dashboard), of een
+geplande GitHub Action met dezelfde twee als secret.
 
-**De generatie is nog nooit op een echte markt gedraaid** — 9 september. De reeks
-loopt in de tests van panel tot tabel, en die tabel gaat door dezelfde lezer als
-de vragenlijst van een merchant. Wat de tests niet kunnen zeggen is of het model
-bruikbare vragen oplevert; dat blijkt pas bij woontextiel. Wat er dan te
-verwachten valt: de bronoogst is de fase die het vaakst zal stranden, want die
-hangt aan sites die traag zijn, blokkeren of hun FAQ ergens anders hebben staan.
-Drie keer dezelfde fase stuk zet de aanvraag op `blocked` en dan hoort er een
-mens naar te kijken.
+**Wat een markt kost** — woontextiel v2 ging volledig direct: rond de zeven
+dollar. v3 is de eerste via de batchroute; verwacht ongeveer de helft. Het echte
+getal staat per run in `bank_runs` (`input_tokens`, `output_tokens`). Let op bij
+het lezen: de eerste batchrun telde door een fout het antwoord van de
+consolidatie twaalf keer mee; de tellers zijn daarna met de hand gecorrigeerd.
 
-**Wat er vóór de eerste echte markt nog moet gebeuren**, in deze volgorde:
+**De mail** — `notified_at` staat klaar, een mailprovider niet. Het wachtscherm
+belooft een bericht dat nu niet komt.
 
-1. Migratie `0007_bank_runs.sql` draaien. Zonder die tabel doet `/api/bank-run`
-   niets en zegt hij dat niet luid genoeg.
-2. `BANK_EXECUTOR_KEY` en `ANTHROPIC_API_KEY` in het Render-dashboard nakijken.
-   Een ontbrekende uitvoerderssleutel en een verkeerde geven allebei 401, dus de
-   route kan het verschil niet zeggen.
-3. De cron aanzetten. Let op: **cron jobs zitten niet in het gratis plan van
-   Render.** Wil je er niet voor betalen, dan doet een geplande GitHub Action
-   hetzelfde — één `curl` met dezelfde twee variabelen als repository-secrets.
-   Die zijn wel onbetrouwbaarder in hun timing en worden uitgezet als de repo
-   zestig dagen stilligt.
+**De indeling reist niet mee naar de merchant** — 11 september. Welke categorie
+een profiel is van welke overlay ("Windscherm" bij "Schaduwdoek") staat in
+`question_banks.grouping` maar niet in de tabel die de merchant krijgt. Een
+profiel valt daardoor onder zijn plek in de boom, niet onder zijn overlay. Veilige
+variant om te bouwen: een profiel krijgt de vragen van zijn overlay alleen als
+het in de catalogus ook onder die overlay hangt, of als de categorie erboven zelf
+geen eigen vragen heeft. Blind volgen gaat mis: de bank zette "Kussens" onder
+Decoratiestoffen, en bij De Groot hangt Kussens onder Meubelstoffen.
 
-**Kosten per markt zijn nog een schatting.** De knoppen zitten er wel: het model
-per fase staat als tabel in `src/server/generator.ts` (lezen op Sonnet, wegen op
-Opus), het systeemdeel is voor elke fase gelijk en draagt een cachemarkering, en
-per run staan de tokens in `bank_runs`. Na de eerste markt is er een echt getal en
-kan `reader` op Haiku worden geprobeerd — dat is de grootste besparing die er nog
-ligt, want de oogst is het leeuwendeel van de tokens. Wat daarbij eerst
-uitgezocht moet worden: of Haiku 4.5 het ophaalgereedschap ondersteunt dat de
-oogst nodig heeft.
+**Subcategorieën landen alleen op de volle naam** — 11 september. Een
+subcategorie krijgt automatisch een eigen vragenset als de bank precies die naam
+kent (spaties en koppeltekens daargelaten). Voor de winkel waarvoor de bank
+gemaakt is klopt dat altijd; een tweede winkel die "Lampenkap stof" schrijft
+waar de bank "Lampenkapstoffen" heeft, krijgt geen eigen set. Op hoofdniveau kan
+de merchant zelf een set kiezen, op subniveau nog niet.
 
-**De vrijgegeven bank komt nog niet terug bij de merchant.** Niets client-side
-leest `question_banks`; hij leest zijn lijst vandaag nog zelf in. De mail bestaat
-evenmin — `notified_at` staat er wel. Dit zijn de twee laatste gaten in de keten,
-en ze zitten allebei aan de kant van de merchant en niet aan die van de generatie.
+**Een vraag zonder kenmerken is niet te redden op het beoordeelscherm** — de
+beheerder kan hem alleen overslaan. Vaak is het een goede vraag waar het model
+de kenmerken bij vergat ("Hoeveel meter heb ik nodig voor mijn fauteuil?", MEU-02,
+kritiek). Kenmerken en een beslisregel kunnen toevoegen op het beoordeelscherm
+zou die vragen redden in plaats van ze weg te gooien.
+
+**Dekking is een telling van het model** — "komt voor op 3 van de onderzochte
+sites" wordt niet nagerekend. Elke gevonden vraag draagt het adres van de pagina,
+maar dat staat niet op het beoordeelscherm en niemand controleert of de vraag er
+staat. Handmatig nagelopen op v3: getal en genoemde sites kloppen overal, geen
+verzonnen sites, een onleesbare site telt nergens mee. Te bouwen: adressen tonen,
+en de app laten natellen.
 
 **De scan weegt niet per toepassingsprofiel** — 9 september. De app stuurt elke
 categorie die de merchant bevestigde mee in de aanvraag, en dat zijn er bij De
@@ -450,15 +495,6 @@ drempel van de groep blijft gelden voor de hele groep. Twee dingen ontbreken:
 een drempel per profiel in het model (nu staat hij in `toelichting`, als tekst),
 en een manier om een product aan zijn profiel te koppelen. Dat laatste is het
 lastige — de catalogus zegt zelden waarvoor een stof bedoeld is.
-
-**De wachtrij achter de bankaanvraag** — sinds 7 september heeft de aanvraag geen
-scherm meer (zie boven). De overdracht is handmatig én buiten de app: jij of een
-agent draait de promptreeks, en het resultaat komt terug via de upload op het
-vragenlijstscherm. `renderBankRequest` staat nog en is nog getest, maar niets
-roept het aan. De naad ligt klaar: `BankStore` in
-`src/storage/banks.ts` is dezelfde vorm als `SnapshotStore`, dus een echte
-jobtabel plus een agent die een aanvraag oppakt is een tweede implementatie van
-vier methodes. Wacht op hetzelfde Supabase-account als de rest.
 
 **Beslisregels uitvoeren** — een regel wordt nu getoond en niet gerekend. "Is
 deze stof sterk genoeg voor mijn bank" vraagt eigenlijk Martindale ≥ drempel, niet
@@ -497,10 +533,8 @@ koppelt staat als controleerbare lijst op het vragensetscherm.*
 
 *Beide wegen liggen er nu: het koppelscherm (stap 3) met de agent-opdracht als
 versneller, en `applyMapping` dat het resultaat in dezelfde vorm op de bank legt
-als een `velden:`-lijst uit de YAML. Wat nog ontbreekt is **bewaren**: de
-koppeling leeft in de paginastatus en is bij een volgende sessie weg. Hij hoort
-naar `BankStore` (of een eigen store met `account_id`), want dan geldt hij voor
-elke volgende scan van deze merchant — en dat is het hele punt.*
+als een `velden:`-lijst uit de YAML. De koppeling wordt bewaard bij de bank in
+`BankStore`, samen met de keuze van vragenset per categorie.*
 
 *Op 8 september begint het koppelen vanzelf, zodra het scherm er is. Een
 merchant hoorde niet te moeten weten dát er een knop bestond voordat zijn scan
@@ -520,9 +554,9 @@ testmerchant: de twee juiste hadden 0,248 en 0,442, de twee onjuiste 0,024 en
 zitten is duidelijk — een verkeerd gekoppeld kenmerk kost één klik, een verkeerd
 gekoppelde categorie zet de verkeerde vragenset op alles wat eronder hangt.*
 
-**Prijzen** — de bedragen en de exacte bestandsgrens staan nog niet vast. De
-prijzenpagina draagt daar een zichtbare TODO in plaats van een verzonnen bedrag.
-Hetzelfde geldt voor wie er achter de scan zit op de over-pagina.
+**Prijzen op de site** — het model staat (zie de beslissing van 10 september),
+maar de prijzenpagina draagt nog een zichtbare TODO. Hetzelfde geldt voor wie er
+achter de scan zit op de over-pagina.
 
 **Mechanisme per veld** — de grootste. Leg per veld vast of het om *filtering*,
 *vergelijking* of *begrip* gaat. Alleen bij de eerste twee is er een mechanisme
@@ -550,28 +584,17 @@ waarschuwing met de uitweg blijft staan voor wat daarboven komt, want dáár is
 niets gemeten. Streamend lezen wordt pas een echte vraag als 50 MB knelt of als
 het serverzijdig moet.
 
-**Echte kwaliteitscontroles** — nu alleen een woordentelling op titel en
-omschrijving. Kandidaten: schijn-volledigheid (veld overal dezelfde waarde),
-de GTIN-checksum die al in `isValidGtin()` staat maar nergens wordt aangeroepen,
-ontbrekende eenheden, en enum-controle op availability en condition.
+**Echte kwaliteitscontroles** — nu een woordentelling op titel en omschrijving
+en de GTIN-checksum. Kandidaten: schijn-volledigheid (veld overal dezelfde
+waarde), ontbrekende eenheden, en enum-controle op availability en condition.
 
 **Herkomst op het rapport** — een rapport noemt zijn spec-snapshot en
 vragensetversie, maar niet de bestanden waarop het draaide. Dat maakte het
 verschil hieronder onnodig lang onverklaarbaar; `Dataset.filename` ligt al klaar
 in `report.sources`, het staat alleen niet in het stempelblok van `ReportView`.
 
-**Accounts aansluiten** — alles eromheen staat, alleen de dienst niet. Wat er ligt:
-`ScanSnapshot` als opslagbare vorm, `compareSnapshots()` met de
-meetlat-waarschuwing, `SnapshotStore` als interface met een browser-implementatie,
-de drie dashboardschermen, en `supabase/migrations/0001_snapshots.sql` met
-`account_id` en row level security. Wat ontbreekt is een Supabase- of
-Clerk-project: dat vraagt een account en sleutels van de opdrachtgever. Zodra die
-er zijn is het een tweede implementatie van drie methodes, geen verbouwing van
-de schermen.
-
-**Serverzijdige scan** — voor bestanden boven de 20 MB. Vereist objectopslag met
-een signed URL en een achtergrondtaak; dezelfde motor, andere aanroeper. Wacht op
-hetzelfde account als hierboven.
+**Serverzijdige scan** — voor bestanden boven de 50 MB. Vereist objectopslag met
+een signed URL en een achtergrondtaak; dezelfde motor, andere aanroeper.
 
 **Delen van een rapport** — `/rapport/[id]` bestaat nog niet echt: een deelbaar
 adres vereist opslag, en opslag betekent dat productdata ons systeem in gaat.

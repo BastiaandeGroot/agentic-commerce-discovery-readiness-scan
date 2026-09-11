@@ -1,36 +1,33 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Agentic Commerce Readiness Scan
 
-## Getting Started
+Meet of de productcatalogus van een webshop de vragen kan beantwoorden die
+kopers in zijn markt stellen — de vragen waar een koopassistent straks op
+selecteert. Niet hoeveel velden gevuld zijn, maar welke vragen onbeantwoord
+blijven en welke data daarvoor ontbreekt.
 
-First, run the development server:
+Live: https://agentic-commerce-discovery-readiness-scan.onrender.com
+
+## Waar staat wat
+
+| Document | Waarover |
+|---|---|
+| [`spec.md`](spec.md) | Wat het product is, voor wie, hoe het geld verdient, en wat er nog moet gebeuren |
+| [`NOTES.md`](NOTES.md) | De stand: genomen beslissingen, afgevallen richtingen, open punten, testdata |
+| [`ONTWERP-vragenbank-keten.md`](ONTWERP-vragenbank-keten.md) | Hoe een vragenbank ontstaat, wordt beoordeeld en bij de merchant terechtkomt |
+| [`CLAUDE.md`](CLAUDE.md) | De regels waar de code zich aan houdt |
+| [`DESIGN.md`](DESIGN.md) | De regels waar de interface zich aan houdt |
+| [`kennis/_methode/`](kennis/_methode/) | De methode waarmee een vragenbank wordt opgebouwd |
+
+## Werken in deze repo
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # lokaal op http://localhost:3000
+npm test           # de tests, zonder browser
+npm run typecheck
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Elke merge naar `main` deployt automatisch naar Render. De sleutels staan in
+`.env.local` (lokaal) en in het Render-dashboard (live); welke er zijn staat in
+`render.yaml`.
