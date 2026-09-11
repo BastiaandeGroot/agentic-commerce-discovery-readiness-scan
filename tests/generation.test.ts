@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { advance, type Ask } from '../src/generation/pipeline';
+import { advance, EmptyPhase, type Ask } from '../src/generation/pipeline';
 import { extractJson } from '../src/generation/json';
 import {
   decodePhase,
@@ -270,5 +270,29 @@ test('een overlay zonder eigen vragen wordt een toepassingsprofiel', async () =>
   assert.ok(
     result.state.findings.some((finding) => finding.includes('Gordijnstoffen')),
     'en het staat als bevinding op het scherm',
+  );
+});
+
+test('een stap die het antwoord van een andere stap krijgt, loopt niet stil door', async () => {
+  // Dit is de eerste batchrun: het batchnummer bleef staan, en elke fase na het
+  // samenvoegen kreeg de onderwerpen terug in plaats van vragen. De lezer
+  // struikelde niet — hij las nul vragen — en de reeks liep tot een lege tabel.
+  // Nu faalt de basislaag zelf, met de betaalde tokens erbij.
+  const verkeerd: Ask = async (task) => ({
+    json: antwoord(task.phase === 'base' ? 'consolidate' : task.phase),
+    usage: { input: 100, output: 50, cached: 0 },
+  });
+
+  let state = emptyState(BRIEF);
+  let phase: Phase = FIRST_PHASE;
+  while (phase.kind !== 'base') {
+    const result = await advance(state, phase, verkeerd, '2026-09-09');
+    state = result.state;
+    phase = result.next;
+  }
+
+  await assert.rejects(
+    advance(state, phase, verkeerd, '2026-09-09'),
+    (caught: unknown) => caught instanceof EmptyPhase && caught.usage.output === 50,
   );
 });

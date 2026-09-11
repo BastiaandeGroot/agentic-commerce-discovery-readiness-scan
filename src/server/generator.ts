@@ -183,12 +183,22 @@ function paramsFor(task: AskTask) {
   };
 }
 
+/**
+ * De fase als label op de batch.
+ *
+ * Een batchantwoord draagt geen herkenbare inhoud: een basislaag met nul vragen
+ * en een antwoord dat voor een andere fase bedoeld was zien er voor de lezer
+ * hetzelfde uit. Het label maakt dat verschil controleerbaar. De API staat
+ * alleen letters, cijfers, `_` en `-` toe, dus `overlay:3` wordt `overlay_3`.
+ */
+const labelOf = (phase: string) => phase.replace(/[^a-zA-Z0-9_-]/g, '_');
+
 /** Eén fase indienen ter verwerking. Geeft het batch-id terug. */
 export async function submitBatch(task: AskTask): Promise<string> {
   const client = makeClient();
   const batch = await client.messages.batches.create({
     requests: [{
-      custom_id: 'phase',
+      custom_id: labelOf(task.phase),
       // De typering van de batch-API kent `output_config` en `thinking` niet in
       // deze combinatie; de API zelf wel. Eén cast op één plek, met de reden
       // erbij, is beter dan de vorm hier uitschrijven en laten verlopen.
@@ -205,12 +215,20 @@ export async function submitBatch(task: AskTask): Promise<string> {
  * batch die net is ingediend, en de beller hoort er niets anders mee te doen
  * dan later terugkomen.
  */
-export async function collectBatch(batchId: string): Promise<AskReply | null> {
+export async function collectBatch(batchId: string, phase: string): Promise<AskReply | null> {
   const client = makeClient();
   const batch = await client.messages.batches.retrieve(batchId);
   if (batch.processing_status !== 'ended') return null;
 
   for await (const entry of await client.messages.batches.results(batchId)) {
+    // Een antwoord voor een andere fase is geen antwoord. Stil opnemen levert
+    // een fase op die er gewoon uitziet en niets bevat.
+    if (entry.custom_id !== labelOf(phase)) {
+      throw new PhaseFailure(
+        `De batch hoort bij ${entry.custom_id} en niet bij ${phase}.`,
+        { input: 0, output: 0, cached: 0 },
+      );
+    }
     if (entry.result.type === 'succeeded') {
       const message = entry.result.message;
       const text = message.content
