@@ -237,7 +237,11 @@ export function BankRequestForm({ s, locale, segments, accountId, siteUrl, onQue
                   onChange={() => setChoice(offer.id)}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium">{offer.vertical}</span>
+                  {/* Met versie: zonder is niet te zien of dit de herziening is
+                      of de lijst die hij al kende. */}
+                  <span className="block text-sm font-medium">
+                    {offer.vertical} <span className="font-normal text-muted">v{offer.version}</span>
+                  </span>
                   <span className="block text-xs text-muted">
                     {offer.questions} {s.waiting.matchQuestions}
                     {offer.categories > 0 ? ` · ${offer.categories} ${s.waiting.matchCategories}` : ''}
