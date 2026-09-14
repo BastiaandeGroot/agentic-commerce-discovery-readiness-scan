@@ -17,7 +17,54 @@
 import type { GroupingEntry, Phase, RunState, Topic } from './state';
 
 /** Omhoog zodra een prompt de uitkomst op dezelfde markt kan verschuiven. */
-export const GENERATION_VERSION = '1.2.0';
+export const GENERATION_VERSION = '1.3.0';
+
+/**
+ * Wat een vraag moet bevatten, en in welke vorm.
+ *
+ * Eén keer uitgeschreven en in élke fase die vragen schrijft voluit
+ * meegegeven. Elke fase is een los gesprek: het model heeft de prompt van de
+ * basislaag nooit gezien, en "zelfde vorm als de basislaag" liet het daarom
+ * zelf een vorm verzinnen — bij woontextiel v3 negen categorieën met negen
+ * vormen, en in geen enkele een bruikbare kenmerknaam.
+ */
+const QUESTION_FIELDS = `- de vraag in het Nederlands én het Engels, allebei als klantvraag
+- intentie: geschiktheid, hoeveelheid, onderhoud, verwachting, materiaal,
+  verwerking, duurzaamheid, veiligheid, koopzekerheid, comfort of functie
+- belang: kritiek, hoog, middel of laag — volgens de wegingsregel, met de
+  onomkeerbare fout hierboven als maat voor kritiek
+- dekking en dekking_bronnen, overgenomen uit het onderwerp waar hij op rust
+- bewijs: de canonieke attribuutnamen die nodig zijn om hem te beantwoorden.
+  Eigen namen in snake_case (rolbreedte_cm, schuurweerstand_martindale), nooit
+  de veldnaam van een site. Eén vraag mag meerdere attributen nodig hebben.
+- synoniemen: hoe de sites in het panel dit kenmerk noemen. Dit is vaktaal en
+  die hoort bij de markt; de app gebruikt het om het kenmerk in de catalogus
+  terug te vinden.
+- modus: "alle" als er gerekend wordt (een som heeft al zijn termen nodig),
+  "een" als bewijs stapelt (één attribuut dat de vraag draagt volstaat)
+- antwoordtype: enum, getal, boolean, tekst, relatie, proces of afgeleid
+- beantwoordbaar: true, gedeeltelijk of false. Zet false bij proces-, structuur-
+  en levenscyclusvragen; die tellen niet mee in de score.
+- beslisregel: alleen als er een deterministische regel bij hoort. Noem in
+  "ruleSource" de site of de URL die de drempel publiceert. Laat dat veld leeg
+  als jij het getal zelf beredeneerd hebt — dan telt de drempel niet mee in de
+  score, en dat is de bedoeling. Een verzonnen bron is erger dan geen bron.
+
+Het bewijs is het belangrijkste veld. Het is een LIJST van kenmerknamen: korte
+namen in snake_case, één kenmerk per naam, zoals een kolom in een PIM zou heten
+(lichtdoorlatendheid_pct, schuurweerstand_martindale, coatingtype). Geen zin,
+geen uitleg, geen object. Wat je erover kwijt wilt hoort in "note".`;
+
+const questionShape = (id: string) => `{
+    "id": "${id}", "questionNl": "...", "questionEn": "...",
+    "intent": "...", "importance": "kritiek|hoog|middel|laag",
+    "coverage": 0, "coverageSites": ["..."], "sources": ["..."],
+    "evidence": ["kenmerk_naam", "tweede_kenmerk"], "synonyms": ["naam op een site"],
+    "rule": "naam_van_regel of weglaten", "ruleSource": "site of URL die de drempel publiceert, of weglaten",
+    "answerType": "...",
+    "answerable": "true|gedeeltelijk|false", "mode": "alle|een",
+    "note": "bron van de drempel, of waarom het belang afwijkt van de dekking"
+  }`;
 
 /**
  * De regels die in élke fase gelden.
@@ -291,40 +338,11 @@ komen straks in de overlays.
 
 Per vraag:
 - een id in de vorm BAS-01, oplopend
-- de vraag in het Nederlands én het Engels, allebei als klantvraag
-- intentie: geschiktheid, hoeveelheid, onderhoud, verwachting, materiaal,
-  verwerking, duurzaamheid, veiligheid, koopzekerheid, comfort of functie
-- belang: kritiek, hoog, middel of laag — volgens de wegingsregel, met de
-  onomkeerbare fout hierboven als maat voor kritiek
-- dekking en dekking_bronnen, overgenomen uit het onderwerp waar hij op rust
-- bewijs: de canonieke attribuutnamen die nodig zijn om hem te beantwoorden.
-  Eigen namen in snake_case (rolbreedte_cm, schuurweerstand_martindale), nooit
-  de veldnaam van een site. Eén vraag mag meerdere attributen nodig hebben.
-- synoniemen: hoe de sites in het panel dit kenmerk noemen. Dit is vaktaal en
-  die hoort bij de markt; de app gebruikt het om het kenmerk in de catalogus
-  terug te vinden.
-- modus: "alle" als er gerekend wordt (een som heeft al zijn termen nodig),
-  "een" als bewijs stapelt (één attribuut dat de vraag draagt volstaat)
-- antwoordtype: enum, getal, boolean, tekst, relatie, proces of afgeleid
-- beantwoordbaar: true, gedeeltelijk of false. Zet false bij proces-, structuur-
-  en levenscyclusvragen; die tellen niet mee in de score.
-- beslisregel: alleen als er een deterministische regel bij hoort. Noem in
-  "ruleSource" de site of de URL die de drempel publiceert. Laat dat veld leeg
-  als jij het getal zelf beredeneerd hebt — dan telt de drempel niet mee in de
-  score, en dat is de bedoeling. Een verzonnen bron is erger dan geen bron.
+${QUESTION_FIELDS}
 
 Antwoord met dit JSON-object:
 {
-  "questions": [{
-    "id": "BAS-01", "questionNl": "...", "questionEn": "...",
-    "intent": "...", "importance": "kritiek|hoog|middel|laag",
-    "coverage": 0, "coverageSites": ["..."], "sources": ["..."],
-    "evidence": ["attribuut_naam"], "synonyms": ["naam op een site"],
-    "rule": "naam_van_regel of weglaten", "ruleSource": "site of URL die de drempel publiceert, of weglaten",
-    "answerType": "...",
-    "answerable": "true|gedeeltelijk|false", "mode": "alle|een",
-    "note": "bron van de drempel, of waarom het belang afwijkt van de dekking"
-  }],
+  "questions": [${questionShape('BAS-01')}],
   "findings": ["beredeneerde drempels en andere open punten"]
 }`,
       };
@@ -339,6 +357,9 @@ Antwoord met dit JSON-object:
         web: false,
         maxTokens: 48000,
         prompt: `Markt: ${vertical}. Categorie: ${category}.
+
+Vorm van de markt — de onomkeerbare fout hierin is de maat voor "kritiek":
+${shapeBlock(state)}
 
 De basislaag stelt deze vragen al:
 ${(state.base?.questions ?? []).map((question) => `- ${question.id}: ${question.questionNl} (${question.importance})`).join('\n')}
@@ -362,9 +383,13 @@ De toepassingen hierboven krijgen GEEN eigen vragen. Zij verschillen in drempels
 en berekeningen bij dezelfde vragen; noem dat verschil in "note" bij de vraag
 waar het op slaat.
 
-Antwoord met hetzelfde JSON-object als de basislaag, plus reweight:
+Per vraag:
+- een id in de vorm ${(category.slice(0, 3) || 'CAT').toUpperCase()}-01, oplopend
+${QUESTION_FIELDS}
+
+Antwoord met dit JSON-object:
 {
-  "questions": [ ... zelfde vorm als de basislaag ... ],
+  "questions": [${questionShape(`${(category.slice(0, 3) || 'CAT').toUpperCase()}-01`)}],
   "reweight": [{"id": "BAS-03", "importance": "kritiek", "reason": "..."}],
   "findings": ["..."]
 }`,

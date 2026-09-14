@@ -80,6 +80,20 @@ const asNumber = (value: unknown): number | null => {
 
 const IMPORTANCE = new Set(['kritiek', 'hoog', 'middel', 'laag']);
 
+/**
+ * Is dit een kenmerknaam, of een zin die zich als kenmerk voordoet?
+ *
+ * Een kenmerk is iets wat in een PIM een kolom kan zijn: `coatingtype`,
+ * `lichtdoorlatendheid_pct`. "Expliciete lichtklasse op de productpagina in één
+ * vaste woordenlijst" is een eis, geen kenmerk, en als kolomnaam komt hij in
+ * geen enkele catalogus voor. Zo'n vraag zou bij elke winkel zakken en dus niets
+ * meten. Vier woorden en 48 tekens is ruim voor elke echte naam.
+ */
+function isAttributeName(raw: string): boolean {
+  const value = raw.trim();
+  return value !== '' && value.length <= 48 && value.split(/[\s_]+/).length <= 5 && !/[():;,]/.test(value);
+}
+
 /** Eén vraag zoals het model hem aanlevert. */
 function readQuestion(raw: unknown, fallbackId: string): DraftQuestion | null {
   const source = asObject(raw);
@@ -101,7 +115,9 @@ function readQuestion(raw: unknown, fallbackId: string): DraftQuestion | null {
     coverage: asNumber(source.coverage),
     coverageSites: asStrings(source.coverageSites),
     sources: asStrings(source.sources),
-    evidence: asStrings(source.evidence).map((one) => one.toLowerCase().replace(/\s+/g, '_')),
+    evidence: asStrings(source.evidence)
+      .filter(isAttributeName)
+      .map((one) => one.toLowerCase().replace(/\s+/g, '_')),
     synonyms: asStrings(source.synonyms),
     rule: asString(source.rule) || undefined,
     ruleSource: asString(source.ruleSource) || undefined,
@@ -133,6 +149,20 @@ function readQuestions(raw: unknown, prefix: string, taken: Set<string>): DraftQ
     out.push(id === question.id ? question : { ...question, id });
   }
   return out;
+}
+
+/**
+ * Kwam deze stap terug met vragen waar niets mee te meten is?
+ *
+ * Eén vraag zonder kenmerken is een vergissing die de beheerder ziet en
+ * overslaat. De meerderheid is een stap die de gevraagde vorm niet volgde — bij
+ * woontextiel v3 alle negen categorieën — en dan hoort de stap opnieuw, niet de
+ * beheerder die tientallen vragen één voor één wegklikt.
+ */
+function unmeasurable(questions: DraftQuestion[]): { empty: number; total: number } | null {
+  const scored = questions.filter((question) => question.answerable !== 'false');
+  const empty = scored.filter((question) => question.evidence.length === 0).length;
+  return scored.length >= 3 && empty * 2 > scored.length ? { empty, total: scored.length } : null;
 }
 
 /** Alle ids die al vergeven zijn, zodat een nieuwe laag erlangs kan. */
@@ -458,6 +488,13 @@ export function applyReply(
       if (questions.length === 0) {
         throw new EmptyPhase('De basislaag kwam terug zonder één vraag.', reply.usage);
       }
+      const blind = unmeasurable(questions);
+      if (blind) {
+        throw new EmptyPhase(
+          `De basislaag noemt bij ${blind.empty} van de ${blind.total} vragen geen bruikbare kenmerknaam.`,
+          reply.usage,
+        );
+      }
       updated = {
         ...state,
         base: { category: '', questions, reweight: [] },
@@ -485,6 +522,13 @@ export function applyReply(
       const questions = readQuestions(answer.questions, prefix, takenIds(state));
       if (questions.length === 0) {
         throw new EmptyPhase(`De categorie ${category} kwam terug zonder één eigen vraag.`, reply.usage);
+      }
+      const blind = unmeasurable(questions);
+      if (blind) {
+        throw new EmptyPhase(
+          `De categorie ${category} noemt bij ${blind.empty} van de ${blind.total} vragen geen bruikbare kenmerknaam.`,
+          reply.usage,
+        );
       }
 
       updated = {
