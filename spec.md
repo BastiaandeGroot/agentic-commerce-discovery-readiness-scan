@@ -6,7 +6,7 @@ Techniek staat er alleen in voor zover die uit die vraag volgt.
 - Hoe het gebouwd is → `CLAUDE.md` (regels) en `NOTES.md` (stand en beslissingen)
 - Hoe het eruitziet → `DESIGN.md`
 
-Laatst bijgewerkt: 10 september 2026.
+Laatst bijgewerkt: 11 september 2026.
 
 ---
 
@@ -63,36 +63,78 @@ een model stuurt — nooit een productrij, prijs of aantal. Het scherm zegt dat.
 catalogus geeft altijd hetzelfde rapport, en een scan kost niets. Elk rapport
 draagt zijn versienummers, zodat twee metingen over tijd te vergelijken zijn.
 
+## Hoe we er geld mee verdienen
+
+Besloten op 10 september: **een dienst, geen zelfbedieningsabonnement.** Een
+meting van de catalogus met een rapport en een gesprek, voor **€950 tot €1.500**
+per winkel. Het gesprek is geen toegift maar het product: een webshop-eigenaar
+koopt geen lijst met gaten, hij koopt weten wat hij eerst moet doen.
+
+De aanleiding die we gebruiken: veel ondernemers weten dat agentic commerce
+eraan komt, maar niet dat de kwaliteit van hun productdata daardoor zwaarder
+gaat wegen dan hun productpagina. Die kloof maken we zichtbaar vóórdat er een
+catalogus op tafel ligt, met **winkel doormeten** (zie hieronder): een meting van
+buitenaf op de gestructureerde data van zijn productpagina's, als pdf die hij
+kan lezen. Dat is de opening van het gesprek, niet de meting zelf — die gaat
+altijd over zijn catalogus.
+
 ## Wat er werkt
 
-De keten staat en draait live: catalogus aanleveren → vragenlijst → kenmerken
-aan kolommen koppelen → vragensets bevestigen → rapport, plus een uitlegpagina
-op `/methode`. Tweetalig NL/EN. Gemeten: een export van 20 MB met duizenden
-producten scant in 1,4 seconde.
+De keten staat en draait live: catalogus aanleveren → categorieën bevestigen →
+een vragenbank kiezen (of aanvragen) → kenmerken aan kolommen koppelen →
+vragensets bevestigen → rapport, plus een uitlegpagina op `/methode`. Tweetalig
+NL/EN. Gemeten: een export van 20 MB met duizenden producten scant in 1,4
+seconde.
 
-Daaromheen staat sinds 9 september de rest van het product: **accounts en
-opslag** op Supabase, met scheiding per account; een **wachtrij** voor markten
-die nog geen vragenbank hebben; en de **generatie zelf**, die de methode als
-vaste reeks fasen draait en de uitkomst voorlegt ter vrijgave.
+Daaromheen:
+
+- **Accounts en opslag** op Supabase, met scheiding per account.
+- **Een wachtrij** voor markten die nog geen vragenbank hebben.
+- **De generatie van een vragenbank**, als vaste reeks stappen in de app zelf.
+  De stappen die niet het web op gaan lopen via de batch-API van Anthropic, voor
+  de halve prijs. Zie `ONTWERP-vragenbank-keten.md`.
+- **Een beheerscherm** waar de beheerder een nieuwe bank per categorie, per vraag
+  beoordeelt: meenemen of overslaan. Overgeslagen vragen blijven in de bank maar
+  tellen bij geen enkele merchant mee.
+- **Een overzicht van alle vragenbanken**, per markt en versie, met panel,
+  indeling en bevindingen.
+- **De vrijgegeven bank terug bij de merchant.** Na het categoriescherm ziet hij
+  welke banken er al liggen, met versie en vijf voorbeeldvragen, en kiest hij er
+  één. Hij hoeft niets te uploaden en niet te wachten als zijn markt al bestaat.
+- **Winkel doormeten** (alleen voor de beheerder): een vragenbank kiezen, een
+  webshopadres invullen, en de app leest een steekproef van productpagina's —
+  via robots.txt en de sitemap, alleen wat de winkel toestaat. Per pagina staat
+  welke vragen gesteld zijn, welke te beantwoorden waren en uit welke gegevens.
+  De uitkomst is een pdf om te delen met de eigenaar.
+
+**Hoe een product gemeten wordt.** Een product hangt vaak op meer plekken in de
+boom: een stof die als gordijnstof én als lampenkapstof verkocht wordt. Het
+wordt gemeten op élke plek waar het hangt, en op elke plek zo specifiek als de
+vragenbank het kent — lampenkapstoffen krijgen de lampenkapvragen en niet de
+algemene decoratievragen. Wat de merchant op het categoriescherm als kenmerk
+liet staan ("Motieven > Lente") krijgt geen eigen vragen. Sinds 11 september,
+scanversie 5.0.0.
 
 ## Wat er nog moet gebeuren
 
-In deze volgorde, want ze bouwen op elkaar.
+In deze volgorde.
 
-1. **De vrijgegeven bank terug bij de merchant** — een bank die is vrijgegeven
-   staat in de database, maar niets aan de merchantkant leest hem. Hij levert
-   zijn vragenlijst vandaag nog zelf aan. Dit is het laatste gat in de keten.
-2. **Bericht als de bank klaar is** — het wachtscherm belooft dat hij het hoort,
+1. **Bericht als de bank klaar is** — het wachtscherm belooft dat hij het hoort,
    en dat gebeurt nu niet. `notified_at` ligt klaar; een mailprovider ontbreekt.
-3. **Prijs en betaling** — de bedragen staan nog niet vast en er is nog geen
-   betaalprovider gekozen. Die keuze komt pas als 1 en 2 staan.
+2. **De generatie zonder laptop** — de reeks wordt nu aangestuurd door een lus in
+   een terminal op de laptop van de beheerder. Slaapt die, dan staat de reeks
+   stil (er gaat niets verloren, het kost alleen tijd). De geplande taak die dat
+   oplost staat al in `render.yaml`; hij moet in Render worden aangezet, voor
+   een paar dollar per maand.
+3. **Betaling en facturatie voor de dienst** — het model staat (zie boven), de
+   uitvoering niet.
 
-*Punten die hier stonden en inmiddels af zijn: accounts en opslag, de markt
-herkennen na de upload, en vragenbanken die vanzelf ontstaan.*
+*Af sinds de vorige versie van dit document: de vrijgegeven bank terug bij de
+merchant.*
 
 ## Vragenbanken die vanzelf ontstaan
 
-Vandaag levert de merchant zelf een vragenlijst aan. Dat is een drempel die geen
+De merchant leverde eerst zelf een vragenlijst aan. Dat is een drempel die geen
 webshop-eigenaar kan nemen: hij weet niet welke vragen zijn markt stelt — dat is
 juist wat hij van ons komt halen. Het doel is dat de upload van zijn catalogus
 het proces aftrapt en hij er verder niets voor hoeft te doen.
@@ -121,14 +163,17 @@ kost meer vertrouwen dan het wachten kost.
 
 **Kwaliteit wordt bewaakt met poorten, niet met leeswerk.** Om te voorkomen dat
 elke nieuwe markt op één paar menselijke ogen wacht, controleert de app
-machinaal wat machinaal te controleren is:
+machinaal wat machinaal te controleren is. Vier poorten staan er, twee zijn
+ontworpen en nog niet gebouwd:
 
-| Poort | Wat het tegenhoudt |
-|---|---|
-| Herkomst afdwingen | Een vraag zonder panelbronnen of een drempel zonder gepubliceerde bron wordt niet afgekeurd maar gedegradeerd: hij komt binnen als beredeneerd, telt niet mee in de score en staat bij de open punten. Een verzonnen norm kan zo nooit als feit het rapport in. |
-| De bron terugvragen | De genoemde URL wordt opgehaald en gecontroleerd op het onderwerp. Een dode link of een pagina die er niet over gaat, valt af. Vangt de belangrijkste faalvorm van een model: een plausibele bron die niet bestaat. |
-| Twee onafhankelijke runs | Genereren met twee verschillende sitepanels; wat beide vinden is stevig, waar ze verschillen gaat naar de open punten. Zelfde logica als `dekking` in de methode. |
-| Criticus tegen de anti-patronen | Een tweede modelaanroep vinkt de concrete fouten af die de methode benoemt: attribuutnaam in plaats van klantvraag, norm zonder bron, duurzaamheidsclaim zonder certificering, bank op één site gebaseerd. |
+| Poort | Wat het tegenhoudt | Staat |
+|---|---|---|
+| Herkomst afdwingen | Een drempel zonder gepubliceerde bron wordt niet afgekeurd maar gedegradeerd: hij komt binnen als beredeneerd en telt niet mee. Een verzonnen norm kan zo nooit als feit het rapport in. | **gebouwd** |
+| De lat voor een eigen vragenset | Een categorie krijgt alleen eigen vragen als het model er drie kan noemen die nergens anders in de markt gesteld worden. Noemt hij er geen, dan wordt het een toepassingsprofiel. | **gebouwd** |
+| Een stap zonder uitkomst faalt | Een basislaag of categorie die zonder één vraag terugkomt, is een mislukte stap en geen magere uitkomst. | **gebouwd** |
+| Beoordelen per vraag | De beheerder loopt de bank per categorie door en slaat over wat er niet in hoort; overgeslagen vragen tellen nergens mee. | **gebouwd** |
+| De bron terugvragen | De genoemde URL wordt opgehaald en gecontroleerd op het onderwerp. Vangt de belangrijkste faalvorm van een model: een plausibele bron die niet bestaat. Nu kan alleen de beheerder dat met de hand nalopen. | ontworpen |
+| Twee onafhankelijke runs | Genereren met twee verschillende sitepanels; wat beide vinden is stevig. | ontworpen |
 
 Wat er dan voor menselijke review overblijft is de handvol vragen die een poort
 markeert — een half uur per markt in plaats van twee dagen.
@@ -149,7 +194,8 @@ onder hetzelfde id.
 | Vijf dependencies | minder om te onderhouden en minder dat onverwacht breekt |
 | Render als hosting | elke merge naar `main` deployt vanzelf |
 | Supabase | database met scheiding per account, aangesloten sinds 9 september |
-| Betaalprovider | nog niet gekozen — bewust uitgesteld |
+| Anthropic | Sonnet leest de panelsites, Opus weegt en schrijft; alleen voor de generatie van een bank en het koppelscherm, nooit in de scan |
+| Betaalprovider | nog niet gekozen — een dienst van €950–1.500 kan voorlopig op factuur |
 
 ## Bewust niet
 

@@ -64,10 +64,11 @@ browsermodel, met dat verschil in beeld.
 | `src/spec/` | veldenregister, plus de woordenlijst en de matcher die bankattributen op catalogus­kolommen leggen |
 | `src/semantic/` | de modellen die koppelingen vóórstellen; nooit importeren vanuit de motor |
 | `src/generation/` | de vragenbankgeneratie als vaste reeks fasen; puur, het modelantwoord komt binnen als argument |
-| `app/api/` | de serverroutes: `/api/mapping`, `/api/site`, `/api/bank-request`, `/api/bank-queue`, `/api/bank-run`, `/api/bank-result` en `/api/admin/queue` |
-| `src/server/` | wat alleen serverzijdig mag draaien: de uitvoerderssleutel, de servicecliënt, de modelaanroep van de generatie en het aannemen van een bank. Nooit importeren vanuit een component. |
-| `src/questions/` | vragenbanken, composer, generator, import (tabel én YAML) en aanvraag |
-| `src/engine/` | categoriekeuze, evaluatie, rapportaggregatie, vergelijken |
+| `src/collect/` | winkel doormeten: productgegevens uit html halen en productadressen uit sitemaps; puur, de html komt binnen als argument |
+| `app/api/` | de serverroutes: `/api/mapping`, `/api/site`, `/api/bank-request`, `/api/bank-queue`, `/api/bank-run`, `/api/bank-result`, `/api/banks` (vrijgegeven banken voor de merchant), `/api/public-scan` (winkel doormeten, alleen beheerder) en `/api/admin/queue` |
+| `src/server/` | wat alleen serverzijdig mag draaien: de uitvoerderssleutel, de servicecliënt, de modelaanroep van de generatie (direct en via de batch-API), het aannemen van een bank en het ophalen van een winkel. Nooit importeren vanuit een component. |
+| `src/questions/` | vragenbanken, composer, generator, import (tabel én YAML), aanvraag en beoordeling |
+| `src/engine/` | plaatsing van een product in de boom, evaluatie, rapportaggregatie, vergelijken |
 | `src/i18n/` | alle teksten, NL en EN naast elkaar |
 | `components/` | UI; `ui.tsx` draagt de gedeelde bouwstenen |
 | `app/` | routes |
@@ -200,7 +201,8 @@ nooit iets vinden en het gat zou stilzwijgend blijven staan.
 
 ## Scanlogica
 
-De motor is `src/intake`, `src/spec`, `src/questions` en `src/engine`. Die blijft
+De motor is `src/intake`, `src/spec`, `src/questions` en `src/engine`, en
+`src/generation` en `src/collect` houden zich aan dezelfde regel. Die blijft
 **puur**: geen DOM, geen `fetch`, geen `fs`, geen datum-van-nu, geen database.
 Alles wat de scan nodig heeft komt binnen als argument. Zo draait dezelfde code
 in de browser en straks serverzijdig.
