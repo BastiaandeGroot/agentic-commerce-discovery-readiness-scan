@@ -445,6 +445,23 @@ doet. Slaapt de laptop, dan staat de reeks stil. Oplossing: de taak in Render
 aanzetten (betaald; `APP_URL` en `BANK_EXECUTOR_KEY` in het dashboard), of een
 geplande GitHub Action met dezelfde twee als secret.
 
+**Stand woontextiel (14 september)** — v1 en v2 vrijgegeven; v3 ingetrokken (alle
+negen categorieën zonder bruikbare kenmerknamen, zie de beslissing hieronder);
+**v4 staat op review** en is nagekeken: 171 vragen, 729 kenmerken, geen enkele
+categorievraag zonder kenmerk en geen kenmerk dat een zin is. Volgende stap:
+v4 beoordelen en vrijgeven. Let bij de indeling op Tassenstoffen, Paneel en
+Buitenkussens.
+
+**Een categoriestap kreeg de vorm van een vraag niet te zien (11 september).**
+De overlay-prompt verwees naar "zelfde vorm als de basislaag", die het model in
+dat losse gesprek nooit zag. Nu staat de vorm voluit in elke stap
+(`QUESTION_FIELDS`), wordt een zin nooit een kenmerk, en faalt een stap waarin de
+meerderheid geen kenmerknaam heeft (`GENERATION_VERSION` 1.3.0). Les: elke fase is
+een los gesprek; verwijs nooit naar een andere prompt.
+
+**De aansturingslus** — gebruik `while true` in plaats van een vast aantal
+rondes; een lus van 240 minuten liep halverwege een run af.
+
 **Wat een markt kost** — woontextiel v2 ging volledig direct: rond de zeven
 dollar. v3 is de eerste via de batchroute; verwacht ongeveer de helft. Het echte
 getal staat per run in `bank_runs` (`input_tokens`, `output_tokens`). Let op bij
