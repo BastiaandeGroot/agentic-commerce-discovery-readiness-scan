@@ -342,3 +342,50 @@ test('een categorie met zinnen in plaats van kenmerknamen is een mislukte stap',
     (caught: unknown) => caught instanceof EmptyPhase && /kenmerknaam/.test(caught.message) && caught.usage.output === 7,
   );
 });
+
+test('een losstaande categorie krijgt een eigen fase en komt zonder basislaag in de bank', async () => {
+  const brief = { ...BRIEF, segments: [...BRIEF.segments, { name: 'Naaigarens', count: 164 }] };
+  const prompts = new Map<string, string>();
+  const ask: Ask = async (task) => {
+    prompts.set(task.phase, task.prompt);
+    const json = antwoord(task.phase) as Record<string, unknown>;
+    if (task.phase === 'panel') {
+      return {
+        json: {
+          ...json,
+          grouping: [
+            ...(json.grouping as unknown[]),
+            { category: 'Naaigarens', kind: 'losstaand', reason: 'de algemene vragen over stof slaan niet op garen' },
+          ],
+        },
+        usage: { input: 1, output: 1, cached: 0 },
+      };
+    }
+    return { json, usage: { input: 1, output: 1, cached: 0 } };
+  };
+
+  let state = emptyState(brief);
+  let phase: Phase = FIRST_PHASE;
+  for (let stap = 0; stap < 40 && phase.kind !== 'done'; stap++) {
+    const result = await advance(state, phase, ask, '2026-09-14');
+    state = result.state;
+    phase = result.next;
+  }
+
+  // Een eigen fase, net als een overlay.
+  assert.ok(prompts.has('overlay:2'), 'de losstaande categorie krijgt een eigen stap');
+  const prompt = prompts.get('overlay:2') ?? '';
+  assert.match(prompt, /Naaigarens/);
+  assert.match(prompt, /losstaand/);
+  assert.doesNotMatch(prompt, /De basislaag stelt deze vragen al/);
+
+  const garen = state.overlays.find((overlay) => overlay.category === 'Naaigarens');
+  assert.equal(garen?.standalone, true);
+  assert.deepEqual(garen?.reweight, [], 'geen basislaag om te herwegen');
+
+  // Door dezelfde lezer als elke vragenlijst: de basislaag staat uit.
+  const read = importQuestionList([{ name: 'woontextiel.csv', text: state.csv ?? '' }]);
+  const overlay = read.bank?.overlays.find((one) => one.label.nl.toLowerCase().includes('naaigaren'));
+  assert.ok(overlay, 'de losstaande categorie staat in de bank');
+  assert.deepEqual([...(overlay?.suppress ?? [])].sort(), (read.bank?.questions ?? []).map((question) => question.id).sort());
+});

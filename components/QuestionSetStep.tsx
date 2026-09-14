@@ -13,11 +13,12 @@ import type { Dataset, Locale, Question, QuestionSetState } from '../src/domain/
 import { isScored } from '../src/questions/compose';
 import { FIELDS, requirementLabel } from '../src/spec/fields';
 import {
-  addQuestion, allValidated, baseQuestions, editBaseQuestion, editQuestion, hasOwnQuestions,
+  addQuestion, allValidated, baseQuestions, byCoverage, disableUncovered, disableUncoveredBase,
+  editBaseQuestion, editQuestion, hasOwnQuestions, isUncovered, stillToConfirm,
   toggleBaseQuestion, toggleBaseValidated, toggleQuestion, toggleValidated,
 } from '../src/questions/mutate';
 import type { Strings } from '../src/i18n/strings';
-import { Badge, Button, Card, CardTitle, ErrorState } from './ui';
+import { Badge, Button, Card, CardTitle } from './ui';
 
 interface Props {
   s: Strings;
@@ -25,11 +26,15 @@ interface Props {
   catalog: Dataset;
   state: QuestionSetState;
   onChange: (next: QuestionSetState) => void;
-  onRun: () => void;
-  /** De scan draait; de knop blijft staan met zijn eigen tekst. */
-  running?: boolean;
-  /** De scan viel om. Zeggen wat er gebeurde, niet stil blijven. */
-  error?: string;
+  /**
+   * Door naar het koppelen. Valideren komt eerst: een vraag die hier uitgaat of
+   * een categorie die hier geen eigen vragen houdt, vraagt straks geen koppeling.
+   */
+  onContinue: () => void;
+  /** Wat opnieuw bevestigd moet worden omdat de bank het veranderde. */
+  reconfirm?: { categories: string[]; base: boolean };
+  /** Waar het werk bewaard wordt, of dat bewaren mislukte. */
+  saved?: 'account' | 'browser' | 'failed';
 }
 
 
@@ -227,7 +232,7 @@ function columnPattern(column: string): string {
 /** Sleutel voor de kaart met de algemene vragen; geen set-id, dus botst niet. */
 const BASE = '\u0000base';
 
-export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, running, error }: Props) {
+export function QuestionSetStep({ s, locale, catalog, state, onChange, onContinue, reconfirm, saved }: Props) {
   const [openSet, setOpenSet] = useState<string | undefined>(BASE);
   const [newLabel, setNewLabel] = useState('');
   const [newField, setNewField] = useState('');
@@ -239,7 +244,10 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, ru
     return [...canonical, ...own];
   }, [catalog.unmappedColumns, locale]);
 
-  const base = useMemo(() => baseQuestions(state), [state]);
+  // Op dekking, hoog naar laag: wat de meeste webshops in de markt behandelen
+  // staat bovenaan bij het nalopen.
+  const base = useMemo(() => byCoverage(baseQuestions(state), (entry) => entry.question.coverage), [state]);
+  const baseUncovered = base.filter((entry) => isUncovered(entry.question) && !entry.question.disabled).length;
   const ready = allValidated(state);
 
   return (
@@ -254,6 +262,34 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, ru
           <span className="text-muted">{s.questions.generatedNote}</span>
         </div>
         <p className="mt-2 text-xs leading-relaxed text-muted">{s.questions.importanceExplain}</p>
+        <p className="mt-1 text-xs leading-relaxed text-muted">{s.questions.sortedByCoverage}</p>
+
+        {/* Waar dit werk blijft. Een merchant die een uur nakijkt, hoort te weten
+            of hij het morgen nog heeft. */}
+        {saved ? (
+          <p className={`mt-1 text-xs leading-relaxed ${saved === 'failed' ? 'text-warn' : 'text-muted'}`}>
+            {saved === 'account' ? s.questions.savedAccount
+              : saved === 'browser' ? s.questions.savedBrowser
+              : s.questions.saveFailed}
+          </p>
+        ) : null}
+
+        {/* De bank veranderde onder een bevestiging. Die bevestiging stil laten
+            staan is een oordeel over vragen die hij niet zag. */}
+        {reconfirm && (reconfirm.categories.length > 0 || reconfirm.base) ? (
+          <div className="mt-3 rounded-lg border border-warn/40 bg-warn-soft px-3 py-2.5">
+            <p className="text-sm font-medium text-warn">{s.questions.reconfirmHeading}</p>
+            {reconfirm.categories.length > 0 ? (
+              <>
+                <p className="mt-1 text-xs leading-relaxed text-ink">{s.questions.reconfirmBody}</p>
+                <p className="mt-1 text-xs leading-relaxed text-ink">{reconfirm.categories.join(' · ')}</p>
+              </>
+            ) : null}
+            {reconfirm.base ? (
+              <p className="mt-1 text-xs leading-relaxed text-ink">{s.questions.reconfirmBase}</p>
+            ) : null}
+          </div>
+        ) : null}
 
         {/* De categorienamen van de lijst sloten niet aan op de boom van de
             merchant, dus draagt elke set alleen de basislaag. Dat halveert de
@@ -312,7 +348,15 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, ru
                 </span>
               </span>
             </button>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {baseUncovered > 0 ? (
+                <Button
+                  variant="quiet"
+                  onClick={() => onChange(disableUncoveredBase(state, new Date().toISOString()))}
+                >
+                  {s.questions.disableUncovered} · {s.questions.disableUncoveredCount.replace('{aantal}', String(baseUncovered))}
+                </Button>
+              ) : null}
               {state.baseValidated ? <Badge tone="ok">✓ {s.questions.validated}</Badge> : null}
               <Button
                 variant={state.baseValidated ? 'quiet' : 'secondary'}
@@ -323,6 +367,10 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, ru
             </div>
           </div>
           {openSet === BASE ? (
+            <>
+            {baseUncovered > 0 ? (
+              <p className="mt-3 text-xs leading-relaxed text-muted">{s.questions.disableUncoveredNote}</p>
+            ) : null}
             <ul className="mt-3">
               {base.map(({ question, reweighted }) => (
                 <QuestionRow
@@ -337,6 +385,7 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, ru
                 />
               ))}
             </ul>
+            </>
           ) : null}
         </Card>
       ) : null}
@@ -345,6 +394,7 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, ru
         const open = openSet === set.id;
         const own = set.questions.filter((q) => q.layer === 'category');
         const active = own.filter((q) => !q.disabled).length;
+        const uncovered = own.filter((q) => isUncovered(q) && !q.disabled).length;
         return (
           <Card key={set.id}>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -366,12 +416,22 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, ru
               </button>
               {/* Terugdraaibaar: wie halverwege bedenkt dat een set toch niet
                   klopt, moet dat kunnen terugnemen zonder opnieuw te beginnen. */}
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
                 {/* Een voorlopige bank hoort de merchant te zien, niet te raden:
                     zijn cijfer klopt met de gestelde vragen, maar of dít de
                     vragen zijn is beredeneerd en niet onderzocht. */}
                 {set.bankStatus && set.bankStatus !== 'frozen' ? (
                   <Badge tone="warn">{s.bank.status[set.bankStatus]}</Badge>
+                ) : null}
+                {/* Alleen de eigen vragen van deze categorie; de algemene vragen
+                    hebben hun eigen knop, want die gelden overal tegelijk. */}
+                {uncovered > 0 ? (
+                  <Button
+                    variant="quiet"
+                    onClick={() => onChange(disableUncovered(state, new Date().toISOString(), set.id))}
+                  >
+                    {s.questions.disableUncovered} · {s.questions.disableUncoveredCount.replace('{aantal}', String(uncovered))}
+                  </Button>
                 ) : null}
                 {hasOwnQuestions(set) ? (
                   <>
@@ -393,7 +453,7 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, ru
                   <p className="mt-3 text-sm text-muted">{s.questions.noOwnExplain}</p>
                 ) : (
                   <ul className="mt-3">
-                    {own.map((question) => (
+                    {byCoverage(own, (question) => question.coverage).map((question) => (
                       <QuestionRow
                         key={question.id}
                         s={s} locale={locale} setId={set.id} question={question}
@@ -463,17 +523,27 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onRun, ru
         )}
       </Card>
 
+      {/* Op slot tot alles bevestigd is, en dan zeggen wát nog open staat. Eerst
+          ging dit verder zonder bevestiging, en stond de merchant op het
+          koppelscherm voor een scanknop die niet werkte en een bevestigknop die
+          een scherm terug stond. */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={onRun} disabled={!ready} loading={running}>{s.questions.runScan}</Button>
-        {error ? (
-          <div className="mt-3 w-full">
-            <ErrorState title={s.errors.scanFailed} body={error} next={s.errors.scanFailedNext} />
-          </div>
+        <Button onClick={onContinue} disabled={!ready}>{s.questions.continueToMapping}</Button>
+        {ready ? (
+          <span className="text-sm text-muted">{s.questions.continueNote}</span>
         ) : null}
-        <span className="text-sm text-muted">
-          {ready ? s.questions.allValidated : s.questions.validateFirst}
-        </span>
       </div>
+      {!ready ? (
+        <p className="text-sm leading-relaxed text-muted">
+          {s.questions.confirmWhere}{' '}
+          <span className="text-ink">
+            {[
+              ...(stillToConfirm(state).base ? [s.questions.baseHeading] : []),
+              ...stillToConfirm(state).categories,
+            ].join(' · ')}
+          </span>
+        </p>
+      ) : null}
     </div>
   );
 }

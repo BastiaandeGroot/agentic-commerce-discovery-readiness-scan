@@ -16,7 +16,7 @@ import type {
   Question, QuestionSet, QuestionOutcome, RequirementGroup,
 } from '../domain/types';
 import { CUSTOM_IMPORTANCE, isScored, weightOf } from '../questions/compose';
-import { FIELD_BY_KEY } from '../spec/fields';
+import { FIELD_BY_KEY, requirementLabel } from '../spec/fields';
 import { isBlank, isPlaceholder, isValidGtin, str } from '../intake/normalize';
 import { placeProduct } from './join';
 
@@ -197,19 +197,12 @@ export function classifyGap(key: string, catalog: Dataset): GapCause {
   return catalogKnows(catalog, key) ? 'unfilled' : 'unmodelled';
 }
 
-/** Maak van een "attr:"-patroon weer iets dat een mens kan lezen. */
-function readableField(key: string): string {
-  return key
-    .slice(5)
-    .replace(/[$^\\]/g, '')
-    .replace(/\|/g, ' / ')
-    .replace(/[_.]+/g, ' ')
-    .trim();
-}
-
 function gapFor(key: string, questionId: string, catalog: Dataset): Gap {
   const def = FIELD_BY_KEY[key];
-  const readable = key.startsWith('attr:') ? readableField(key) : key;
+  // Eén omzetting voor het hele product. Hier stond een eigen kopie die de punt
+  // uit het scheidingsteken `.?` haalde en het vraagteken liet staan, zodat het
+  // rapport "aanbevolen ?naalddikte" toonde.
+  const readable = key.startsWith('attr:') ? requirementLabel(key, 'nl') : key;
   return {
     field: key,
     label: def?.label ?? { nl: readable, en: readable },
@@ -228,8 +221,10 @@ export function evaluateProduct(
   level = 0,
   /** De paden die een kenmerk zijn en geen categorie; zie expandFacets. */
   facets: ReadonlySet<string> = new Set(),
+  /** De paden die de merchant uitsloot; die plekken tellen niet. */
+  excluded: ReadonlySet<string> = new Set(),
 ): ProductResult {
-  const placement = placeProduct(product, sets, level, facets);
+  const placement = placeProduct(product, sets, level, facets, excluded);
   const set = placement.sets[0];
   const questions: QuestionOutcome[] = [];
   const gaps = new Map<string, Gap>();

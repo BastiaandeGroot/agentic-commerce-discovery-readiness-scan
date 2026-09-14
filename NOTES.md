@@ -20,7 +20,7 @@ De service is *blueprint managed*: `render.yaml` is leidend, en een variabele me
 `sync: false` daarin haalt zijn waarde uit het dashboard onder Settings.
 
 De keten is: **catalogus aanleveren → categorieën bevestigen → vragenbank
-kiezen of aanvragen → kenmerken koppelen → vragensets valideren → rapport**,
+kiezen of aanvragen → vragensets valideren → kenmerken koppelen → rapport**,
 plus een uitlegpagina op `/methode` in merchant-taal. Voor de beheerder daarnaast:
 banken beoordelen en vrijgeven, een overzicht van alle banken, en winkel
 doormeten (een meting van buitenaf, als pdf).
@@ -442,6 +442,135 @@ voorstellen gaan in blokken van 100 naar `/api/mapping`: v4 vroeg er ruim 700,
 de route neemt er 200, en de hele aanvraag gaf een 400 zonder dat het scherm iets
 zei.
 
+**Kenmerken worden getypeerd in een losse stap per markt (14 september 2026).**
+Een bank noemde een kenmerk alleen bij naam, en het antwoordtype stond per vraag.
+Nu krijgt elk kenmerk een vorm — ja/nee, getal met generieke eenheid, lijst met
+hooguit acht waarden, code, tekst — in dezelfde woorden als het kolomprofiel. Het
+model krijgt kenmerknamen, twee vragen per kenmerk en de synoniemen, en verder
+niets. De uitkomst staat naast de CSV (`attribute_types`, zoals `excluded`), gaat
+eerst op review en telt pas voor een merchant als de beheerder hem bevestigt; een
+aangepast type zet hem terug op review.
+
+Een losse stap en geen fase in de reeks, zodat een bank die er al ligt zijn typen
+krijgt zonder opnieuw gegenereerd te worden. Afgevallen: v4 opnieuw genereren met
+een aangepaste prompt — duurder en een nieuwe bank om te beoordelen, voor
+dezelfde uitkomst.
+
+Op het koppelscherm wijst `shapeMisfit` alleen af wat zeker niet past: een getal
+op een ja/nee-kolom, een getal op woorden zonder één cijfer, of een eenheid uit
+een andere grootheid (°C tegen cm). Een ja/nee-kenmerk wordt nooit afgewezen — een
+waterkolom beantwoordt "waterdicht" ook — en een lege kolom evenmin. Een voorstel
+van het model dat niet past vervalt met een melding; kiest de merchant hem zelf,
+dan staat er een waarschuwing en geen blokkade.
+
+**Het werk van de merchant blijft bewaard, per account en per markt (14
+september 2026).** Kenmerkkoppeling, vragenset per categorie en wat hij op het
+vragensetscherm deed — uitgezet, aangepast, eigen vragen, bevestigd — staan in
+`merchant_bank_settings` (migratie 0010) achter `SettingsStore`; zonder login in
+de browser. Het werk staat los van de sets (`src/questions/work.ts`) en wordt na
+elke samenstelling weer overheen gelegd. Daarvóór gooide elke wijziging op het
+koppelscherm al het valideerwerk weg. Een aangepaste tekst blijft alleen als de
+bank de vraag niet herschreef; een bevestiging alleen als de vragen van die
+categorie gelijk bleven (vingerafdruk), anders meldt het scherm wat opnieuw
+bevestigd moet worden. De categoriekeuze komt alleen terug op dezelfde
+bankversie; de koppeling altijd, want die hangt aan kolomnamen. Alleen namen gaan
+de deur uit.
+
+**Een categorie kan worden uitgesloten (14 september 2026).** Een derde stand
+naast categorie en kenmerk. Een kenmerk wordt afgeknipt; een uitgesloten pad valt
+met alles eronder weg. Geen vragenset, dus ook geen eigen vragen op het
+vragensetscherm en geen kenmerken op het koppelscherm; een product dat alleen
+daar hangt telt nergens mee, ook niet in de noemer of het kolomprofiel. Hangt het
+ook onder een categorie die blijft, dan wordt het daar gemeten. Vastgelegd als
+`QuestionSetState.excludedPaths`, zodat de scan dezelfde uitsluiting gebruikt als
+de sets.
+
+**Vragen staan op dekking, en dekking 0 kan in één keer uit (14 september
+2026).** Hoog naar laag, niet onderzocht onderaan, bij gelijke dekking de
+bankvolgorde. De knop zet alleen dekking exact 0 uit — `null` is niet onderzocht
+en blijft staan — en per categorie alleen haar eigen vragen; de algemene vragen
+hebben een eigen knop die in elke categorie tegelijk werkt. Per vraag terug te
+draaien, elke vraag met zijn eigen changelogregel.
+
+**Terug naar een eerdere stap** kan via de stappenbalk. Terug gaan gooit niets
+weg: koppeling, keuzes en het valideerwerk blijven staan.
+
+**"Maximum update depth exceeded" was een lus op het categoriescherm.** De
+pagina gaf de categoriepaden als uitdrukking in de render mee; elke render een
+nieuwe lijst, het scherm gaf daarop segmenten en kenmerken omhoog, de pagina
+renderde opnieuw. Nu één keer per catalogus (`useMemo`).
+
+**Eerst vragensets valideren, dan kenmerken koppelen (14 september 2026).**
+Andersom koppelde de merchant kenmerken van vragen die hij een scherm later
+uitzette, en van categorieën die geen eigen vragen hielden. Nu kiest hij op het
+vragensetscherm eerst welke vragenset bij welke categorie hoort
+(`CategorySetsCard`, met de automatische koppeling die eerst op het koppelscherm
+stond), valideert hij de vragen, en koppelt hij daarna alleen kenmerken van
+vragen die aanstaan en meetellen (`attributeInventory` en `mappingSummary` slaan
+uitgezette en niet-gescoorde vragen over). De scanknop staat op het koppelscherm
+en wacht nog steeds tot alles bevestigd is; verder naar koppelen mag eerder. Het
+volgt ook de methode: eerst de vraagkant, dan de aanbodkant — wie vragen beoordeelt
+zonder zijn eigen kolommen te zien, zet niet uit wat hij toevallig niet kan
+beantwoorden.
+
+**Het rapport wordt opgeslagen als pdf, opgebouwd uit de gegevens (14 september
+2026).** De knop opende het printvenster; de merchant wilde een bestand. Nu
+downloadt "Opslaan als pdf" een pdf die met jsPDF uit het rapport wordt opgebouwd
+(`components/reportPdf.ts`): doorzoekbare tekst, tabellen die tussen rijen
+afbreken, paginanummers, kleuren uit de lichte tokens van de pagina en nooit
+hardgecodeerd. De bibliotheek laadt pas bij de klik en alles gebeurt in de
+browser. Wat op het scherm achter een keuzelijst zit, staat in de pdf voluit —
+alle categorieën, alle onbeantwoorde vragen; de productverkenner niet, dat is een
+zoekscherm. Afgevallen: een pdf als afbeelding van het scherm (niet doorzoekbaar,
+groot, breekt door regels) en opslaan als html (geen pdf).
+
+De afleidingen die het scherm in zijn componenten deed — grootste blokkades,
+gemiddelde over alle categorieën, samengevoegde gaten, advies per vraag — staan nu
+één keer in `src/report/derive.ts`, puur, en worden door scherm én pdf gebruikt.
+Anders zegt het bewaarde bestand iets anders dan wat de merchant zag.
+
+**Een categorie kan ook op het vragensetscherm niet meegenomen worden (14
+september 2026).** Een keuze "niet meenemen" per regel in "Welke vragenset hoort
+bij welke categorie". Het is dezelfde uitsluiting als op het categoriescherm — het
+oordeel wordt bewaard en de sets worden opnieuw samengesteld — dus vragen,
+kenmerken en producten vallen ook hier overal weg. Een subcategorie wordt gezocht
+onder haar eigen categorie. Wat niet meegenomen wordt staat eronder, met "Weer
+meenemen"; dat zet het pad terug op categorie.
+
+**Categorieën die los staan van het kernproduct krijgen geen basislaag (14
+september 2026).** Naaigaren en onderhoudsmiddelen kregen in woontextiel de 30
+algemene vragen over stof ("hoe breed is de stof"), omdat de generatie alleen
+overlay, profiel en facet kende. De app kon het al lezen (`laag: standalone`),
+maar niets maakte het. Nu:
+
+- De generatie kent een vierde soort, **losstaand**, met een toets in de prompt:
+  slaan de meeste algemene vragen van de markt op deze producten nergens op, dan
+  is de categorie losstaand — waar de winkel haar in zijn menu hangt verandert
+  daar niets aan. Zo'n categorie krijgt een eigen fase, schrijft de volledige
+  vragenset zonder te herwegen, en komt als `standalone` in de CSV
+  (`GENERATION_VERSION` 1.4.0).
+- Een bank die er al ligt krijgt het op het beoordeelscherm, per categorie, naast
+  de CSV bewaard (`question_banks.standalone`, migratie 0010) en toegepast waar
+  een bank gelezen wordt (`applyOverlaySettings`: merchant, beheer, winkel
+  doormeten).
+- Op dezelfde plek kan een label gecorrigeerd worden (`overlay_labels`): een bank
+  hoort bij de markt en niet bij de spelfout van één winkel
+  ("Onderhoudsprodukten"). De oude naam blijft aansluiten, zodat de categorie van
+  de merchant haar vragenset niet kwijtraakt.
+
+Waarom ze bij De Groot onder Meubelstoffen staan: alle 168 garens en
+onderhoudsproducten hangen in de Magento-export uitsluitend onder
+`Meubelstoffen/…`, met attributenset "Bijproducten". Het scherm volgt de boom van
+de merchant; dat blijft zo.
+
+**Een gekozen bank wordt ververst (14 september 2026).** Een vrijgegeven bank
+stond in de browser zoals hij was op het moment van kiezen; wat de beheerder
+daarna besliste — losstaand, label, typering, overgeslagen vragen — kwam bij die
+merchant nooit aan. Nu onthoudt `StoredBank` de `bankId`, en haalt de scanpagina
+een eerder gekozen bank één keer per sessie opnieuw op zodra bekend is wie er is
+(alleen dezelfde versie; een nieuwere kiest de merchant zelf). Banken van vóór
+deze wijziging worden teruggevonden op markt en versie.
+
 ## Bewust afgevallen
 
 Niet opnieuw voorstellen zonder dat er iets veranderd is.
@@ -462,11 +591,21 @@ Niet opnieuw voorstellen zonder dat er iets veranderd is.
 
 ## Open
 
-**Type per kenmerk in de bank** — 14 september. De generatie vraagt een
-`antwoordtype` per vraag, niet per kenmerk; de 729 kenmerken van woontextiel v4
-dragen alleen een naam. Met het kolomprofiel erbij kan dan zonder model worden
-uitgesloten wat niet past (een °C-kenmerk op een ja/nee-kolom). Voorstel: één
-losse, goedkope stap per markt die de kenmerken typeert, zodat v4 blijft staan.
+**Voorstellen op het categoriescherm worden niet bewaard** — 14 september. Wat
+het model of de site voorstelde ("Motieven" is een kenmerk) staat alleen in het
+scherm; alleen een eigen keuze van de merchant wordt bewaard. Na opnieuw inlezen
+zonder het categoriescherm opnieuw te laten beoordelen, staat zo'n pad weer op
+"nog te beoordelen" en krijgt het een eigen regel met alleen algemene vragen.
+
+
+**Migraties 0009 en 0010 draaien, dan woontextiel v4 bijwerken** — 14 september. In v4 op het beheerscherm
+Universele naaigarens, Extra sterke naaigarens, Outdoor naaigarens en Onderhoudsprodukten losstaand maken, en het
+label van Onderhoudsprodukten corrigeren. 0009 geeft de banken een
+kolom voor kenmerktypen; daarna op het beheerscherm woontextiel v4 typeren (521
+kenmerken, 5 blokken op Sonnet), nalopen en bevestigen. 0010 maakt
+`merchant_bank_settings` en staat `excluded` toe in `category_verdicts`. Zonder
+0010 werkt de scan, maar valt bewaren in het account stil terug (het scherm meldt
+dat) en mislukt het bewaren van een uitgesloten categorie.
 
 **Een categorie die de bank als facet kent, krijgt een verkeerde overlay** — 14
 september. In v4 is Decoratiestoffen een facet; op het koppelscherm koos Haiku er
@@ -476,10 +615,6 @@ standaard op "alleen de algemene vragen" te staan.
 **Eén kolom, meerdere kenmerken, en andersom** — een koppeling wijst nu naar
 één kolom. `washing_label` draagt zowel maximale wastemperatuur als bleekbaar, en
 de drie Oekotex-kenmerken van v4 zijn in een catalogus meestal één kolom.
-
-**"Maximum update depth exceeded" op de scanpagina** — 14 september gezien in de
-console, vóór het koppelscherm; bron niet gevonden en niet teruggekomen na een
-herlaad.
 
 **De generatie hangt aan een laptop** — 11 september. De geplande taak staat in
 `render.yaml` (`vragenbank-generator`, `starter`-plan), maar cron zit niet in het

@@ -26,7 +26,7 @@ import type { AttributeDef, QuestionBank } from './bank';
 import { bankFor, resolveBanks } from './banks';
 import { composeSet, ownOverlayFor } from './compose';
 import { str } from '../intake/normalize';
-import { categoryMemberships, expandFacets, segmentAt, segmentLevel, withoutFacets } from '../engine/join';
+import { categoryMemberships, expandFacets, segmentAt, segmentLevel, withoutFacets, withoutExcluded, isExcludedProduct } from '../engine/join';
 import { normalizeName } from '../intake/facets';
 import { catalogKnows } from '../engine/evaluate';
 import { matchAttributes, type AttributeMatch } from '../spec/match';
@@ -59,11 +59,13 @@ export function deriveCategories(
   /** Paden die een kenmerk zijn; zie `expandFacets`. */
   facets: ReadonlySet<string> = new Set(),
   level = segmentLevel(catalog.products, segments),
+  /** Paden die de merchant uitsloot; die en alles eronder krijgen geen set. */
+  excluded: ReadonlySet<string> = new Set(),
 ): CategoryStat[] {
   const counts = new Map<string, number>();
   for (const product of catalog.products) {
     const seen = new Set<string>();
-    for (const path of withoutFacets(categoryMemberships(product), facets)) {
+    for (const path of withoutFacets(withoutExcluded(categoryMemberships(product), excluded), facets)) {
       const name = segmentAt(path, level);
       if (seen.has(name)) continue;
       seen.add(name);
@@ -90,11 +92,12 @@ function deriveSubcategories(
   banks: QuestionBank[],
   facets: ReadonlySet<string>,
   level: number,
+  excluded: ReadonlySet<string> = new Set(),
 ): Subcategory[] {
   const counts = new Map<string, { name: string; count: number; parents: Map<string, number> }>();
   for (const product of catalog.products) {
     const seen = new Set<string>();
-    for (const path of withoutFacets(categoryMemberships(product), facets)) {
+    for (const path of withoutFacets(withoutExcluded(categoryMemberships(product), excluded), facets)) {
       const top = Math.min(level, path.length - 1);
       const parent = path[top];
       const bank = bankFor(parent, banks);
@@ -224,8 +227,20 @@ export function generateQuestionSets(
    * stof en geen markt, en hem een set geven betekent dat buitenkussens de
    * algemene vragen krijgen omdat ze toevallig een motief hebben.
    */
-  options: { facets?: string[] } = {},
+  options: {
+    facets?: string[];
+    /**
+     * Wat het categoriescherm uitsloot, als padsleutels. Zo'n pad en alles eronder
+     * krijgt geen vragenset, en een product dat alleen daar hangt telt niet mee —
+     * ook niet in het segmentniveau of in welke kenmerken er gevraagd worden.
+     */
+    excluded?: string[];
+  } = {},
 ): QuestionSetState {
+  const excluded = new Set(options.excluded ?? []);
+  if (excluded.size > 0) {
+    catalog = { ...catalog, products: catalog.products.filter((product) => !isExcludedProduct(product, excluded)) };
+  }
   const mapped = new Map<string, AttributeMatch[]>();
   const banks = resolveBanks(imported).map((bank) => {
     const result = mapToCatalog(applyMapping(bank, manual, catalog), catalog);
@@ -243,7 +258,7 @@ export function generateQuestionSets(
   const level = segmentLevel(catalog.products, segments);
   const facetPaths = expandFacets(catalog.products, options.facets ?? []);
   const facets = new Set(facetPaths);
-  const categories = deriveCategories(catalog, segments, facets, level);
+  const categories = deriveCategories(catalog, segments, facets, level, excluded);
   // Vragen die in deze catalogus niets te vragen hebben, laten we weg in plaats
   // van ze als permanent gat te laten staan.
   const askCondition = sellsNonNew(catalog);
@@ -271,7 +286,7 @@ export function generateQuestionSets(
   // voor de categorie erboven, of kent de lijst er dezelfde vragen voor, dan is
   // het dezelfde meting en krijgt hij geen eigen rij.
   const taken = new Set(sets.map((set) => set.id));
-  for (const sub of deriveSubcategories(catalog, banks, facets, level)) {
+  for (const sub of deriveSubcategories(catalog, banks, facets, level, excluded)) {
     const parentSet = sets.find((set) => set.category === sub.parent);
     const bank = bankFor(sub.parent, banks);
     const chosen = sub.name in chosenOverlays ? chosenOverlays[sub.name] : undefined;
@@ -335,6 +350,7 @@ export function generateQuestionSets(
     sets,
     changeLog: [],
     facetPaths: facetPaths.length > 0 ? facetPaths : undefined,
+    excludedPaths: excluded.size > 0 ? [...excluded].sort() : undefined,
     segmentLevel: level,
     blindAttributes: [...blind.values()],
     // Wat de koppeling wél opleverde. Dit is een gok van de app en geen uitspraak

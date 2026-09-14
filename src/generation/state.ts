@@ -119,7 +119,12 @@ export interface VerticalShape {
 export interface GroupingEntry {
   category: string;
   count: number;
-  kind: 'overlay' | 'profiel' | 'facet';
+  /**
+   * `losstaand`: de producten zijn niet het kernproduct van de markt — garen,
+   * onderhoudsmiddelen, gereedschap, onderdelen. Ze krijgen een eigen vragenset
+   * zonder de basislaag, want de algemene vragen slaan op deze producten niet.
+   */
+  kind: 'overlay' | 'profiel' | 'facet' | 'losstaand';
   /** Bij `profiel`: onder welke overlay hij hangt. */
   parent?: string;
   reason: string;
@@ -190,6 +195,8 @@ export interface LayerDraft {
   questions: DraftQuestion[];
   /** Basisvragen die in deze categorie anders wegen. Herwegen mag, herschrijven niet. */
   reweight: { id: string; importance: string; reason: string }[];
+  /** Losstaand: deze categorie erft de basislaag niet. */
+  standalone?: boolean;
 }
 
 export interface FacetEntry {
@@ -232,7 +239,16 @@ export function emptyState(brief: RunBrief): RunState {
 
 /** De categorieën die een eigen overlay verdienen, in vaste volgorde. */
 export function overlayCategories(state: RunState): string[] {
-  return state.grouping.filter((entry) => entry.kind === 'overlay').map((entry) => entry.category);
+  // Losstaand hoort erbij: ook die categorie krijgt een eigen vragenset, alleen
+  // zonder de basislaag.
+  return state.grouping
+    .filter((entry) => entry.kind === 'overlay' || entry.kind === 'losstaand')
+    .map((entry) => entry.category);
+}
+
+/** Staat deze categorie los van het kernproduct van de markt? */
+export function isStandaloneCategory(state: RunState, category: string): boolean {
+  return state.grouping.some((entry) => entry.category === category && entry.kind === 'losstaand');
 }
 
 /**

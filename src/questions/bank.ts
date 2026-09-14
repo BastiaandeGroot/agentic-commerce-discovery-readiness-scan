@@ -17,6 +17,7 @@
 //      dekking die onderzocht is iets anders dan dekking die nooit gemeten is.
 //      Het model dwingt af dat je dat onderscheid niet kúnt verliezen.
 
+import type { AttributeShape } from '../domain/types';
 import type { Bilingual } from '../domain/types';
 
 // --- Herkomst en status ----------------------------------------------------
@@ -148,6 +149,8 @@ export interface AttributeDef {
   evidence: string[];
   /** 'any' = één gevuld veld volstaat; 'all' = alle velden nodig. */
   mode?: 'any' | 'all';
+  /** Welke waarde dit kenmerk verwacht; alleen na een bevestigde typering. */
+  shape?: AttributeShape;
 }
 
 // --- Beslisregels ----------------------------------------------------------
@@ -389,6 +392,77 @@ export function excludeFromScore(bank: QuestionBank, ids: Iterable<string>): Que
     questions: bank.questions.map(apply),
     overlays: bank.overlays.map((overlay) =>
       overlay.questions ? { ...overlay, questions: overlay.questions.map(apply) } : overlay),
+  };
+}
+
+/**
+ * De bevestigde typering over de kenmerken leggen.
+ *
+ * Los van de CSV, zoals het overslaan van vragen: de typering is een stap ná de
+ * generatie en kan opnieuw zonder de bank te herschrijven. Een kenmerk zonder
+ * type blijft zoals het was; dan legt het koppelscherm er ook niets naast.
+ */
+export function applyAttributeShapes(bank: QuestionBank, shapes: Record<string, AttributeShape>): QuestionBank {
+  if (Object.keys(shapes).length === 0) return bank;
+  const apply = (attribute: AttributeDef): AttributeDef =>
+    shapes[attribute.key] ? { ...attribute, shape: shapes[attribute.key] } : attribute;
+  return {
+    ...bank,
+    attributes: bank.attributes.map(apply),
+    overlays: bank.overlays.map((overlay) =>
+      overlay.attributes ? { ...overlay, attributes: overlay.attributes.map(apply) } : overlay),
+  };
+}
+
+/** Wat de beheerder per categorie van een bank besliste, naast de CSV bewaard. */
+export interface OverlaySettings {
+  /** Overlay-id's die los staan van het kernproduct: alleen eigen vragen. */
+  standalone: string[];
+  /** Overlay-id -> gecorrigeerd label. */
+  labels: Record<string, Bilingual>;
+}
+
+/** Een regex die op een categorienaam aanslaat, ongeacht spatie of koppelteken. */
+function categoryPattern(name: string): string {
+  return name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/[\s_-]+/g, '.?');
+}
+
+/**
+ * De beslissingen van de beheerder over de categorieën op de bank leggen.
+ *
+ * **Losstaand**: de categorie krijgt alleen haar eigen vragen. Hetzelfde als
+ * `laag: standalone` in een vragenlijst — de hele basislaag uitgeschakeld —
+ * zodat een bank die er al ligt het kan krijgen zonder opnieuw gegenereerd te
+ * worden. Naaigaren heeft geen baanbreedte, en een onderhoudsmiddel geen
+ * slijtvastheid.
+ *
+ * **Label**: de naam die de bank toont. De oude naam blijft aansluiten: de
+ * categorie van de merchant heet nog steeds zoals ze heette, en een correctie van
+ * "Onderhoudsprodukten" naar "Onderhoudsproducten" mag niet betekenen dat zijn
+ * categorie haar vragenset kwijtraakt.
+ */
+export function applyOverlaySettings(bank: QuestionBank, settings: Partial<OverlaySettings>): QuestionBank {
+  const standalone = new Set(settings.standalone ?? []);
+  const labels = settings.labels ?? {};
+  if (standalone.size === 0 && Object.keys(labels).length === 0) return bank;
+
+  const baseIds = bank.questions.map((question) => question.id);
+  return {
+    ...bank,
+    overlays: bank.overlays.map((overlay) => {
+      let next = overlay;
+      if (standalone.has(overlay.id)) next = { ...next, suppress: baseIds };
+      const label = labels[overlay.id];
+      if (label) {
+        const parts = new Set(overlay.match.split('|'));
+        for (const name of [label.nl, label.en]) {
+          const pattern = categoryPattern(name);
+          if (pattern.length >= 3) parts.add(pattern);
+        }
+        next = { ...next, label, match: [...parts].join('|') };
+      }
+      return next;
+    }),
   };
 }
 

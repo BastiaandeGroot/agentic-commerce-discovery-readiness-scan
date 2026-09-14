@@ -149,6 +149,8 @@ Herhaal per hoofdcategorie.
 
 > Bouw nu de overlay voor **{{categorie}}**, die erft van de basislaag.
 >
+> Is de categorie **losstaand** — de producten zijn niet het kernproduct van de markt, zoals garen of onderhoudsmiddelen — dan erft ze de basislaag níét. Schrijf dan de volledige vragenset voor deze producten en herweeg niets; in de tabel wordt dat `laag: standalone`.
+>
 > Neem alleen op wat categoriespecifiek is. Herhaal geen basisvragen.
 >
 > Voeg toe:
@@ -169,7 +171,7 @@ Herhaal per hoofdcategorie.
 
 > Loop de volledige categorieboom van {{merchant}} langs: {{plak de boom met aantallen}}.
 >
-> Bepaal per pad of het een **toepassing** is (verdient een profiel of overlay) of een **facet** (is eigenlijk een eigenschap en hoort een attribuutwaarde te zijn).
+> Bepaal per pad of het een **toepassing** is (verdient een profiel of overlay), een **facet** (is eigenlijk een eigenschap en hoort een attribuutwaarde te zijn), of **losstaand** (geen kernproduct van de markt: de algemene vragen slaan er niet op).
 >
 > Gebruik het sitepanel als toets: als andere spelers hetzelfde onderscheid als filter aanbieden in plaats van als categorie, is dat sterk bewijs dat het een facet is.
 >
@@ -208,6 +210,24 @@ Herhaal per hoofdcategorie.
 > - de openstaande inhoudelijke vragen, per categorie, met een aanwijzing welke het zwaarst wegen
 >
 > Schrijf voor iemand die het vak kent maar de tool niet. Geen jargon over datamodellen.
+
+---
+
+## Prompt 6 — Kenmerken typeren
+
+Na de review, één keer per markt. De app draait deze prompt in blokken van 120 kenmerken (`src/generation/attributes.ts`); de tekst hier is de naslag.
+
+> Je typeert de kenmerken van een vragenbank voor de markt {{vertical}}. Je ziet geen catalogus, en dat is de bedoeling: de typering hoort bij de markt en niet bij één winkel.
+>
+> Geef per kenmerk precies één vorm: "ja/nee", "getal", "lijst", "code" of "tekst".
+> - Eenheid alleen bij "getal", en alleen uit de generieke lijst van de app. Heeft het getal geen eenheid uit die lijst (Martindale-toeren, blauwschaal), laat hem leeg. Verzin geen eenheid.
+> - Waarden alleen bij "lijst", hooguit acht, zoals een catalogus ze zou schrijven.
+> - De naam helpt: _cm, _pct, _c wijzen op een getal met die eenheid; _ja_nee op ja/nee.
+> - Twijfel je tussen "lijst" en "tekst", kies "tekst".
+>
+> KENMERKEN: per kenmerk de naam, hooguit twee vragen die erop leunen, en hoe de sites het noemen.
+>
+> Antwoord met `{"kenmerken": [{"key": "...", "vorm": "...", "eenheid": "", "waarden": []}]}`.
 
 ---
 

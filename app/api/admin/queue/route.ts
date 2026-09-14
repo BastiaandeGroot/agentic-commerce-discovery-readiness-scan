@@ -9,6 +9,8 @@ import { NextResponse } from 'next/server';
 import { isAdmin } from '../../../../src/server/admin';
 import { isRefusal, serviceClient } from '../../../../src/server/executor';
 import { importQuestionList } from '../../../../src/questions/list';
+import { applyOverlaySettings, type OverlaySettings } from '../../../../src/questions/bank';
+import type { Bilingual } from '../../../../src/domain/types';
 import { reviewBank, summariseBank } from '../../../../src/questions/review';
 
 /** Na hoeveel uur een openstaande aanvraag te lang duurt. Eén werkdag. */
@@ -28,10 +30,18 @@ export async function GET(request: Request) {
     .select('id, vertical, status, site_url, suggested_sites, panel, grouping, segments, requested_at, started_at, finished_at, failure, bank_id')
     .order('requested_at', { ascending: true });
 
-  const banks = await supabase
+  let banks = await supabase
     .from('question_banks')
-    .select('id, vertical, version, status, findings, panel, grouping, csv, excluded, created_at, released_at')
+    .select('id, vertical, version, status, findings, panel, grouping, csv, excluded, attribute_types, standalone, overlay_labels, created_at, released_at')
     .order('created_at', { ascending: false });
+  // Zonder migratie 0009 of 0010 bestaat de kolom met kenmerktypen niet. Dan blijft het
+  // beoordelen gewoon werken; alleen typeren meldt dat de migratie nog moet.
+  if (banks.error) {
+    banks = await supabase
+      .from('question_banks')
+      .select('id, vertical, version, status, findings, panel, grouping, csv, excluded, created_at, released_at')
+      .order('created_at', { ascending: false }) as typeof banks;
+  }
 
   // Hoe ver de generatie is. Een aparte vraag en geen join: het is de enige
   // plek waar de stand van het werk vandaan komt, en een aanvraag zonder run —
@@ -71,10 +81,21 @@ export async function GET(request: Request) {
       const read = importQuestionList([{ name: `${bank.vertical}.csv`, text: String(bank.csv ?? '') }]);
       const { csv, ...rest } = bank;
       void csv;
+      // Beoordelen op de bank zoals de merchant hem krijgt: met losstaande
+      // categorieën en gecorrigeerde labels erop.
+      const settings = settingsOf(bank);
+      const applied = read.bank ? applyOverlaySettings(read.bank, settings) : undefined;
       return {
         ...rest,
-        questions: read.bank ? reviewBank(read.bank) : [],
-        summary: read.bank ? summariseBank(read.bank) : undefined,
+        questions: applied ? reviewBank(applied) : [],
+        summary: applied ? summariseBank(applied) : undefined,
+        overlays: (read.bank?.overlays ?? []).map((overlay) => ({
+          id: overlay.id,
+          label: settings.labels[overlay.id] ?? overlay.label,
+          original: overlay.label,
+          standalone: settings.standalone.includes(overlay.id),
+          questions: overlay.questions?.length ?? 0,
+        })),
         // Opnieuw berekend en niet de opgeslagen lijst: die is vastgelegd bij
         // het afleveren, en de lezer is sindsdien scherper geworden. Een bank
         // beoordelen op meldingen die we inmiddels niet meer maken, kost een
@@ -83,6 +104,17 @@ export async function GET(request: Request) {
       };
     }),
   });
+}
+
+/** De instellingen per categorie, zoals ze naast de bank bewaard staan. */
+function settingsOf(bank: unknown): OverlaySettings {
+  const row = bank as { standalone?: unknown; overlay_labels?: unknown };
+  return {
+    standalone: Array.isArray(row.standalone) ? row.standalone.filter((id): id is string => typeof id === 'string') : [],
+    labels: row.overlay_labels && typeof row.overlay_labels === 'object'
+      ? row.overlay_labels as Record<string, Bilingual>
+      : {},
+  };
 }
 
 export async function POST(request: Request) {
@@ -94,7 +126,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: supabase.error }, { status: supabase.status });
   }
 
-  let body: { bankId?: string; questionId?: string; action?: 'release' | 'toggle' };
+  let body: {
+    bankId?: string;
+    questionId?: string;
+    action?: 'release' | 'toggle' | 'standalone' | 'label';
+    overlayId?: string;
+    label?: { nl?: string; en?: string };
+  };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -124,6 +162,40 @@ export async function POST(request: Request) {
       .select('excluded')
       .maybeSingle();
     return NextResponse.json({ excluded: saved.data?.excluded ?? [] });
+  }
+
+  // Een categorie losstaand maken, of de algemene vragen weer meenemen. Naast de
+  // CSV bewaard, zoals een overgeslagen vraag: terug te draaien zonder dat de bank
+  // herschreven wordt.
+  if (body.action === 'standalone' && body.overlayId) {
+    const current = await supabase.from('question_banks').select('standalone').eq('id', body.bankId).maybeSingle();
+    if (current.error) {
+      return NextResponse.json({ error: 'Losstaande categorieën zijn niet op te halen. Is migratie 0010 al gedraaid?' }, { status: 502 });
+    }
+    if (!current.data) return NextResponse.json({ error: 'Deze bank bestaat niet.' }, { status: 404 });
+    const standalone = new Set<string>((current.data.standalone as string[]) ?? []);
+    if (standalone.has(body.overlayId)) standalone.delete(body.overlayId);
+    else standalone.add(body.overlayId);
+    const saved = await supabase.from('question_banks').update({ standalone: [...standalone].sort() }).eq('id', body.bankId);
+    if (saved.error) return NextResponse.json({ error: 'Bewaren is niet gelukt.' }, { status: 502 });
+    return NextResponse.json({ standalone: [...standalone].sort() });
+  }
+
+  // Een label corrigeren. Leeg in beide talen zet het terug op wat de bank zegt.
+  if (body.action === 'label' && body.overlayId) {
+    const current = await supabase.from('question_banks').select('overlay_labels').eq('id', body.bankId).maybeSingle();
+    if (current.error) {
+      return NextResponse.json({ error: 'Labels zijn niet op te halen. Is migratie 0010 al gedraaid?' }, { status: 502 });
+    }
+    if (!current.data) return NextResponse.json({ error: 'Deze bank bestaat niet.' }, { status: 404 });
+    const labels = { ...((current.data.overlay_labels as Record<string, { nl: string; en: string }>) ?? {}) };
+    const nl = body.label?.nl?.trim() ?? '';
+    const en = body.label?.en?.trim() ?? '';
+    if (nl === '' && en === '') delete labels[body.overlayId];
+    else labels[body.overlayId] = { nl: nl || en, en: en || nl };
+    const saved = await supabase.from('question_banks').update({ overlay_labels: labels }).eq('id', body.bankId);
+    if (saved.error) return NextResponse.json({ error: 'Bewaren is niet gelukt.' }, { status: 502 });
+    return NextResponse.json({ labels });
   }
 
   const bank = await supabase

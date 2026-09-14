@@ -34,7 +34,12 @@ export interface SiteEvidence {
   filters: string[];
 }
 
-export type PathKind = 'category' | 'facet' | 'unclear';
+/**
+ * `excluded`: de merchant sluit dit pad uit, met alles eronder. Geen vragenset,
+ * geen kenmerken, en een product dat alleen hier hangt telt niet mee in de scan.
+ * Anders dan een kenmerk, dat wordt afgeknipt en de categorie erboven laat staan.
+ */
+export type PathKind = 'category' | 'facet' | 'excluded' | 'unclear';
 
 /**
  * Waaróm, als code en niet als zin.

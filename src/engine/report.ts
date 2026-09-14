@@ -14,7 +14,7 @@ import type {
   QuestionSetState, ScanReport,
 } from '../domain/types';
 import { evaluateProduct } from './evaluate';
-import { segmentLevel } from './join';
+import { isExcludedProduct, segmentLevel } from './join';
 import { FIELD_REGISTER_ID } from '../spec/snapshot';
 import { SCAN_VERSION } from './version';
 
@@ -168,9 +168,13 @@ export function runScan(
     questionState.sets.filter((set) => !set.parent).map((set) => set.category ?? ''),
   );
   const facets = new Set(questionState.facetPaths ?? []);
-  const products = catalog.products.map(
-    (product) => evaluateProduct(product, questionState.sets, catalog, level, facets),
-  );
+  // Wat de merchant uitsloot telt nergens mee, ook niet in de noemer: hij zei dat
+  // het niet bij deze meting hoort. Een product dat ook onder een categorie hangt
+  // die blijft, wordt daar gewoon gemeten.
+  const excluded = new Set(questionState.excludedPaths ?? []);
+  const products = catalog.products
+    .filter((product) => !isExcludedProduct(product, excluded))
+    .map((product) => evaluateProduct(product, questionState.sets, catalog, level, facets, excluded));
   const scored = products.filter((r) => !r.unmatched);
 
   // Per vraag: hoeveel producten die de set gebruiken, beantwoorden hem?

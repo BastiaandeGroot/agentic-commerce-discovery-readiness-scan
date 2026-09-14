@@ -14,7 +14,7 @@
 //
 // Puur: geen klok, geen opslag, geen DOM.
 
-import type { Bilingual, Dataset, QuestionSetState } from '../domain/types';
+import type { AttributeShape, Bilingual, Dataset, QuestionSetState } from '../domain/types';
 import type { AttributeDef, QuestionBank } from './bank';
 import type { MappingPair } from '../spec/mapping';
 
@@ -91,6 +91,8 @@ export interface AttributeRow {
   weight: number;
   /** Vragen die blijven staan zolang een ánder kenmerk ongekoppeld is. */
   blocked: BlockedQuestion[];
+  /** Wat de bank in dit kenmerk verwacht, als de typering bevestigd is. */
+  shape?: AttributeShape;
 }
 
 /**
@@ -147,7 +149,7 @@ export function mappingSummary(state: QuestionSetState, pending?: Mapping): Mapp
 
   for (const set of state.sets) {
     for (const question of set.questions) {
-      if (question.answerable === 'no') continue;
+      if (question.answerable === 'no' || question.disabled) continue;
       const groups = question.evidence ?? [];
       if (groups.length === 0) continue;
       const open = groups.filter((group) => !isLinked(group.attributeKey, group.fields, pending));
@@ -190,6 +192,10 @@ export function attributeInventory(
 
   for (const set of state.sets) {
     for (const question of set.questions) {
+      // Een vraag die de merchant uitzette of die niet meetelt, vraagt niets van
+      // zijn catalogus. Zijn kenmerken hier laten staan betekent koppelwerk voor
+      // een vraag die in het rapport nergens een gat kan maken.
+      if (question.disabled || question.answerable === 'no') continue;
       const groups = question.evidence ?? [];
       for (const group of groups) {
         const row = rows.get(group.attributeKey) ?? {
@@ -199,6 +205,7 @@ export function attributeInventory(
           questions: [],
           weight: 0,
           blocked: [],
+          shape: group.shape,
         };
         if (!row.questions.some((entry) => entry.nl === question.label.nl)) {
           row.questions.push(question.label);

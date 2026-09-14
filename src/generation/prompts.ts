@@ -15,9 +15,10 @@
 // nooit iets fase-eigens in — geen categorienaam, geen sitenaam, geen datum.
 
 import type { GroupingEntry, Phase, RunState, Topic } from './state';
+import { isStandaloneCategory, overlayCategories } from './state';
 
 /** Omhoog zodra een prompt de uitkomst op dezelfde markt kan verschuiven. */
-export const GENERATION_VERSION = '1.3.0';
+export const GENERATION_VERSION = '1.4.0';
 
 /**
  * Wat een vraag moet bevatten, en in welke vorm.
@@ -206,7 +207,7 @@ Controleer dat elke site bestaat en werkelijk in deze markt handelt.
 
 TWEE — bepaal de vorm van de markt, en groepeer de categorieën hierboven.
 
-Per categorie kies je één van drie:
+Per categorie kies je één van vier:
 - "overlay": deze categorie roept ándere vragen op dan de rest en verdient een
   eigen vragenset.
 - "profiel": een toepassing binnen een overlay. Dezelfde vragen, andere drempels
@@ -214,6 +215,17 @@ Per categorie kies je één van drie:
   bij "parent" onder welke overlay hij hangt.
 - "facet": geen categorie maar een eigenschap die een attribuutwaarde hoort te
   zijn (Vlekwerend, Duurzaam, Effen, Vlamvertragend).
+- "losstaand": de producten zijn niet het kernproduct van deze markt maar iets
+  wat ernaast verkocht wordt — garen, onderhoudsmiddelen, gereedschap,
+  onderdelen, verpakking. Ze krijgen een eigen vragenset zónder de algemene
+  vragen van de markt.
+
+**De toets voor losstaand.** Neem de algemene vragen die in deze markt voor élk
+product gelden — de maat, het materiaal, het gebruik van het kernproduct. Slaan
+de meeste daarvan op deze producten nergens op ("hoe breed is de stof" bij een
+klos garen), dan is de categorie losstaand. Hangt de categorie in de boom van de
+winkel onder een kernproduct, dan verandert dat niets: waar een winkel iets in
+zijn menu zet, zegt niet wat het is.
 
 **De toets voor een overlay.** Een eigen vragenset is alleen terecht als je
 minstens DRIE vragen kunt noemen die in deze categorie gesteld worden en in geen
@@ -229,7 +241,7 @@ krijgt een rij die een onderscheid suggereert dat de vragenlijst niet maakt.
 Een lampenkapstof lijkt een eigen soort, maar stelt dezelfde vragen als een
 gordijnstof met een andere drempel voor lichtdoorlatendheid: profiel. Naaigaren
 stelt werkelijk andere vragen — dikte, treksterkte, en niets over slijtage of
-licht: overlay, of het hoort niet in deze markt thuis.
+licht — en de algemene vragen over stof slaan er niet op: losstaand.
 
 Antwoord met dit JSON-object:
 {
@@ -240,7 +252,7 @@ Antwoord met dit JSON-object:
     "standards": ["ETIM, ISO/EN-normen, ... — alleen wat je kunt onderbouwen"],
     "legal": ["alleen echte verplichtingen"]
   },
-  "grouping": [{"category": "exact zoals hierboven", "count": 0, "kind": "overlay|profiel|facet", "parent": "alleen bij profiel", "reason": "in één zin", "distinct": ["alleen bij overlay: drie vragen die hier gesteld worden en nergens anders"]}],
+  "grouping": [{"category": "exact zoals hierboven", "count": 0, "kind": "overlay|profiel|facet|losstaand", "parent": "alleen bij profiel", "reason": "in één zin; bij losstaand welke algemene vragen er niet op slaan", "distinct": ["alleen bij overlay: drie vragen die hier gesteld worden en nergens anders"]}],
   "findings": ["wat een mens hierover moet weten voordat hij dit vaststelt"]
 }`,
       };
@@ -348,7 +360,10 @@ Antwoord met dit JSON-object:
       };
 
     case 'overlay': {
-      const category = state.grouping.filter((entry) => entry.kind === 'overlay')[phase.index]?.category ?? '';
+      // Dezelfde lijst als de planning van de fasen, anders hoort index 2 hier bij
+      // een andere categorie dan daar.
+      const category = overlayCategories(state)[phase.index] ?? '';
+      const standalone = isStandaloneCategory(state, category);
       const profiles = state.grouping
         .filter((entry) => entry.kind === 'profiel' && entry.parent === category)
         .map((entry) => entry.category);
@@ -361,16 +376,23 @@ Antwoord met dit JSON-object:
 Vorm van de markt — de onomkeerbare fout hierin is de maat voor "kritiek":
 ${shapeBlock(state)}
 
-De basislaag stelt deze vragen al:
-${(state.base?.questions ?? []).map((question) => `- ${question.id}: ${question.questionNl} (${question.importance})`).join('\n')}
+${standalone
+  ? `Deze categorie is losstaand: de producten zijn niet het kernproduct van deze markt, en de algemene vragen
+van de basislaag gelden hier NIET. Er komt dus niets vanzelf mee — geen maat, geen materiaal, geen levering.`
+  : `De basislaag stelt deze vragen al:
+${(state.base?.questions ?? []).map((question) => `- ${question.id}: ${question.questionNl} (${question.importance})`).join('\n')}`}
 
 De geconsolideerde onderwerpen:
 ${topicBlock(state.topics)}
 
 ${profiles.length > 0 ? `Toepassingen binnen deze categorie: ${profiles.join(', ')}.` : 'Er zijn geen aparte toepassingen binnen deze categorie.'}
 
-Bouw de overlay voor ${category}. Neem alleen op wat categoriespecifiek is en
-herhaal geen basisvragen.
+${standalone
+  ? `Bouw de volledige vragenset voor ${category}: alles wat een koper over deze producten vraagt,
+ook wat in een gewone categorie uit de basislaag zou komen. Laat "reweight" leeg — er is geen
+basislaag om te herwegen.`
+  : `Bouw de overlay voor ${category}. Neem alleen op wat categoriespecifiek is en
+herhaal geen basisvragen.`}
 
 Twee dingen apart:
 - "reweight": basisvragen die in deze categorie ánders wegen, met de reden. Een
@@ -422,7 +444,7 @@ deze stap: nu heb je de vragen gezien en toen niet.
 Antwoord met dit JSON-object:
 {
   "facets": [{"category": "...", "count": 0, "attribute": "attribuut_dat_dit_vervangt", "condition": "wanneer het facet waar is", "panelSites": 0, "priority": "hoog|middel|laag"}],
-  "regroup": [{"category": "...", "kind": "overlay|profiel|facet", "parent": "...", "reason": "..."}],
+  "regroup": [{"category": "...", "kind": "overlay|profiel|facet|losstaand", "parent": "...", "reason": "..."}],
   "findings": ["..."]
 }`,
       };

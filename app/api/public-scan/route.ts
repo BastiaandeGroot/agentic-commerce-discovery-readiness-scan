@@ -16,7 +16,7 @@ import { importQuestionList } from '../../../src/questions/list';
 import { ingest } from '../../../src/intake/index';
 import { generateQuestionSets } from '../../../src/questions/generate';
 import { runScan } from '../../../src/engine/report';
-import { excludeFromScore, type QuestionBank } from '../../../src/questions/bank';
+import { excludeFromScore, type QuestionBank, applyOverlaySettings } from '../../../src/questions/bank';
 
 /**
  * Dezelfde vraag over alle vragensets heen optellen.
@@ -121,22 +121,33 @@ export async function POST(request: Request) {
     }
     const found = await supabase
       .from('question_banks')
-      .select('vertical, version, csv, excluded')
+      .select('vertical, version, csv, excluded, standalone, overlay_labels')
       .eq('id', body.bankId)
       .maybeSingle();
+    // Zonder migratie 0010 bestaan de kolommen per categorie niet; dan zonder.
+    const fallback = found.error
+      ? await supabase.from('question_banks').select('vertical, version, csv, excluded').eq('id', body.bankId).maybeSingle()
+      : undefined;
+    const bankRow = (fallback?.data ?? found.data) as {
+      vertical: string; version: number; csv: string; excluded: string[] | null;
+      standalone?: string[] | null; overlay_labels?: Record<string, { nl: string; en: string }> | null;
+    } | null;
 
-    if (!found.data) return NextResponse.json({ error: 'Die vragenbank bestaat niet.' }, { status: 404 });
+    if (!bankRow) return NextResponse.json({ error: 'Die vragenbank bestaat niet.' }, { status: 404 });
 
     const read = importQuestionList([
-      { name: `${found.data.vertical}.csv`, text: String(found.data.csv ?? '') },
+      { name: `${bankRow.vertical}.csv`, text: String(bankRow.csv ?? '') },
     ]);
     if (!read.bank) {
       return NextResponse.json({ error: 'Deze vragenbank is niet in te lezen.' }, { status: 422 });
     }
     // Wat de beheerder oversloeg telt hier net zomin mee als bij de merchant:
     // het rapport dat een winkeleigenaar krijgt hoort op dezelfde lat te staan.
-    banks = [excludeFromScore(read.bank, (found.data.excluded as string[] | null) ?? [])];
-    bankLabel = `${found.data.vertical} v${found.data.version}`;
+    banks = [applyOverlaySettings(
+      excludeFromScore(read.bank, bankRow.excluded ?? []),
+      { standalone: bankRow.standalone ?? [], labels: bankRow.overlay_labels ?? {} },
+    )];
+    bankLabel = `${bankRow.vertical} v${bankRow.version}`;
   }
 
   try {
