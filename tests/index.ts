@@ -19,3 +19,4 @@ import './sitescan.test';
 import './generation.test';
 import './collect.test';
 import './categories.test';
+import './profile.test';

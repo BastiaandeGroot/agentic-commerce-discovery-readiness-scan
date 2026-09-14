@@ -299,7 +299,7 @@ export const STRINGS = {
       byModel: 'Voorgesteld door',
       bySelf: 'Voorgesteld door het model in je browser; er is geen sleutel ingesteld op de server.',
       suggestNote:
-        'Hiervoor gaan je kolomnamen, een paar voorbeeldwaarden per kolom en de vragen uit je lijst naar Claude. Geen bestand, geen productrijen, geen prijzen. Kan dat niet, dan draait er een kleiner model in je browser en zie je dat erbij staan. Loop de voorstellen na — een fout voorstel kost je één klik, een gemist kenmerk kost je een gat dat je niet ziet.',
+        'Hiervoor gaan je kolomnamen, een paar voorbeeldwaarden per kolom, het soort waarde en de categorieën waar een kolom gevuld is, en de vragen uit je lijst naar Claude. Geen aantallen, geen bestand, geen productrijen, geen prijzen. Kan dat niet, dan draait er een kleiner model in je browser en zie je dat erbij staan. Loop de voorstellen na — een fout voorstel kost je één klik, een gemist kenmerk kost je een gat dat je niet ziet.',
       suggestFailed: 'Het model kon niet geladen worden',
       suggestFailedBody:
         'De download is niet gelukt. Dat kan aan je verbinding liggen of aan een netwerk dat hem tegenhoudt.',
@@ -317,7 +317,21 @@ export const STRINGS = {
       setNone: '— alleen de algemene vragen —',
       setUnder: 'onder',
       setSubNote: 'Subcategorieën met een eigen vragenset in de lijst krijgen hun eigen regel. Een product dat onder meer categorieën hangt, beantwoordt de vragen van elk ervan.',
-      alsoNeeds: 'heeft ook nodig:',
+      samplesIn: 'Vaakst:',
+      filledShare: 'gevuld bij {pct}%',
+      filledIn: 'vooral in {categorieen}',
+      sharedField: 'gedeeld veld met een andere kolom',
+      kinds: {
+        empty: 'leeg',
+        boolean: 'ja/nee',
+        number: 'getal',
+        list: 'vaste lijst',
+        code: 'code',
+        text: 'vrije tekst',
+      },
+      samplesEmpty: 'Deze kolom is leeg in je catalogus.',
+      openSummary:
+        'Onbeantwoordbaar met deze koppeling: {vragen} vragen, door {kenmerken} ongekoppelde kenmerken. Staat een kenmerk echt niet in je catalogus, laat dan "geen kolom" staan — dat is de bevinding. Welke vragen het zijn, zie je in het rapport.',
       moreQuestions: 'meer vragen',
       listHeading: 'Kenmerken',
       noColumn: '— geen kolom —',
@@ -1257,7 +1271,7 @@ export const STRINGS = {
       byModel: 'Proposed by',
       bySelf: 'Proposed by the model in your browser; no key is configured on the server.',
       suggestNote:
-        'This sends your column names, a few sample values per column, and the questions from your list to Claude. No file, no product rows, no prices. If that is unavailable, a smaller model runs in your browser and you will see that noted. Check the proposals — a wrong one costs you a click, a missed characteristic costs you a gap you cannot see.',
+        'This sends your column names, a few sample values per column, the kind of value and the categories where a column is filled, and the questions from your list to Claude. No counts, no file, no product rows, no prices. If that is unavailable, a smaller model runs in your browser and you will see that noted. Check the proposals — a wrong one costs you a click, a missed characteristic costs you a gap you cannot see.',
       suggestFailed: 'The model could not be loaded',
       suggestFailedBody:
         'The download failed. That may be your connection, or a network blocking it.',
@@ -1275,7 +1289,21 @@ export const STRINGS = {
       setNone: '— general questions only —',
       setUnder: 'under',
       setSubNote: 'Subcategories with their own question set in the list get their own line. A product listed under several categories answers the questions of each.',
-      alsoNeeds: 'also needs:',
+      samplesIn: 'Most common:',
+      filledShare: 'filled for {pct}%',
+      filledIn: 'mainly in {categorieen}',
+      sharedField: 'shared field with another column',
+      kinds: {
+        empty: 'empty',
+        boolean: 'yes/no',
+        number: 'number',
+        list: 'fixed list',
+        code: 'code',
+        text: 'free text',
+      },
+      samplesEmpty: 'This column is empty in your catalogue.',
+      openSummary:
+        'Unanswerable with this mapping: {vragen} questions, because of {kenmerken} unlinked characteristics. If a characteristic really is not in your catalogue, leave "no column" — that is the finding. The report shows which questions they are.',
       moreQuestions: 'more questions',
       listHeading: 'Characteristics',
       noColumn: '— no column —',

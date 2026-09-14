@@ -114,6 +114,53 @@ export function requirementFor(column: string, catalog: Dataset): string {
 /** Komt dit veld uit de catalogus, of is het nog een zoekpatroon van ons? */
 const isGuess = (field: string) => field.startsWith('attr:') && !field.startsWith('attr:^');
 
+/** Komt dit kenmerk ergens op uit — via de bank of via de keuze van nu? */
+function isLinked(key: string, fields: string[], pending?: Mapping): boolean {
+  const chosen = pending?.[key];
+  if (chosen !== undefined) return chosen.length > 0;
+  return fields.some((field) => !isGuess(field));
+}
+
+/** Wat de koppeling van nu nog openlaat, in één telling. */
+export interface MappingSummary {
+  /** Gescoorde vragen die met deze koppeling niet te beantwoorden zijn. */
+  questions: number;
+  /** De ongekoppelde kenmerken waar die vragen op wachten. */
+  attributes: number;
+}
+
+/**
+ * Hoeveel vragen er onbeantwoordbaar blijven door wat nog nergens op uitkomt.
+ *
+ * Eén telling voor het hele scherm, en geen melding per kenmerk. Per regel zei
+ * die melding welke ándere kenmerken een vraag nog nodig had, en daar kon de
+ * merchant op die regel niets aan doen — terwijl hij bij 700 kenmerken dezelfde
+ * vraag tientallen keren voorbij zag komen. Welke vragen het precies zijn staat
+ * in het rapport, waar elk gat de vragen noemt die het blokkeert.
+ *
+ * Een som (`all`) staat open zodra één term ongekoppeld is; bij `any` pas als
+ * geen enkel kenmerk gekoppeld is.
+ */
+export function mappingSummary(state: QuestionSetState, pending?: Mapping): MappingSummary {
+  const questions = new Set<string>();
+  const attributes = new Set<string>();
+
+  for (const set of state.sets) {
+    for (const question of set.questions) {
+      if (question.answerable === 'no') continue;
+      const groups = question.evidence ?? [];
+      if (groups.length === 0) continue;
+      const open = groups.filter((group) => !isLinked(group.attributeKey, group.fields, pending));
+      const unanswerable = question.mode === 'all' ? open.length > 0 : open.length === groups.length;
+      if (!unanswerable) continue;
+      questions.add(question.id);
+      for (const group of open) attributes.add(group.attributeKey);
+    }
+  }
+
+  return { questions: questions.size, attributes: attributes.size };
+}
+
 /**
  * Alle kenmerken die de samengestelde sets gebruiken, met hun vragen erbij.
  *
@@ -139,13 +186,7 @@ export function attributeInventory(
   pending?: Mapping,
 ): AttributeRow[] {
   const rows = new Map<string, AttributeRow>();
-
-  /** Komt dit kenmerk ergens op uit — via de bank of via de keuze van nu? */
-  const linked = (key: string, fields: string[]) => {
-    const chosen = pending?.[key];
-    if (chosen !== undefined) return chosen.length > 0;
-    return fields.some((field) => !isGuess(field));
-  };
+  const linked = (key: string, fields: string[]) => isLinked(key, fields, pending);
 
   for (const set of state.sets) {
     for (const question of set.questions) {
