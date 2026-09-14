@@ -1,7 +1,7 @@
 # Werknotities
 
 Sessiestand: wat er staat, wat er besloten is, wat er open is.
-Laatst bijgewerkt: 2026-09-11.
+Laatst bijgewerkt: 2026-09-14.
 
 Structurele regels die altijd gelden staan **niet** hier maar in `CLAUDE.md`.
 
@@ -417,6 +417,31 @@ het is een oordeel over de set, geen wijziging eraan.
 **Elke scan draagt twee versienummers**: spec-snapshot en vragenset-versie.
 Zonder allebei is vergelijken over tijd betekenisloos.
 
+**Het koppelscherm meet elke kolom door, en een prijs gaat nooit mee (14 september
+2026).** `profileCatalog` in `src/engine/profile.ts` legt per kolom vast wat erin
+staat — vorm (ja/nee, getal met eenheid, vaste lijst, code, tekst), hoe vaak
+gevuld, in welke marktcategorieën, de vaakste waarden — over de hele catalogus
+en niet over de eerste regels. Het draait in de browser zodra de catalogus er
+is; op De Groot (3.746 producten, 157 kolommen) ~200 ms, dus nog op de
+hoofddraad. Het model krijgt vorm, eenheid en de namen van de categorieën waar
+een kolom gevuld is, geen percentage en geen aantal. Van een prijs- of
+voorraadkolom gaat alleen de naam mee: gevoelig is een kolom met valutatekens,
+of een kolom die naar prijs of voorraad heet én getallen draagt. Zo blijft
+"Per meter · Per piece" leesbaar. Daarvóór gingen de waarden van `price`, `cost`
+en `special_price` als voorbeeld mee naar Claude — dat was een lek.
+
+Het profiel is generiek gehouden en getoetst op nagebouwde exports van Shopify,
+WooCommerce, Akeneo, een verlichtingswinkel en een Duitse export, naast de echte
+Magento-export van De Groot. Het scheidingsteken van een meervoudige keuze volgt
+uit de kolom (kort én terugkerend), niet uit het systeem.
+
+Tegelijk op het scherm: de melding "heeft ook nodig" per kenmerk is weg — per
+regel viel er niets aan te doen en bij 700 kenmerken herhaalde hij zich
+tientallen keren. Er staat één telling onderaan (`mappingSummary`). En de
+voorstellen gaan in blokken van 100 naar `/api/mapping`: v4 vroeg er ruim 700,
+de route neemt er 200, en de hele aanvraag gaf een 400 zonder dat het scherm iets
+zei.
+
 ## Bewust afgevallen
 
 Niet opnieuw voorstellen zonder dat er iets veranderd is.
@@ -436,6 +461,25 @@ Niet opnieuw voorstellen zonder dat er iets veranderd is.
 ---
 
 ## Open
+
+**Type per kenmerk in de bank** — 14 september. De generatie vraagt een
+`antwoordtype` per vraag, niet per kenmerk; de 729 kenmerken van woontextiel v4
+dragen alleen een naam. Met het kolomprofiel erbij kan dan zonder model worden
+uitgesloten wat niet past (een °C-kenmerk op een ja/nee-kolom). Voorstel: één
+losse, goedkope stap per markt die de kenmerken typeert, zodat v4 blijft staan.
+
+**Een categorie die de bank als facet kent, krijgt een verkeerde overlay** — 14
+september. In v4 is Decoratiestoffen een facet; op het koppelscherm koos Haiku er
+Tafelkleedstoffen voor, en Outdoorstoffen kreeg Schaduwdoek. Zo'n categorie hoort
+standaard op "alleen de algemene vragen" te staan.
+
+**Eén kolom, meerdere kenmerken, en andersom** — een koppeling wijst nu naar
+één kolom. `washing_label` draagt zowel maximale wastemperatuur als bleekbaar, en
+de drie Oekotex-kenmerken van v4 zijn in een catalogus meestal één kolom.
+
+**"Maximum update depth exceeded" op de scanpagina** — 14 september gezien in de
+console, vóór het koppelscherm; bron niet gevonden en niet teruggekomen na een
+herlaad.
 
 **De generatie hangt aan een laptop** — 11 september. De geplande taak staat in
 `render.yaml` (`vragenbank-generator`, `starter`-plan), maar cron zit niet in het

@@ -18,8 +18,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Sparkles } from 'lucide-react';
 import type { Dataset, Locale, QuestionSetState } from '../src/domain/types';
-import { attributeInventory, type Mapping } from '../src/questions/mapping';
+import { attributeInventory, mappingSummary, type Mapping } from '../src/questions/mapping';
 import { describeAttribute, describeColumn } from '../src/semantic/describe';
+import { filledIn, profileCatalog } from '../src/engine/profile';
 import { MIN_MARGIN_CATEGORIES, suggestMappings } from '../src/semantic/suggest';
 import { embed, ModelUnavailable, type LoadProgress } from '../src/semantic/model';
 import { MappingNotConfigured, requestMapping } from '../src/semantic/remote';
@@ -42,6 +43,22 @@ interface Props {
 /** Geen kolom is een geldig antwoord; die keuze moet expliciet kunnen. */
 const NONE = '';
 
+/** Hoeveel voorbeeldwaarden er onder een gekozen kolom staan. Genoeg om te herkennen. */
+const SAMPLES_SHOWN = 3;
+
+/**
+ * Hoeveel kenmerken er per aanvraag naar de koppelroute gaan.
+ *
+ * Onder de grens van 200 in de route, en klein genoeg dat het korte antwoord
+ * (4.096 tokens) er niet halverwege afbreekt.
+ */
+const ATTRIBUTE_BATCH = 100;
+/** De grens van de koppelroute voor kolommen per aanvraag. */
+const MAX_COLUMNS = 300;
+
+/** Hoeveel categorieën de regel onder een kolom hoogstens noemt. */
+const CATEGORIES_SHOWN = 3;
+
 export function MappingStep({
   s, locale, catalog, state, mapping, onChange, categories, onCategories, onContinue,
 }: Props) {
@@ -63,6 +80,16 @@ export function MappingStep({
   const columns = useMemo(
     () => [...catalog.columns].sort((a, b) => a.localeCompare(b)),
     [catalog.columns],
+  );
+
+  const summary = useMemo(() => mappingSummary(state, mapping), [state, mapping]);
+  /**
+   * Wat er in elke kolom staat, over de hele catalogus: vorm, eenheid, hoe vaak
+   * gevuld en in welke categorieën. Eén keer per catalogus, in de browser.
+   */
+  const profiles = useMemo(
+    () => profileCatalog(catalog, state.segmentLevel ?? 0, new Set(state.facetPaths ?? [])),
+    [catalog, state.segmentLevel, state.facetPaths],
   );
 
   const linked = rows.filter((row) => row.fields.length > 0).length;
@@ -232,12 +259,38 @@ export function MappingStep({
     // een andere kwaliteit en dat hoort niemand te moeten raden.
     setBusy('remote');
     try {
-      const result = await requestMapping(
-        { attributes: described, columns: free.map((column) => ({ key: column, text: describeColumn(column, catalog) })) },
-        catalog.columns,
-      );
-      setNotes([...result.notes, ...result.rejected]);
-      accept(result.pairs, result.model);
+      // In blokken: de route neemt hoogstens 200 kenmerken en 300 kolommen per
+      // aanvraag, en een bank als woontextiel v4 vraagt er ruim 700. Eén grote
+      // aanvraag gaf een 400 en dus stil geen enkel voorstel. Lege kolommen gaan
+      // niet mee: daar valt niets in te herkennen, en ze drukken de kolommen die
+      // wél iets zeggen onder de grens.
+      const describedColumns = free
+        .filter((column) => (profiles[column]?.filled ?? 0) > 0)
+        .slice(0, MAX_COLUMNS)
+        .map((column) => ({ key: column, text: describeColumn(column, catalog, profiles[column]) }));
+      const pairs: { key: string; columns: string[] }[] = [];
+      const seenNotes: string[] = [];
+      let model = '';
+      for (let start = 0; start < described.length; start += ATTRIBUTE_BATCH) {
+        // Een kolom die een eerder blok al kreeg, gaat niet opnieuw mee; anders
+        // grijpen twee kenmerken naar dezelfde kolom.
+        const used = new Set(pairs.flatMap((pair) => pair.columns.slice(0, 1)));
+        const result = await requestMapping(
+          {
+            attributes: described.slice(start, start + ATTRIBUTE_BATCH),
+            columns: describedColumns.filter((column) => !used.has(column.key)),
+          },
+          catalog.columns,
+        );
+        pairs.push(...result.pairs);
+        seenNotes.push(...result.notes, ...result.rejected);
+        model = result.model;
+        // Wat binnen is, staat er meteen; bij 700 kenmerken hoort niemand een
+        // halve minuut naar een lege lijst te kijken.
+        setNotes([...seenNotes]);
+        accept(pairs, model);
+      }
+      setBusy(undefined);
       return;
     } catch (caught) {
       if (!(caught instanceof MappingNotConfigured)) {
@@ -250,7 +303,7 @@ export function MappingStep({
     setBusy({ step: 'library' });
     try {
       const vectors = await embed(
-        [...described.map((entry) => entry.text), ...free.map((column) => describeColumn(column, catalog))],
+        [...described.map((entry) => entry.text), ...free.map((column) => (profiles[column]?.sensitive ? column : describeColumn(column, catalog)))],
         setBusy,
       );
       const found = suggestMappings(
@@ -418,23 +471,35 @@ export function MappingStep({
                       ? ` +${row.questions.length - 1} ${s.mapping.moreQuestions}`
                       : null}
                   </p>
-                  {/* Een som heeft al zijn termen. Koppel je de rolbreedte en
-                      niet de rapporthoogte, dan blijft "hoeveel meter heb ik
-                      nodig" onbeantwoordbaar — en dít is het moment waarop de
-                      merchant er nog iets aan kan doen. */}
-                  {row.blocked.map((entry) => (
-                    <p
-                      key={entry.question.nl}
-                      className="mt-1 flex items-start gap-1.5 text-xs leading-relaxed text-warn"
-                    >
-                      <AlertTriangle className="mt-0.5 size-3 shrink-0" aria-hidden />
-                      <span className="min-w-0">
-                        <span className="text-ink">{entry.question[locale]}</span>{' '}
-                        {s.mapping.alsoNeeds}{' '}
-                        {entry.missing.map((one) => one.label[locale]).join(', ')}
-                      </span>
-                    </p>
-                  ))}
+                  {/* Wat er in de gekozen kolom staat. Een kolomnaam zegt niet
+                      of hij klopt; "PU-coating, acryl, geen" wel. Dit blijft in
+                      de browser. */}
+                  {current !== NONE && profiles[current] ? (() => {
+                    const profile = profiles[current];
+                    if (profile.filled === 0) {
+                      return <p className="mt-0.5 text-xs text-muted">{s.mapping.samplesEmpty}</p>;
+                    }
+                    const where = filledIn(profile);
+                    const facts = [
+                      profile.kind === 'number' && profile.unit
+                        ? `${s.mapping.kinds.number} (${profile.unit})`
+                        : s.mapping.kinds[profile.kind],
+                      s.mapping.filledShare.replace('{pct}', String(Math.round((profile.filled / profile.total) * 100))),
+                      where.length > 0
+                        ? s.mapping.filledIn.replace('{categorieen}', where.slice(0, CATEGORIES_SHOWN).join(', '))
+                        : null,
+                      profile.shared ? s.mapping.sharedField : null,
+                    ].filter(Boolean);
+                    return (
+                      <>
+                        <p className="mt-0.5 truncate text-xs text-muted">{facts.join(' · ')}</p>
+                        <p className="mt-0.5 truncate text-xs text-muted">
+                          {s.mapping.samplesIn}{' '}
+                          <span className="text-ink">{profile.samples.slice(0, SAMPLES_SHOWN).join(' · ')}</span>
+                        </p>
+                      </>
+                    );
+                  })() : null}
                 </div>
                 {isProposal ? <Badge tone="accent">{s.mapping.proposed}</Badge> : null}
                 <select
@@ -452,6 +517,18 @@ export function MappingStep({
             );
           })}
         </ul>
+        {/* Eén telling voor het hele scherm in plaats van een melding per
+            kenmerk; welke vragen het zijn staat in het rapport. */}
+        {summary.questions > 0 ? (
+          <p className="mt-3 flex items-start gap-1.5 border-t border-line pt-3 text-xs leading-relaxed text-warn">
+            <AlertTriangle className="mt-0.5 size-3 shrink-0" aria-hidden />
+            <span className="min-w-0">
+              {s.mapping.openSummary
+                .replace('{vragen}', String(summary.questions))
+                .replace('{kenmerken}', String(summary.attributes))}
+            </span>
+          </p>
+        ) : null}
       </Card>
 
       <Button onClick={onContinue}>{s.mapping.continue}</Button>

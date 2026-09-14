@@ -8,7 +8,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { attributeInventory } from '../src/questions/mapping';
+import { attributeInventory, mappingSummary } from '../src/questions/mapping';
 import type { Bilingual, Question, QuestionSetState, RequirementGroup } from '../src/domain/types';
 
 const two = (nl: string): Bilingual => ({ nl, en: nl });
@@ -75,4 +75,18 @@ test('de keuze van nu telt mee, ook voordat hij toegepast is', () => {
   // En andersom: "geen kolom" is een geldig antwoord, en dan blijft het gat.
   const cleared = attributeInventory(state, { rapporthoogte: [] });
   assert.equal(cleared.find((row) => row.key === 'rolbreedte')?.blocked.length, 1);
+});
+
+test('de telling onderaan: een som staat open bij één ontbrekende term, bewijs pas als niets gekoppeld is', () => {
+  const som = question('som', 'all', [group('rolbreedte', ['dimensions']), group('rapporthoogte', [])]);
+  const bewijs = question('bewijs', 'any', [group('keurmerk', ['certifications']), group('gerecycled', [])]);
+  const state = {
+    sets: [{ category: 'Stoffen', productCount: 10, questions: [som, bewijs] }],
+    overlays: [],
+    version: 1,
+  } as unknown as QuestionSetState;
+
+  assert.deepEqual(mappingSummary(state), { questions: 1, attributes: 1 });
+  assert.deepEqual(mappingSummary(state, { rapporthoogte: ['pattern_repeat'] }), { questions: 0, attributes: 0 });
+  assert.deepEqual(mappingSummary(state, { keurmerk: [] }), { questions: 2, attributes: 3 });
 });
