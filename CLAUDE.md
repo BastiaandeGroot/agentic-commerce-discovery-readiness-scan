@@ -32,7 +32,9 @@ mens ziet en bevestigt — geen oordeel dat stilzwijgend doorwerkt.
    browser. Er gaan kenmerknamen, vraagteksten en kolomnamen de deur uit, geen
    productrij en geen veldwaarde.
 2. De **generatie van een vragenbank** (`src/generation/`, met
-   `src/server/generator.ts` en `app/api/bank-run/`). Daar bouwt een model de
+   `src/server/generator.ts` en `app/api/bank-run/`), plus de losse stap die de
+   kenmerken van een bank typeert (`src/generation/attributes.ts`, via
+   `app/api/admin/attribute-types/`). Daar bouwt een model de
    vragenlijst voor een markt volgens de methode in `kennis/_methode/`. Er gaan
    categorienamen met aantallen en een URL de deur uit — geen kolomnamen, geen
    productrijen, geen prijzen. Het gebeurt één keer per markt en niet per
@@ -65,10 +67,11 @@ browsermodel, met dat verschil in beeld.
 | `src/semantic/` | de modellen die koppelingen vóórstellen; nooit importeren vanuit de motor |
 | `src/generation/` | de vragenbankgeneratie als vaste reeks fasen; puur, het modelantwoord komt binnen als argument |
 | `src/collect/` | winkel doormeten: productgegevens uit html halen en productadressen uit sitemaps; puur, de html komt binnen als argument |
-| `app/api/` | de serverroutes: `/api/mapping`, `/api/site`, `/api/bank-request`, `/api/bank-queue`, `/api/bank-run`, `/api/bank-result`, `/api/banks` (vrijgegeven banken voor de merchant), `/api/public-scan` (winkel doormeten, alleen beheerder) en `/api/admin/queue` |
+| `app/api/` | de serverroutes: `/api/mapping`, `/api/site`, `/api/bank-request`, `/api/bank-queue`, `/api/bank-run`, `/api/bank-result`, `/api/banks` (vrijgegeven banken voor de merchant), `/api/public-scan` (winkel doormeten, alleen beheerder), `/api/admin/queue` en `/api/admin/attribute-types` (kenmerken van een bank typeren) |
 | `src/server/` | wat alleen serverzijdig mag draaien: de uitvoerderssleutel, de servicecliënt, de modelaanroep van de generatie (direct en via de batch-API), het aannemen van een bank en het ophalen van een winkel. Nooit importeren vanuit een component. |
 | `src/questions/` | vragenbanken, composer, generator, import (tabel én YAML), aanvraag en beoordeling |
 | `src/engine/` | plaatsing van een product in de boom, evaluatie, rapportaggregatie, vergelijken |
+| `src/report/` | wat het rapport laat zien, afgeleid uit de scanuitkomst; het scherm én de pdf gebruiken het, zodat ze hetzelfde zeggen. Puur |
 | `src/i18n/` | alle teksten, NL en EN naast elkaar |
 | `components/` | UI; `ui.tsx` draagt de gedeelde bouwstenen |
 | `app/` | routes |

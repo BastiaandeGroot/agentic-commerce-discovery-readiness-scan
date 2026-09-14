@@ -103,6 +103,24 @@ export interface Dataset {
 
 // --- Vragensets ------------------------------------------------------------
 
+/**
+ * Welke waarde een kenmerk in een catalogus hoort te dragen.
+ *
+ * Dezelfde woorden als het kolomprofiel (`src/engine/profile.ts`), zodat een
+ * kenmerk en een kolom zonder model naast elkaar te leggen zijn. Komt uit de
+ * typeerstap per markt (`src/generation/attributes.ts`) en telt pas als een
+ * beheerder hem bevestigde.
+ */
+export type ShapeKind = 'boolean' | 'number' | 'list' | 'code' | 'text';
+
+export interface AttributeShape {
+  kind: ShapeKind;
+  /** Alleen bij een getal, en alleen een generieke eenheid. */
+  unit?: string;
+  /** Alleen bij een lijst: waarden zoals een catalogus ze zou schrijven. */
+  values?: string[];
+}
+
 /** Eén attribuut met de velden die het in een catalogus kunnen dragen. */
 export interface RequirementGroup {
   /** Sleutel van het domeinattribuut uit de vragenbank. */
@@ -112,6 +130,8 @@ export interface RequirementGroup {
   fields: string[];
   /** 'any' = één gevuld veld volstaat; 'all' = alle velden nodig. */
   mode: 'any' | 'all';
+  /** Wat de bank in dit kenmerk verwacht, als dat getypeerd en bevestigd is. */
+  shape?: AttributeShape;
 }
 
 export interface Question {
@@ -296,6 +316,14 @@ export interface QuestionSetState {
    * categorieën en meet de scan er vijf.
    */
   facetPaths?: string[];
+  /**
+   * Paden die de merchant op het categoriescherm uitsloot, als padsleutels.
+   *
+   * Zo'n pad en alles eronder krijgt geen vragenset, en een product dat alleen
+   * daar hangt telt niet mee in de scan. Vastgelegd bij het samenstellen, zodat
+   * de scan dezelfde uitsluiting gebruikt als de sets.
+   */
+  excludedPaths?: string[];
   /**
    * Op welk niveau van de categorieboom de markt begint (zie `segmentLevel`).
    *

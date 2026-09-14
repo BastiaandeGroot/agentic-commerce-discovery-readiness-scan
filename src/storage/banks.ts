@@ -22,6 +22,14 @@ export interface StoredBank {
   savedAt: string;
   /** Bestandsnaam of bron, zodat herkomst navolgbaar blijft. */
   source: string;
+  /**
+   * De id van een vrijgegeven bank, als hij daarvandaan kwam.
+   *
+   * Nodig om hem te verversen: wat de beheerder na het kiezen beslist — een
+   * categorie losstaand, een gecorrigeerd label, een typering — hoort bij de
+   * merchant aan te komen, en niet bevroren te blijven op het moment van kiezen.
+   */
+  bankId?: string;
   bank: QuestionBank;
   /**
    * Welke kolom welk kenmerk draagt, zoals de merchant het bevestigde.

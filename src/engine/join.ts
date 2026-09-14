@@ -141,6 +141,32 @@ export function segmentAt(segments: string[], level: number): string {
 // --- Kenmerken die als categorie in de boom staan --------------------------
 
 /**
+ * De plekken van een product zonder wat de merchant uitsloot, pad en alles eronder.
+ *
+ * Anders dan een kenmerk wordt hier niets afgeknipt: een uitgesloten pad doet
+ * niet mee, dus de plek valt in zijn geheel weg.
+ */
+export function withoutExcluded(memberships: string[][], excluded: ReadonlySet<string>): string[][] {
+  if (excluded.size === 0) return memberships;
+  return memberships.filter((segments) =>
+    !segments.some((_, index) => excluded.has(pathKey(segments.slice(0, index + 1)))));
+}
+
+/**
+ * Hangt dit product alleen onder paden die de merchant uitsloot?
+ *
+ * Dan telt het nergens mee: geen vragen, geen score, niet in de noemer. Hangt het
+ * ook onder een categorie die blijft, dan wordt het daar gewoon gemeten — dat
+ * regelt `withoutExcluded` per plek. Een product zonder enige categorie is niet
+ * uitgesloten; dat is een ander geval en het rapport telt het als niet geplaatst.
+ */
+export function isExcludedProduct(product: ProductRecord, excluded: ReadonlySet<string>): boolean {
+  if (excluded.size === 0) return false;
+  const memberships = categoryMemberships(product);
+  return memberships.length > 0 && withoutExcluded(memberships, excluded).length === 0;
+}
+
+/**
  * De plekken van een product, zonder wat eigenlijk een kenmerk is.
  *
  * Een pad dat als kenmerk is aangemerkt — "Outdoorstoffen > Gestreept" — wordt
@@ -240,8 +266,10 @@ export function placeProduct(
   sets: QuestionSet[],
   level: number,
   facets: ReadonlySet<string> = new Set(),
+  /** Paden die de merchant uitsloot; die plekken tellen niet. */
+  excluded: ReadonlySet<string> = new Set(),
 ): Placement {
-  const raw = categoryMemberships(product);
+  const raw = withoutExcluded(categoryMemberships(product), excluded);
   if (raw.length === 0) return { sets: [], facetOnly: false };
   const memberships = withoutFacets(raw, facets);
   if (memberships.length === 0) return { sets: [], facetOnly: true };

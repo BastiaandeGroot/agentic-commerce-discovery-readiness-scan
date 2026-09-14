@@ -38,10 +38,18 @@ export async function GET(request: Request) {
 
   const wanted = new URL(request.url).searchParams.get('id');
 
-  const found = await supabase
+  let found = await supabase
     .from('question_banks')
-    .select('id, vertical, version, status, csv, excluded, created_at, released_at')
+    .select('id, vertical, version, status, csv, excluded, attribute_types, standalone, overlay_labels, created_at, released_at')
     .order('created_at', { ascending: false });
+  // Zonder migratie 0009 bestaat de kolom met kenmerktypen niet. Dan meet de
+  // merchant gewoon zonder typen, in plaats van helemaal geen bank te zien.
+  if (found.error) {
+    found = await supabase
+      .from('question_banks')
+      .select('id, vertical, version, status, csv, excluded, created_at, released_at')
+      .order('created_at', { ascending: false }) as typeof found;
+  }
 
   if (found.error) {
     return NextResponse.json({ error: 'De vragenbanken zijn niet op te halen.' }, { status: 502 });
@@ -61,6 +69,15 @@ export async function GET(request: Request) {
       // Wat de beheerder oversloeg. Het staat los van de tabel omdat de tabel
       // is wat de generatie opleverde, en het overslaan een oordeel erna.
       excluded: (bank.excluded as string[] | null) ?? [],
+      // Alleen een bevestigde typering. Een tabel die nog op review staat is een
+      // voorstel van een model, en dat mag niet stil voorstellen gaan afwijzen.
+      // Wat de beheerder per categorie besliste: losstaand, en een gecorrigeerd label.
+      standalone: (bank as { standalone?: unknown }).standalone ?? [],
+      labels: (bank as { overlay_labels?: unknown }).overlay_labels ?? {},
+      shapes: (() => {
+        const typing = (bank as { attribute_types?: { status?: string; shapes?: Record<string, unknown> } | null }).attribute_types;
+        return typing?.status === 'confirmed' ? typing.shapes ?? {} : {};
+      })(),
     });
   }
 

@@ -29,6 +29,7 @@ import {
   type SiteHarvest,
   type Topic,
   type Usage,
+  isStandaloneCategory,
 } from './state';
 
 /** Wat er aan het model gevraagd wordt. Wie dat uitvoert staat in `src/server/`. */
@@ -173,7 +174,7 @@ function takenIds(state: RunState): Set<string> {
   ]);
 }
 
-const KINDS = new Set(['overlay', 'profiel', 'facet']);
+const KINDS = new Set(['overlay', 'profiel', 'facet', 'losstaand']);
 
 function readGrouping(raw: unknown, state: RunState): GroupingEntry[] {
   const counts = new Map(state.brief.segments.map((segment) => [segment.name, segment.count]));
@@ -531,11 +532,16 @@ export function applyReply(
         );
       }
 
+      // Een losstaande categorie erft de basislaag niet, en herwegen van een
+      // basisvraag die hier niet gesteld wordt heeft dan geen betekenis.
+      const standalone = isStandaloneCategory(state, category);
       updated = {
         ...state,
         overlays: [
           ...state.overlays,
-          { category, questions, reweight },
+          standalone
+            ? { category, questions, reweight: [], standalone: true }
+            : { category, questions, reweight },
         ],
         findings: [...state.findings, ...findingsOf(answer)],
       };
@@ -560,7 +566,9 @@ export function applyReply(
         // overlay wegnemen zou de vragen weggooien die er al voor geschreven
         // zijn. Beide worden een bevinding, en dan beslist de beheerder of het
         // een herziening waard is.
-        if (entry.kind === 'overlay' || before.kind === 'overlay') {
+        // Losstaand telt als overlay: er hangt een eigen vragenset aan.
+        const ownSet = (kind: string) => kind === 'overlay' || kind === 'losstaand';
+        if (ownSet(entry.kind) || ownSet(before.kind)) {
           moved.push(
             `De facetanalyse zou ${entry.category} liever als ${entry.kind} zien dan als ${before.kind} (${entry.reason}). `
             + 'Dat is niet doorgevoerd: de vragensets waren op dat moment al gebouwd.',

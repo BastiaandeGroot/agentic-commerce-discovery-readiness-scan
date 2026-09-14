@@ -17,6 +17,9 @@ import { STRINGS } from '../../../../src/i18n/strings';
 import { useLocale } from '../../../../src/i18n/useLocale';
 import { authHeader } from '../../../../src/auth/client';
 import { hasObjection } from '../../../../src/questions/review';
+import { AttributeTypesPanel } from '../../../../components/AttributeTypesPanel';
+import { BankCategoriesPanel, type BankOverlayRow } from '../../../../components/BankCategoriesPanel';
+import type { StoredTyping } from '../../../../src/generation/attributes';
 
 interface GroupingEntry {
   category: string; count: number; kind: string; parent?: string; reason?: string;
@@ -60,6 +63,10 @@ interface BankRow {
   summary?: BankSummary;
   /** Vragen die de beheerder bij het vrijgeven overslaat. Terugdraaibaar. */
   excluded?: string[];
+  /** Welke waarde elk kenmerk verwacht; ontbreekt tot de bank getypeerd is. */
+  attribute_types?: StoredTyping | null;
+  /** De categorieën met een eigen vragenset, met wat de beheerder erover besliste. */
+  overlays?: BankOverlayRow[];
 }
 
 type State =
@@ -149,6 +156,9 @@ export default function Page() {
 
   const open = state.requests.filter((one) => one.status !== 'ready');
   const review = state.banks.filter((one) => one.status === 'review');
+  // Typeren kan ook na het vrijgeven: een bank die er al ligt krijgt zo zijn
+  // typen zonder opnieuw gegenereerd te worden. Een ingetrokken bank niet.
+  const typable = state.banks.filter((one) => one.status !== 'withdrawn');
 
   return (
     <div className="flex flex-col gap-4">
@@ -490,6 +500,38 @@ export default function Page() {
                     {busy === bank.id ? s.admin.releasing : s.admin.release}
                   </Button>
                 </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card>
+        <CardTitle sub={s.admin.typingBody}>{s.admin.typingTitle}</CardTitle>
+        {typable.length === 0 ? (
+          <EmptyState title={s.admin.typingNoBanks} body={s.admin.typingBody} />
+        ) : (
+          <ul className="flex flex-col gap-4">
+            {typable.map((bank) => (
+              <li key={bank.id} className="border-t border-line pt-4 first:border-t-0 first:pt-0">
+                <AttributeTypesPanel s={s} bank={bank} onChanged={load} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      {/* Welke categorieën los staan van het kernproduct. Ook na het vrijgeven,
+          want een bank die er al ligt hoort het te kunnen krijgen. */}
+      <Card>
+        <CardTitle sub={s.admin.categoriesBody}>{s.admin.categoriesTitle}</CardTitle>
+        {typable.length === 0 ? (
+          <EmptyState title={s.admin.typingNoBanks} body={s.admin.categoriesBody} />
+        ) : (
+          <ul className="flex flex-col gap-4">
+            {typable.map((bank) => (
+              <li key={bank.id} className="border-t border-line pt-4 first:border-t-0 first:pt-0">
+                <BankCategoriesPanel s={s} bank={bank} onChanged={load} />
               </li>
             ))}
           </ul>

@@ -64,20 +64,24 @@ function Choice({ s, row, onDecide }: {
       aria-label={row.segments.join(' > ')}
       className="inline-flex shrink-0 overflow-hidden rounded-lg border border-line"
     >
-      {(['category', 'facet'] as const).map((kind) => {
+      {/* Drie standen. Uitsluiten is geen oordeel over wat het pad ís maar over
+          of het meedoet: geen vragen, geen kenmerken, niet in de scan. */}
+      {(['category', 'facet', 'excluded'] as const).map((kind) => {
         const active = row.kind === kind;
         return (
           <button
             key={kind}
             type="button"
             aria-pressed={active}
-            title={kind === 'category' ? s.segments.isCategory : s.segments.isFacet}
+            title={kind === 'category' ? s.segments.isCategory : kind === 'facet' ? s.segments.isFacet : s.segments.isExcluded}
             onClick={() => onDecide(row, kind)}
             className={`px-2.5 py-1 text-xs font-medium transition ${
               active
                 ? kind === 'category'
                   ? 'bg-ok-soft text-ok'
-                  : 'bg-warn-soft text-warn'
+                  : kind === 'facet'
+                    ? 'bg-warn-soft text-warn'
+                    : 'bg-surface-2 text-ink'
                 : 'bg-surface text-muted hover:bg-surface-2 hover:text-ink'
             }`}
           >
@@ -184,7 +188,7 @@ function Rows({ s, rows, onDecide }: {
   );
 }
 
-export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onFacets, onSite, onContinue }: {
+export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onFacets, onExcluded, onSite, onContinue }: {
   s: Strings;
   paths: CategoryPath[];
   verdicts: Verdicts;
@@ -209,6 +213,13 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onFacets
    * hier net als kenmerk had laten staan.
    */
   onFacets: (pathKeys: string[]) => void;
+  /**
+   * De paden die de merchant uitsloot, als padsleutel.
+   *
+   * Zelfde reden als de kenmerken. Zo'n pad krijgt verderop geen vragenset en
+   * geen kenmerken, en een product dat alleen daar hangt telt niet mee.
+   */
+  onExcluded: (pathKeys: string[]) => void;
   /**
    * Het adres van zijn eigen winkel, zodra hij het invulde.
    *
@@ -281,6 +292,7 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onFacets
       .sort((a, b) => b.count - a.count)
       .slice(0, 40));
     onFacets(rows.filter((row) => row.kind === 'facet').map((row) => pathKey(row.segments)).sort());
+    onExcluded(rows.filter((row) => row.kind === 'excluded').map((row) => pathKey(row.segments)).sort());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows]);
 

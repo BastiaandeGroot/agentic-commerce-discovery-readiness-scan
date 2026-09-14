@@ -8,12 +8,14 @@
 // een koper in deze markt stelt.
 
 import { useMemo, useState } from 'react';
+import { Download } from 'lucide-react';
+import { adviceKey, advisoryItems, mergedGaps, scoreRows, topBlockers, unansweredQuestions } from '../src/report/derive';
 import { toSnapshot } from '../src/engine/snapshot';
 import { LOCAL_ACCOUNT, snapshotStore } from '../src/storage/snapshots';
 import type { Locale, ScanReport } from '../src/domain/types';
 import { requirementLabel } from '../src/spec/fields';
 import type { Strings } from '../src/i18n/strings';
-import { Badge, Bar, Button, Card, CardTitle, InfoButton, InfoPanel, Select, TrafficLight, statusOf } from './ui';
+import { Badge, Bar, Button, Card, CardTitle, ErrorState, InfoButton, InfoPanel, Select, TrafficLight, statusOf } from './ui';
 import { Explorer } from './Explorer';
 
 function n(value: number): string {
@@ -133,39 +135,12 @@ function CategoryScores({ s, report }: { s: Strings; report: ScanReport }) {
     })),
   ], [report.categories, s.report.scoreAllCategories]);
 
-  const shown = useMemo(() => {
-    if (category === 'all') {
-      // Alles bij elkaar: alleen de hoofdcategorieën, anders tellen de
-      // subcategorieën hun producten een tweede keer mee.
-      const mains = report.categories.filter((row) => row.subcategory === undefined);
-      const total = mains.reduce((sum, row) => sum + row.total, 0);
-      const mix = (pick: (row: typeof mains[number]) => { answered: number; total: number }) => ({
-        answered: total === 0 ? 0
-          : mains.reduce((sum, row) => sum + pick(row).answered * row.total, 0) / total,
-        total: total === 0 ? 0
-          : mains.reduce((sum, row) => sum + pick(row).total * row.total, 0) / total,
-      });
-      return {
-        label: s.report.scoreAllCategories,
-        total,
-        critical: mix((row) => row.critical),
-        general: mix((row) => row.general),
-        all: mix((row) => row.all),
-      };
-    }
-    const [setId, sub] = category.split('|');
-    const row = report.categories.find(
-      (entry) => entry.setId === setId && (entry.subcategory ?? '') === sub,
-    );
-    if (!row) return undefined;
-    return {
-      label: row.subcategory ? `${row.category} › ${row.subcategory}` : row.category,
-      total: row.total,
-      critical: row.critical,
-      general: row.general,
-      all: row.all,
-    };
-  }, [category, report.categories, s.report.scoreAllCategories]);
+  // De afleiding staat in `src/report/derive.ts`, zodat de pdf hetzelfde zegt.
+  const rowsByKey = useMemo(
+    () => new Map(scoreRows(report, s.report.scoreAllCategories).map((row) => [row.key, row])),
+    [report, s.report.scoreAllCategories],
+  );
+  const shown = rowsByKey.get(category);
 
   if (report.categories.length === 0 || !shown) return null;
 
@@ -248,37 +223,10 @@ function CategoryScores({ s, report }: { s: Strings; report: ScanReport }) {
 function NextStep({ s, report, locale }: {
   s: Strings; report: ScanReport; locale: Locale;
 }) {
-  const { funnel, distance, questionCoverage } = report;
-
-  // De dichtstbijzijnde stand die nog niet vindbaar is.
-  const nearest = distance.find((bucket) => bucket.open > 0);
-
-  // Welke vragen houden de meeste producten tegen? Tel over alle sets heen, want
-  // dezelfde vraag komt in meerdere categorieën terug.
-  const blockers = new Map<string, { label: string; open: number; empty: number; ids: Set<string> }>();
-  for (const row of questionCoverage) {
-    if (!row.scored) continue;
-    const open = row.applicable - row.answered;
-    if (open === 0) continue;
-    const key = row.label[locale];
-    const entry = blockers.get(key) ?? { label: key, open: 0, empty: 0, ids: new Set<string>() };
-    entry.open += open;
-    // Waar het veld al bestaat is dit invulwerk, en dat is de goedkoopste winst
-    // die er is. Dat onderscheid hoort in de eerste zin die een merchant leest.
-    entry.empty += row.empty;
-    entry.ids.add(row.questionId);
-    blockers.set(key, entry);
-  }
-  const top = [...blockers.values()].sort((a, b) => b.open - a.open).slice(0, 2);
-
-  // Wat levert het op als juist die vragen beantwoord worden? Een product wordt
-  // vindbaar als er daarna niets meer openstaat.
-  const topIds = new Set(top.flatMap((entry) => [...entry.ids]));
-  const wouldBecome = report.products.filter((product) => {
-    if (product.unmatched) return false;
-    const open = product.questions.filter((q) => q.scored && !q.answered);
-    return open.length > 0 && open.every((q) => topIds.has(q.questionId));
-  }).length;
+  const { funnel } = report;
+  // Welke vragen de meeste producten tegenhouden, en wat het oplevert als juist
+  // die beantwoord worden. Afgeleid in `src/report/derive.ts`.
+  const { top, wouldBecome, nearest } = topBlockers(report, locale);
 
   if (top.length === 0) return null;
 
@@ -349,13 +297,7 @@ function QuestionCoverageCard({ s, report, locale }: {
   // Beste eerst. Een merchant leest dan van boven naar beneden af waar hij al
   // ver is en waar het werk begint, in plaats van meteen tegen het slechtste
   // nieuws aan te kijken.
-  const rows = report.questionCoverage
-    .filter((q) => q.scored)
-    .filter((q) => q.answered < q.applicable)
-    .filter((q) => setId === 'all' || q.setId === setId)
-    .sort(
-      (a, b) => b.answered / Math.max(b.applicable, 1) - a.answered / Math.max(a.applicable, 1),
-    );
+  const rows = unansweredQuestions(report, setId);
 
   // Zonder categoriekeuze zou de lijst over alle sets heen te lang worden; met
   // een gekozen categorie hoort hij compleet te zijn.
@@ -483,7 +425,7 @@ function QuestionCoverageCard({ s, report, locale }: {
                     ))}
                   </ul>
                   <p className="mt-2 font-medium text-muted">{s.report.qNext}</p>
-                  <p className="mt-0.5 leading-relaxed">{advice(row, s)}</p>
+                  <p className="mt-0.5 leading-relaxed">{s.report[adviceKey(row)]}</p>
                 </div>
               ) : null}
             </li>
@@ -495,41 +437,11 @@ function QuestionCoverageCard({ s, report, locale }: {
   );
 }
 
-/**
- * Wat een merchant nu kan doen aan deze onbeantwoorde vraag.
- *
- * Op volgorde van goedkoopst: een ontbrekende koppeling kost een muisklik, een
- * leeg veld invulwerk, een te mager veld herschrijven, en een ontbrekende kolom
- * eerst een beslissing over het datamodel. Alleen "niet beantwoord" tonen laat
- * die volgorde onzichtbaar, en dan begint iedereen bij het duurste.
- */
-function advice(row: ScanReport['questionCoverage'][number], s: Strings): string {
-  const unlinked = (row.evidence ?? []).some((group) => group.fields.length === 0);
-  if (unlinked) return s.report.qNextUnlinked;
-  if (row.empty >= row.absent && row.empty > 0) return s.report.qNextEmpty;
-  if (row.absent > 0) return s.report.qNextAbsent;
-  if (row.unusable > 0 || row.incomplete > 0) return s.report.qNextWeak;
-  return s.report.qNextEmpty;
-}
-
 function GapTable({ s, report, locale }: { s: Strings; report: ScanReport; locale: Locale }) {
   // Eén kolomuitleg tegelijk; twee open panelen boven een tabel is onleesbaar.
   const [openInfo, setOpenInfo] = useState<string>();
 
-  const merged = new Map<string, {
-    field: string; label: { nl: string; en: string };
-    cause: string; owner: string; affected: number; questions: string[];
-  }>();
-  {
-    for (const gap of report.gaps) {
-      const id = `${gap.field}|${gap.cause}`;
-      const existing = merged.get(id);
-      if (!existing || gap.affected > existing.affected) {
-        merged.set(id, { ...gap });
-      }
-    }
-  }
-  const rows = [...merged.values()].sort((a, b) => b.affected - a.affected).slice(0, 25);
+  const rows = mergedGaps(report);
   if (rows.length === 0) return null;
 
   // Op inspanning en niet op ernst: invulwerk is de goedkoopste winst die er is,
@@ -622,25 +534,18 @@ function GapTable({ s, report, locale }: { s: Strings; report: ScanReport; local
 function Advisory({ s, report, locale }: { s: Strings; report: ScanReport; locale: Locale }) {
   // Ontdubbeld op vraag, met de categorieën erachter: dezelfde procesvraag komt
   // in meerdere categorieën terug en hoeft maar één keer als advies te staan.
-  const seen = new Map<string, { label: string; importance: string; categories: Set<string> }>();
-  const categories = new Map(report.categories.map((c) => [c.setId, c.category]));
-  for (const row of report.advisory) {
-    const entry = seen.get(row.questionId)
-      ?? { label: row.label[locale], importance: row.importance, categories: new Set<string>() };
-    entry.categories.add(categories.get(row.setId) ?? row.setId);
-    seen.set(row.questionId, entry);
-  }
-  if (seen.size === 0) return null;
+  const items = advisoryItems(report, locale);
+  if (items.length === 0) return null;
 
   return (
     <Card>
       <CardTitle sub={s.report.advisoryIntro}>{s.report.advisoryHeading}</CardTitle>
       <ul className="space-y-2">
-        {[...seen.entries()].map(([id, entry]) => (
-          <li key={id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line pt-2">
+        {items.map((entry) => (
+          <li key={entry.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line pt-2">
             <Badge tone="neutral">{s.questions.importance[entry.importance]}</Badge>
             <span className="min-w-0 flex-1 text-sm">{entry.label}</span>
-            <span className="text-xs text-muted">{[...entry.categories].join(', ')}</span>
+            <span className="text-xs text-muted">{entry.categories.join(', ')}</span>
           </li>
         ))}
       </ul>
@@ -659,6 +564,27 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
   canSave?: boolean;
 }) {
   const [saved, setSaved] = useState(false);
+  /** Het pdf-bestand: bezig, of mislukt met de weg eromheen. */
+  const [pdf, setPdf] = useState<'idle' | 'busy' | 'failed'>('idle');
+
+  /**
+   * Het rapport als pdf-bestand downloaden.
+   *
+   * Opgebouwd uit de gegevens en niet uit een afdruk van het scherm: de tekst is
+   * doorzoekbaar en een tabel breekt niet midden in een regel af. De bibliotheek
+   * laadt pas bij de klik, zodat wie het rapport alleen bekijkt hem niet
+   * binnenhaalt. Alles gebeurt in de browser; er gaat niets de deur uit.
+   */
+  async function savePdf() {
+    setPdf('busy');
+    try {
+      const { saveReportPdf } = await import('./reportPdf');
+      await saveReportPdf(report, s, locale);
+      setPdf('idle');
+    } catch {
+      setPdf('failed');
+    }
+  }
 
   async function save() {
     // Alleen de uitkomst gaat de opslag in, niet de producten of het bronbestand.
@@ -782,8 +708,8 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
         <p className="text-xs leading-relaxed text-muted">{s.report.disclaimer}</p>
       </Card>
 
-      {/* Delen zonder dat er data weggaat: afdrukken doet de browser zelf. De
-          knop verdwijnt in de afdruk, want daar kun je niet op klikken. */}
+      {/* Bewaren zonder dat er data weggaat: de pdf wordt in de browser gemaakt
+          en rechtstreeks gedownload. */}
       <Card>
         <p className="text-sm leading-relaxed text-muted">{s.report.shareNote}</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -792,9 +718,17 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
               {saved ? s.report.savedScan : s.report.saveScan}
             </Button>
           ) : null}
-          <Button variant="secondary" onClick={() => window.print()}>{s.report.printReport}</Button>
+          <Button variant="secondary" onClick={() => void savePdf()} loading={pdf === 'busy'}>
+            <Download className="size-4" aria-hidden />
+            {pdf === 'busy' ? s.report.savingPdf : s.report.savePdf}
+          </Button>
           <Button variant="quiet" onClick={onRestart}>{restartLabel ?? s.report.startOver}</Button>
         </div>
+        {pdf === 'failed' ? (
+          <div className="mt-3">
+            <ErrorState title={s.report.pdfFailed} body={s.report.pdfFailedBody} next={s.report.pdfFailedNext} />
+          </div>
+        ) : null}
       </Card>
     </div>
   );

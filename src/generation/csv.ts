@@ -59,7 +59,7 @@ function joinList(values: string[]): string {
 
 function row(
   question: DraftQuestion,
-  layer: 'basis' | 'overlay',
+  layer: 'basis' | 'overlay' | 'standalone',
   category: string,
   state: RunState,
   reweight: string,
@@ -112,8 +112,11 @@ export function toCsv(state: RunState): string {
   }
 
   for (const overlay of state.overlays) {
+    // Een losstaande categorie schakelt de basislaag uit: de lezer maakt van
+    // `standalone` een overlay die geen algemene vragen erft.
+    const layer = overlay.standalone ? 'standalone' : 'overlay';
     for (const question of overlay.questions) {
-      lines.push(row(question, 'overlay', overlay.category, state, ''));
+      lines.push(row(question, layer, overlay.category, state, ''));
     }
   }
 

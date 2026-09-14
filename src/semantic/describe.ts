@@ -13,7 +13,7 @@
 // Puur en deterministisch: dezelfde catalogus geeft dezelfde beschrijving, want
 // de waarden worden in vaste volgorde verzameld en niet gesampled.
 
-import type { Dataset } from '../domain/types';
+import type { AttributeShape, Dataset } from '../domain/types';
 import { filledIn, type ColumnProfile } from '../engine/profile';
 
 /** Hoeveel producten er hoogstens doorzocht worden voor voorbeeldwaarden. */
@@ -116,6 +116,8 @@ const KIND_TEXT: Record<ColumnProfile['kind'], string> = {
 export interface DescribableAttribute {
   key: string;
   questions: string[];
+  /** Wat de bank in dit kenmerk verwacht, als de typering bevestigd is. */
+  shape?: AttributeShape;
 }
 
 /**
@@ -125,7 +127,17 @@ export interface DescribableAttribute {
  * en bij een kenmerk waar tien vragen op leunen zou de naam erin verdrinken.
  */
 export function describeAttribute(attribute: DescribableAttribute): string {
-  const readable = attribute.key.replace(/[_.]+/g, ' ').trim();
+  const base = attribute.key.replace(/[_.]+/g, ' ').trim();
+  const readable = attribute.shape ? `${base} [${shapeText(attribute.shape)}]` : base;
   const questions = attribute.questions.slice(0, 2);
   return questions.length === 0 ? readable : `${readable}: ${questions.join(' ')}`;
+}
+
+/** Een kenmerktype in dezelfde woorden als een kolomprofiel, zodat het model ze naast elkaar legt. */
+function shapeText(shape: AttributeShape): string {
+  if (shape.kind === 'number' && shape.unit) return `getal (${shape.unit})`;
+  if (shape.kind === 'list' && shape.values && shape.values.length > 0) {
+    return `vaste lijst: ${shape.values.slice(0, 5).join(', ')}`;
+  }
+  return KIND_TEXT[shape.kind];
 }

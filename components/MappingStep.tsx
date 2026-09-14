@@ -1,6 +1,6 @@
 'use client';
 
-// Stap 3: kenmerken aan kolommen koppelen.
+// Stap 5: kenmerken aan kolommen koppelen, na het valideren van de vragensets.
 //
 // Je vragenlijst noemt een kenmerk zoals het vak het noemt, je export zoals je
 // systeem het opsloeg. Drie lagen, van goedkoop naar duur en elk strenger dan
@@ -17,11 +17,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Sparkles } from 'lucide-react';
-import type { Dataset, Locale, QuestionSetState } from '../src/domain/types';
+import type { AttributeShape, Dataset, Locale, QuestionSetState } from '../src/domain/types';
 import { attributeInventory, mappingSummary, type Mapping } from '../src/questions/mapping';
+import { allValidated, stillToConfirm } from '../src/questions/mutate';
 import { describeAttribute, describeColumn } from '../src/semantic/describe';
-import { filledIn, profileCatalog } from '../src/engine/profile';
-import { MIN_MARGIN_CATEGORIES, suggestMappings } from '../src/semantic/suggest';
+import { filledIn, profileCatalog, shapeMisfit, type ColumnProfile } from '../src/engine/profile';
+import { suggestMappings } from '../src/semantic/suggest';
 import { embed, ModelUnavailable, type LoadProgress } from '../src/semantic/model';
 import { MappingNotConfigured, requestMapping } from '../src/semantic/remote';
 import type { Strings } from '../src/i18n/strings';
@@ -33,11 +34,23 @@ interface Props {
   catalog: Dataset;
   state: QuestionSetState;
   mapping: Mapping;
-  onChange: (mapping: Mapping) => void;
-  /** Welke vragenset uit de lijst bij welke eigen categorie hoort. */
-  categories: Record<string, string | null>;
-  onCategories: (next: Record<string, string | null>) => void;
-  onContinue: () => void;
+  /**
+   * Een functie in plaats van een waarde werkt op de koppeling van nú. Dat is
+   * nodig voor alles wat asynchroon terugkomt: een voorstel dat na een minuut
+   * landt, hoort niet de keuzes te wissen die de merchant intussen maakte.
+   */
+  onChange: (mapping: Mapping | ((current: Mapping) => Mapping)) => void;
+  /**
+   * De scan starten. Dit is de laatste stap vóór het rapport: de vragen zijn op
+   * het vorige scherm bevestigd, hier komen de kolommen erbij.
+   */
+  onRun: () => void;
+  /** De scan draait; de knop blijft staan met zijn eigen tekst. */
+  running?: boolean;
+  /** De scan viel om. Zeggen wat er gebeurde, niet stil blijven. */
+  error?: string;
+  /** Terug naar het valideren, als daar nog iets open staat. */
+  onBack: () => void;
 }
 
 /** Geen kolom is een geldig antwoord; die keuze moet expliciet kunnen. */
@@ -60,8 +73,9 @@ const MAX_COLUMNS = 300;
 const CATEGORIES_SHOWN = 3;
 
 export function MappingStep({
-  s, locale, catalog, state, mapping, onChange, categories, onCategories, onContinue,
+  s, locale, catalog, state, mapping, onChange, onRun, running, error, onBack,
 }: Props) {
+  const ready = allValidated(state);
   const [busy, setBusy] = useState<LoadProgress | 'remote'>();
   const [failed, setFailed] = useState(false);
   /** Welk model de voorstellen deed; dat hoort de merchant te zien. */
@@ -70,9 +84,6 @@ export function MappingStep({
   const [notes, setNotes] = useState<string[]>([]);
   /** Welke keuzes van het model komen; ze blijven gemarkeerd tot je ze wijzigt. */
   const [proposed, setProposed] = useState<Record<string, string>>({});
-  /** Bezig met het koppelen van de vragensets, en wie het deed. */
-  const [matchingSets, setMatchingSets] = useState(false);
-  const [setsBy, setSetsBy] = useState<string>();
 
   // De keuze van nu telt mee, anders blijft de waarschuwing hieronder staan
   // bij een kenmerk dat de merchant zojuist gekoppeld heeft.
@@ -88,66 +99,18 @@ export function MappingStep({
    * gevuld en in welke categorieën. Eén keer per catalogus, in de browser.
    */
   const profiles = useMemo(
-    () => profileCatalog(catalog, state.segmentLevel ?? 0, new Set(state.facetPaths ?? [])),
-    [catalog, state.segmentLevel, state.facetPaths],
+    () => profileCatalog(
+      catalog,
+      state.segmentLevel ?? 0,
+      new Set(state.facetPaths ?? []),
+      new Set(state.excludedPaths ?? []),
+    ),
+    [catalog, state.segmentLevel, state.facetPaths, state.excludedPaths],
   );
 
   const linked = rows.filter((row) => row.fields.length > 0).length;
   const open = rows.filter((row) => row.fields.length === 0);
   const proposals = Object.keys(proposed).length;
-
-  /**
-   * Leg de vragensets uit de lijst op de eigen categorieën van de merchant.
-   *
-   * Dit gebeurt vanzelf en niet pas na een klik, want zonder deze koppeling
-   * krijgt élke categorie stilzwijgend alleen de algemene vragen — en dan valt
-   * het cijfer te gunstig uit, want juist de categoriespecifieke vragen dragen
-   * de onomkeerbare fout. Een merchant hoort niet te moeten weten dat hij eerst
-   * een knop moet indrukken voordat zijn eigen lijst helemaal meetelt.
-   *
-   * Wat de deur uit gaat zijn twee lijstjes namen. Geen aantallen, geen
-   * producten: het aantal producten per categorie zegt niets over wélke set
-   * erbij hoort, en het is data die er niet hoeft te zijn.
-   */
-  async function matchCategories(open: typeof state.sets) {
-    const namen = state.overlays.map((overlay) => ({ key: overlay.id, text: overlay.label[locale] }));
-    const eigen = open.map((set) => ({ key: set.category as string, text: set.category as string }));
-
-    const toepassen = (pairs: { key: string; columns: string[] }[], from: string) => {
-      if (pairs.length === 0) return false;
-      const next = { ...categories };
-      for (const pair of pairs) if (pair.columns[0]) next[pair.columns[0]] = pair.key;
-      onCategories(next);
-      setSetsBy(from);
-      return true;
-    };
-
-    try {
-      const gevonden = await requestMapping(
-        { kind: 'categories', attributes: namen, columns: eigen },
-        eigen.map((entry) => entry.key),
-      );
-      if (toepassen(gevonden.pairs, gevonden.model)) return;
-    } catch (caught) {
-      if (!(caught instanceof MappingNotConfigured)) return;
-    }
-
-    // Terugval op het browsermodel. Dat haalt de categorieën met een verwant
-    // woord (Decoratiestoffen ↔ Decorative fabrics) en laat de rest los —
-    // gemeten 2 van de 4 goed en 0 fout, dankzij de wederzijds-beste-eis.
-    try {
-      const vectors = await embed([...namen.map((n) => n.text), ...eigen.map((e) => e.text)]);
-      const found = suggestMappings(
-        namen.map((n, i) => ({ key: n.key, vector: vectors[i] })),
-        eigen.map((e, i) => ({ key: e.key, vector: vectors[namen.length + i] })),
-        [],
-        { minMargin: MIN_MARGIN_CATEGORIES },
-      );
-      toepassen(found.map((f) => ({ key: f.key, columns: [f.column] })), 'browser');
-    } catch {
-      // Geen model beschikbaar: de keuzelijsten staan er, de merchant wijst aan.
-    }
-  }
 
   /**
    * Koppel wat er te koppelen valt, zodra het scherm er is.
@@ -157,48 +120,21 @@ export function MappingStep({
    * openslaat en meteen doorklikt kreeg anders een cijfer dat te laag is —
    * tientallen kenmerken ongekoppeld terwijl het antwoord in zijn data staat.
    *
-   * In twee fases en niet tegelijk. Dat is een afhankelijkheid en geen
-   * voorkeur: een andere vragenset betekent andere kenmerken. Lieten we ze
-   * tegelijk lopen, dan schrijven twee stromen allebei hun eigen kijk op de
-   * staat terug en wint de laatste — gemeten gedrag, niet theorie: de
-   * categoriekoppeling verdween dan zonder spoor.
+   * De vragenset per categorie ligt op dit moment al vast: die kiest hij op het
+   * vragensetscherm, vóór dit scherm. Zo vraagt dit scherm alleen naar kenmerken
+   * van vragen die werkelijk gesteld worden.
    */
-  const [phase, setPhase] = useState<'sets' | 'attributes' | 'done'>('sets');
+  const [phase, setPhase] = useState<'attributes' | 'done'>('attributes');
   /**
-   * Grendels die synchroon dichtgaan, en dat is het hele punt.
-   *
-   * Een fase omzetten kan pas ná het async werk, en intussen levert elke
-   * toepassing een nieuwe staat en dus een nieuwe render op. Zonder deze
-   * grendel ziet het effect dan nog steeds de oude fase en begint het opnieuw:
-   * gemeten negen modelaanroepen waar er twee horen te zijn.
+   * De kenmerken die de merchant zelf aanwees in deze sessie. Een voorstel dat
+   * daarna nog binnenkomt, laat die met rust.
    */
-  const startedSets = useRef(false);
+  const chosenByMerchant = useRef(new Set<string>());
+  /**
+   * Een grendel die synchroon dichtgaat. Een fase omzetten kan pas ná het async
+   * werk, en zonder grendel begint het effect in de tussenrender opnieuw.
+   */
   const startedAttributes = useRef(false);
-
-  useEffect(() => {
-    if (phase !== 'sets' || startedSets.current) return;
-    startedSets.current = true;
-    const openSets = state.sets.filter(
-      (set) => set.category !== undefined && set.overlayId === undefined,
-    );
-    void (async () => {
-      // De render eerst laten aflopen; een fase omzetten in het lichaam van een
-      // effect lokt een extra render uit voordat deze klaar is.
-      await Promise.resolve();
-      if (openSets.length > 0 && state.overlays.length > 0) {
-        setMatchingSets(true);
-        try {
-          await matchCategories(openSets);
-        } finally {
-          setMatchingSets(false);
-        }
-      }
-      // Pas hierna: de volgende render draagt de nieuw samengestelde sets, en
-      // dus de kenmerken die er werkelijk gevraagd worden.
-      setPhase('attributes');
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, state.sets, state.overlays]);
 
   useEffect(() => {
     if (phase !== 'attributes' || startedAttributes.current) return;
@@ -227,16 +163,54 @@ export function MappingStep({
 
   /** Neem voorstellen over en markeer ze, zodat ze na te lopen blijven. */
   function accept(pairs: { key: string; columns: string[] }[], from: string) {
-    const next = { ...mapping };
+    // Op de koppeling van nu. Een voorstelronde duurt bij een grote bank een
+    // minuut; wat de merchant in die tijd zelf koos, blijft staan.
+    const chosen = chosenByMerchant.current;
     const marks: Record<string, string> = {};
     for (const pair of pairs) {
-      if (pair.columns.length === 0) continue;
-      next[pair.key] = [pair.columns[0]];
+      if (pair.columns.length === 0 || chosen.has(pair.key)) continue;
       marks[pair.key] = pair.columns[0];
     }
     setProposed(marks);
     setSource(from);
-    onChange(next);
+    onChange((current) => {
+      const next = { ...current };
+      for (const [key, column] of Object.entries(marks)) next[key] = [column];
+      return next;
+    });
+  }
+
+  /** Een vorm in de woorden van het scherm: "getal (°c)", "ja/nee". */
+  const shapeLabel = (shape: AttributeShape | ColumnProfile) =>
+    shape.kind === 'number' && shape.unit ? `${s.mapping.kinds.number} (${shape.unit})` : s.mapping.kinds[shape.kind];
+
+  /**
+   * Voorstellen die niet kunnen kloppen, zonder model eruit.
+   *
+   * Een model koppelt op betekenis en ziet een °C-kenmerk en een ja/nee-kolom
+   * met dezelfde naam als een match. Die koppeling laat een gat verdwijnen dat er
+   * wél is, dus hij vervalt — met een melding, zodat de merchant hem alsnog kan
+   * kiezen als hij het beter weet. Alleen voor kenmerken met een bevestigd type.
+   */
+  function keepFitting(pairs: { key: string; columns: string[] }[]) {
+    const shapes = new Map(rows.map((row) => [row.key, row.shape]));
+    const kept: { key: string; columns: string[] }[] = [];
+    const dropped: string[] = [];
+    for (const pair of pairs) {
+      const shape = shapes.get(pair.key);
+      const column = pair.columns[0];
+      const profile = column ? profiles[column] : undefined;
+      if (shape && profile && shapeMisfit(shape, profile)) {
+        dropped.push(s.mapping.misfitDropped
+          .replace('{kenmerk}', pair.key)
+          .replace('{kolom}', column)
+          .replace('{verwacht}', shapeLabel(shape))
+          .replace('{gevonden}', shapeLabel(profile)));
+      } else {
+        kept.push(pair);
+      }
+    }
+    return { kept, dropped };
   }
 
   async function suggest() {
@@ -249,6 +223,7 @@ export function MappingStep({
       key: row.key,
       text: describeAttribute({
         key: row.key,
+        shape: row.shape,
         questions: row.questions.map((question) => question[locale]),
       }),
     }));
@@ -282,8 +257,9 @@ export function MappingStep({
           },
           catalog.columns,
         );
-        pairs.push(...result.pairs);
-        seenNotes.push(...result.notes, ...result.rejected);
+        const fitting = keepFitting(result.pairs);
+        pairs.push(...fitting.kept);
+        seenNotes.push(...result.notes, ...result.rejected, ...fitting.dropped);
         model = result.model;
         // Wat binnen is, staat er meteen; bij 700 kenmerken hoort niemand een
         // halve minuut naar een lege lijst te kijken.
@@ -310,8 +286,9 @@ export function MappingStep({
         described.map((entry, i) => ({ key: entry.key, vector: vectors[i] })),
         free.map((column, i) => ({ key: column, vector: vectors[described.length + i] })),
       );
-      setNotes([]);
-      accept(found.map((f) => ({ key: f.key, columns: [f.column] })), 'browser');
+      const fitting = keepFitting(found.map((f) => ({ key: f.key, columns: [f.column] })));
+      setNotes(fitting.dropped);
+      accept(fitting.kept, 'browser');
     } catch (caught) {
       setFailed(caught instanceof ModelUnavailable);
     } finally {
@@ -321,12 +298,13 @@ export function MappingStep({
 
   /** Een eigen keuze haalt het voorstel-label weg; het is dan van de merchant. */
   function choose(key: string, column: string) {
+    chosenByMerchant.current.add(key);
     setProposed((current) => {
       const next = { ...current };
       delete next[key];
       return next;
     });
-    onChange({ ...mapping, [key]: column === NONE ? [] : [column] });
+    onChange((current) => ({ ...current, [key]: column === NONE ? [] : [column] }));
   }
 
   return (
@@ -385,69 +363,6 @@ export function MappingStep({
         ) : null}
       </Card>
 
-      {/* Eerst welke vragenset bij welke categorie hoort, en pas daarna de
-          kenmerken. Die volgorde is niet willekeurig: kiest de merchant hier een
-          andere set, dan verandert de lijst kenmerken eronder mee — een
-          gordijnenset vraagt naar lichtdoorlatendheid, een meubelset naar
-          slijtvastheid. */}
-      {state.overlays.length > 0 ? (
-        <Card>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted">
-            {s.mapping.setsHeading}
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-muted">{s.mapping.setsNote}</p>
-          {state.sets.some((set) => set.parent) ? (
-            <p className="mt-1 text-xs leading-relaxed text-muted">{s.mapping.setSubNote}</p>
-          ) : null}
-          {matchingSets ? (
-            <p className="mt-1.5 text-xs text-muted">{s.mapping.setsMatching}</p>
-          ) : setsBy ? (
-            <p className="mt-1.5 text-xs text-muted">
-              {s.mapping.setsMatched}{' '}
-              <span className="text-ink">
-                {setsBy === 'browser' ? s.mapping.bySelf : `${s.mapping.byModel} ${setsBy}.`}
-              </span>
-            </p>
-          ) : null}
-          <ul className="mt-2">
-            {state.sets.filter((set) => set.category !== undefined).map((set) => (
-              <li
-                key={set.id}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-2 first:border-t-0"
-              >
-                <span className={`min-w-0 flex-1 truncate text-sm ${set.parent ? 'pl-4' : ''}`}>
-                  {set.category}
-                  {/* Een subcategorie noemt haar tak: "Lampenkapstoffen" zegt
-                      zonder "onder Decoratiestoffen" niet waar ze in de boom zit. */}
-                  {set.parent ? (
-                    <span className="ml-1.5 text-xs text-muted">{s.mapping.setUnder} {set.parent}</span>
-                  ) : null}
-                  <span className="ml-2 text-xs text-muted">
-                    {set.questions.filter((q) => q.layer === 'category').length > 0
-                      ? `${set.questions.length} ${s.mapping.setQuestions}`
-                      : s.mapping.setBaseOnly}
-                  </span>
-                </span>
-                <select
-                  aria-label={set.category}
-                  value={categories[set.category as string] ?? set.overlayId ?? ''}
-                  onChange={(event) => onCategories({
-                    ...categories,
-                    [set.category as string]: event.target.value === '' ? null : event.target.value,
-                  })}
-                  className="shrink-0 rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink"
-                >
-                  <option value="">{s.mapping.setNone}</option>
-                  {state.overlays.map((overlay) => (
-                    <option key={overlay.id} value={overlay.id}>{overlay.label[locale]}</option>
-                  ))}
-                </select>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      ) : null}
-
       <Card>
         <p className="text-xs font-medium uppercase tracking-wide text-muted">
           {s.mapping.listHeading}
@@ -462,7 +377,14 @@ export function MappingStep({
                 className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line py-2 first:border-t-0"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-mono text-xs">{row.key}</p>
+                  <p className="truncate text-xs">
+                    <span className="font-mono">{row.key}</span>
+                    {/* Wat de bank hier verwacht, zodat een kolom ernaast te
+                        leggen is zonder de vragen te lezen. */}
+                    {row.shape ? (
+                      <span className="ml-2 text-muted">{s.mapping.expects} {shapeLabel(row.shape)}</span>
+                    ) : null}
+                  </p>
                   {/* De vraag eronder: een sleutel alleen is een woord zonder
                       context, en dan kan niemand beoordelen of de kolom klopt. */}
                   <p className="mt-0.5 truncate text-xs text-muted">
@@ -497,6 +419,19 @@ export function MappingStep({
                           {s.mapping.samplesIn}{' '}
                           <span className="text-ink">{profile.samples.slice(0, SAMPLES_SHOWN).join(' · ')}</span>
                         </p>
+                        {/* Een waarschuwing en geen blokkade: de merchant kent
+                            zijn catalogus, en soms draagt een kolom het antwoord
+                            in een andere vorm dan de bank verwacht. */}
+                        {row.shape && shapeMisfit(row.shape, profile) ? (
+                          <p className="mt-0.5 flex items-start gap-1.5 text-xs leading-relaxed text-warn">
+                            <AlertTriangle className="mt-0.5 size-3 shrink-0" aria-hidden />
+                            <span className="min-w-0">
+                              {s.mapping.misfit
+                                .replace('{verwacht}', shapeLabel(row.shape))
+                                .replace('{gevonden}', shapeLabel(profile))}
+                            </span>
+                          </p>
+                        ) : null}
                       </>
                     );
                   })() : null}
@@ -531,7 +466,37 @@ export function MappingStep({
         ) : null}
       </Card>
 
-      <Button onClick={onContinue}>{s.mapping.continue}</Button>
+      {/* Staat er toch nog iets open — een nieuwe bankversie, of een bevestiging
+          die hij introk — dan zeggen wát en waar, met de weg erheen. Een
+          uitgeschakelde knop met "bevestig eerst" liet hem zoeken op een scherm
+          waar niets te bevestigen valt. */}
+      {!ready ? (
+        <div className="rounded-lg border border-warn/40 bg-warn-soft px-3 py-2.5">
+          <p className="text-sm font-medium text-warn">{s.mapping.notReadyHeading}</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink">
+            {s.mapping.notReadyBody}{' '}
+            {[
+              ...(stillToConfirm(state).base ? [s.questions.baseHeading] : []),
+              ...stillToConfirm(state).categories,
+            ].join(' · ')}
+          </p>
+          <div className="mt-2">
+            <Button variant="secondary" onClick={onBack}>{s.mapping.backToQuestions}</Button>
+          </div>
+        </div>
+      ) : null}
+
+      <p className="text-xs leading-relaxed text-muted">{s.mapping.noColumnIsFine}</p>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button onClick={onRun} disabled={!ready} loading={running}>{s.questions.runScan}</Button>
+        {ready ? <span className="text-sm text-muted">{s.questions.allValidated}</span> : null}
+        {error ? (
+          <div className="mt-3 w-full">
+            <ErrorState title={s.errors.scanFailed} body={error} next={s.errors.scanFailedNext} />
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

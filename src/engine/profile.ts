@@ -15,8 +15,8 @@
 // Het wordt opgebouwd zodra de catalogus er is, in de browser. Puur en
 // deterministisch: dezelfde catalogus geeft hetzelfde profiel.
 
-import type { Dataset, ProductRecord } from '../domain/types';
-import { categoryMemberships, segmentAt, withoutFacets } from './join';
+import type { AttributeShape, Dataset, ProductRecord } from '../domain/types';
+import { categoryMemberships, isExcludedProduct, segmentAt, withoutExcluded, withoutFacets } from './join';
 
 export type ValueKind = 'empty' | 'boolean' | 'number' | 'list' | 'code' | 'text';
 
@@ -125,6 +125,9 @@ const UNITS = [
   'gb', 'tb', 'mb',
   'kcal', 'kj', 'bar', 'pa',
 ].sort((a, b) => b.length - a.length);
+
+/** De eenheden die het profiel herkent; ook de lijst waaruit een kenmerktype mag kiezen. */
+export const UNIT_WORDS: readonly string[] = UNITS;
 const NUMBER = new RegExp(
   `^[-+]?(?:\\d{1,3}(?:[.,\\s\\u00a0]\\d{3})+|\\d+)(?:[.,]\\d+)?\\s*(${UNITS.map((unit) => unit.replace(/[.*+?^${}()|[\]\\/"]/g, '\\$&')).join('|')})?$`,
   'i',
@@ -151,6 +154,8 @@ export function profileCatalog(
   level = 0,
   /** Paden die de merchant als kenmerk liet staan; die tellen niet als categorie. */
   facets: ReadonlySet<string> = new Set(),
+  /** Paden die de merchant uitsloot; producten die alleen daar hangen tellen niet. */
+  excluded: ReadonlySet<string> = new Set(),
 ): Record<string, ColumnProfile> {
   const byCanonical = new Map<string, number>();
   for (const canonical of Object.values(catalog.mapping)) {
@@ -162,8 +167,13 @@ export function profileCatalog(
     tallies.set(column, { filled: 0, raw: new Map(), byCategory: new Map() });
   }
 
+  let included = 0;
   for (const product of catalog.products) {
-    const categories = [...new Set(withoutFacets(categoryMemberships(product), facets).map((path) => segmentAt(path, level)))];
+    // Wat de merchant uitsloot, hoort niet mee te bepalen hoe vol een kolom is.
+    if (isExcludedProduct(product, excluded)) continue;
+    included += 1;
+    const places = withoutFacets(withoutExcluded(categoryMemberships(product), excluded), facets);
+    const categories = [...new Set(places.map((path) => segmentAt(path, level)))];
     for (const column of catalog.columns) {
       const tally = tallies.get(column) as Tally;
       const value = valueOf(product, column, catalog.mapping[column]);
@@ -191,7 +201,7 @@ export function profileCatalog(
     out[column] = {
       column,
       filled: tally.filled,
-      total: catalog.products.length,
+      total: included,
       kind,
       unit,
       distinct: counts.size,
@@ -326,4 +336,60 @@ const CATEGORY_FILLED = 0.5;
 export function filledIn(profile: ColumnProfile): string[] {
   const filled = profile.categories.filter((entry) => entry.filled / entry.total >= CATEGORY_FILLED);
   return filled.length === profile.categories.length ? [] : filled.map((entry) => entry.category);
+}
+
+/**
+ * Eenheden die hetzelfde meten. Een breedte in cm en een kolom in mm passen;
+ * een temperatuur en een kolom in cm niet.
+ */
+const UNIT_FAMILIES: string[][] = [
+  ['µm', 'mm', 'cm', 'm', 'km', 'mtr', 'inch', 'in', 'ft', '"'],
+  ['mm²', 'mm2', 'cm²', 'cm2', 'm²', 'm2'],
+  ['ml', 'cl', 'dl', 'l', 'ltr', 'cm³', 'cm3', 'm³', 'm3'],
+  ['mg', 'g', 'gr', 'kg', 'oz', 'lb', 'lbs'],
+  ['g/m²', 'g/m2', 'gr/m2', 'gsm'],
+  ['g/m1', 'g/m', 'kg/m'],
+  ['°c', '°f', '°'],
+  ['%'],
+  ['w', 'kw'],
+  ['wh', 'kwh', 'kcal', 'kj'],
+  ['v'],
+  ['ma', 'mah', 'ah'],
+  ['lm', 'lux'],
+  ['k'],
+  ['db'],
+  ['hz', 'khz'],
+  ['mb', 'gb', 'tb'],
+  ['bar', 'pa'],
+];
+
+const familyOf = (unit: string) => UNIT_FAMILIES.findIndex((family) => family.includes(unit.toLowerCase()));
+
+/**
+ * Kan deze kolom dit kenmerk nooit dragen?
+ *
+ * Alleen de gevallen die zeker zijn, want een afgewezen koppeling die wél klopte
+ * kost de merchant een gat dat er niet is. Drie:
+ *
+ *   - een getal verwacht, en de kolom is ja/nee;
+ *   - een getal verwacht, en de kolom is een lijst of tekst zonder één cijfer;
+ *   - een getal met eenheid verwacht, en de kolom meet in een andere grootheid
+ *     (°C tegen cm).
+ *
+ * Een ja/nee-kenmerk wordt nooit afgewezen: een waterkolom in mm beantwoordt
+ * "is hij waterdicht" ook, en een certificaatnummer "heeft hij een keurmerk". Een
+ * lege kolom evenmin — leeg is invulwerk, en dat is de bevinding.
+ */
+export function shapeMisfit(shape: AttributeShape, profile: ColumnProfile): boolean {
+  if (profile.kind === 'empty' || shape.kind !== 'number') return false;
+  if (profile.kind === 'boolean') return true;
+  if ((profile.kind === 'list' || profile.kind === 'text') && !profile.samples.some((value) => /\d/.test(value))) {
+    return true;
+  }
+  if (profile.kind === 'number' && shape.unit && profile.unit) {
+    const expected = familyOf(shape.unit);
+    const found = familyOf(profile.unit);
+    if (expected >= 0 && found >= 0 && expected !== found) return true;
+  }
+  return false;
 }

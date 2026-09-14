@@ -133,6 +133,16 @@ Vuistregel: bij stoffen was een derde van de vragen categorieoverstijgend. Verwa
 
 Een overlay mag een basisvraag **herwegen** of uitschakelen, maar niet herschrijven. Anders lopen dezelfde vragen uit de pas.
 
+### Losstaande categorieën krijgen geen basislaag
+
+Niet alles wat een winkel verkoopt is het kernproduct van de markt. Een stoffenwinkel verkoopt ook naaigaren, onderhoudsmiddelen en gereedschap; een fietsenwinkel verlichting en sloten. Voor zulke producten slaan de algemene vragen nergens op — "hoe breed is de stof" bij een klos garen — en ze meetellen meet iets wat er niet is.
+
+Markeer zo'n categorie als **losstaand**: een eigen vragenset, zonder de basislaag. De toets: slaan de meeste algemene vragen van deze markt op deze producten nergens op, dan is ze losstaand. Waar de winkel haar in zijn menu hangt verandert daar niets aan; De Groot hangt zijn garens onder Meubelstoffen, en het blijft garen.
+
+In de vragenlijst is dat `laag: standalone`. Voor een bank die er al ligt kan de beheerder een categorie op het beoordeelscherm losstaand maken, zonder opnieuw te genereren.
+
+Neem categorienamen over zoals de markt ze schrijft en niet zoals één winkel ze spelt: een bank hoort bij de markt. Een label is op het beoordeelscherm te corrigeren; de categorie van de merchant blijft er dan gewoon op aansluiten.
+
 ### Subcategorieën worden profielen, geen eigen bank
 
 Toepassingssubcategorieën (banken, eetkamerstoelen, vouwgordijnen) verschillen niet in wélke vragen gesteld worden, maar in de **drempels en berekeningen** bij dezelfde vragen. Leg ze vast als `toepassingsprofielen` binnen de overlay. Dat houdt de vragenset klein en de parametrisering expliciet.
@@ -187,6 +197,23 @@ Lever de MD-versie aan, niet de YAML. Vraag specifiek om:
 - of de vragen kloppen zoals klanten ze werkelijk stellen
 - welke vraag ontbreekt die zij dagelijks krijgen
 - of een attribuut op product- of variantniveau hoort
+
+---
+
+## Fase 7 — Kenmerken typeren
+
+Na de review, en los van de generatie. Een bank noemt een kenmerk bij naam (`hittebestendigheid_max_c`, `coatingtype`), en het antwoordtype staat per vraag — een vraag met vier kenmerken heeft één type voor alle vier. Het koppelscherm moet per kenmerk weten welke waarde er in een catalogus hoort, anders legt het een °C-kenmerk op een ja/nee-kolom en verdwijnt een gat dat er wél is.
+
+Per kenmerk één vorm:
+- **ja/nee** — waar of niet waar
+- **getal** — met een generieke eenheid als die er is (cm, g/m², °C, %); zonder eenheid bij toeren of een blauwschaal
+- **lijst** — een keuze uit een beperkte set, met hooguit acht voorbeeldwaarden
+- **code** — certificaatnummer, EAN, normcode
+- **tekst** — vrije omschrijving
+
+Het model krijgt alleen de kenmerknamen, hooguit twee vragen per kenmerk en hoe de sites het noemen. Geen catalogus: de typering hoort bij de markt. Eén keer per markt, in blokken van 120 die tegelijk lopen. De uitkomst is een tabel die de beheerder naloopt en bevestigt; pas dan ziet een merchant de typen. Bij twijfel liever "tekst": het koppelscherm wijst alleen af wat zeker niet past, en een te strenge vorm wijst een kolom af die wél klopte.
+
+Omdat het een losse stap is, krijgt een bank die er al ligt zijn typen zonder opnieuw gegenereerd te worden. Pas je een type aan, dan gaat de tabel terug op review.
 
 ---
 

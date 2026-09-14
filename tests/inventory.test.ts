@@ -90,3 +90,16 @@ test('de telling onderaan: een som staat open bij één ontbrekende term, bewijs
   assert.deepEqual(mappingSummary(state, { rapporthoogte: ['pattern_repeat'] }), { questions: 0, attributes: 0 });
   assert.deepEqual(mappingSummary(state, { keurmerk: [] }), { questions: 2, attributes: 3 });
 });
+
+test('een uitgezette vraag vraagt geen koppeling', () => {
+  const aan = question('aan', 'any', [group('rolbreedte', [])]);
+  const uit = { ...question('uit', 'any', [group('naalddikte', [])]), disabled: true } as Question;
+  const state = {
+    sets: [{ category: 'Stoffen', productCount: 10, questions: [aan, uit] }],
+    overlays: [],
+    version: 1,
+  } as unknown as QuestionSetState;
+
+  assert.deepEqual(attributeInventory(state).map((row) => row.key), ['rolbreedte']);
+  assert.deepEqual(mappingSummary(state), { questions: 1, attributes: 1 });
+});

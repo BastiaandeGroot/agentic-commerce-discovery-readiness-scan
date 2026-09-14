@@ -86,7 +86,10 @@ export function toQuestion(
 ): Question {
   const evidence = question.evidence.map((key) => {
     const attribute = attributes.get(key);
-    if (attribute) return groupFor(attribute);
+    // Het type gaat mee tot op de vraag, zodat het koppelscherm het naast een
+    // kolom kan leggen. Alleen als het er is: een kenmerk zonder bevestigd type
+    // blijft zoals het was.
+    if (attribute) return attribute.shape ? { ...groupFor(attribute), shape: attribute.shape } : groupFor(attribute);
     return { attributeKey: key, label: { nl: key, en: key }, fields: [], mode: 'any' as const };
   });
 

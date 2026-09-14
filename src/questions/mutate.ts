@@ -235,3 +235,74 @@ export function allValidated(state: QuestionSetState): boolean {
   if (!state.baseValidated) return false;
   return state.sets.filter(hasOwnQuestions).every((s) => s.validated);
 }
+
+/**
+ * Een vraag die geen enkele onderzochte webshop behandelt.
+ *
+ * Exact 0 en niet `null`: 0 is een vondst (niemand behandelt dit), `null` is een
+ * onderwerp dat niet onderzocht is. Die twee samen uitzetten zou een vraag laten
+ * vallen omdat wíj niet keken. Een eigen vraag van de merchant heeft geen
+ * dekking en valt er dus nooit onder.
+ */
+export function isUncovered(question: Question): boolean {
+  return question.coverage === 0 && !question.custom;
+}
+
+/**
+ * De eigen vragen van één categorie zonder dekking uitzetten.
+ *
+ * Alleen de categorievragen: een algemene vraag hier uitzetten zou hem in de ene
+ * categorie uit en in de andere aan laten staan, en dan meten twee categorieën
+ * iets anders onder hetzelfde id. Daarvoor is `disableUncoveredBase`. Per vraag
+ * terug te draaien, en elke vraag krijgt zijn eigen changelogregel.
+ */
+export function disableUncovered(state: QuestionSetState, at: string, setId: string): QuestionSetState {
+  const set = state.sets.find((candidate) => candidate.id === setId);
+  if (!set) return state;
+  return set.questions
+    .filter((question) => question.layer === 'category' && isUncovered(question) && !question.disabled)
+    .reduce((acc, question) => toggleQuestion(acc, at, setId, question.id), state);
+}
+
+/** De algemene vragen zonder dekking uitzetten, in elke categorie tegelijk. */
+export function disableUncoveredBase(state: QuestionSetState, at: string): QuestionSetState {
+  return baseQuestions(state)
+    .map((entry) => entry.question)
+    .filter((question) => isUncovered(question) && !question.disabled)
+    .reduce((acc, question) => toggleBaseQuestion(acc, at, question.id), state);
+}
+
+/**
+ * Op dekking, hoog naar laag.
+ *
+ * Wat de meeste webshops in de markt behandelen, is het zekerst iets waar een
+ * koper naar vraagt, en dat hoort bovenaan te staan bij het nalopen. Niet
+ * onderzocht staat onderaan, want daar zegt de dekking niets. Bij gelijke dekking
+ * blijft de volgorde uit de bank staan.
+ */
+export function byCoverage<T>(items: T[], coverageOf: (item: T) => number | null | undefined): T[] {
+  const rank = (item: T) => {
+    const coverage = coverageOf(item);
+    return coverage === null || coverage === undefined ? -1 : coverage;
+  };
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => rank(b.item) - rank(a.item) || a.index - b.index)
+    .map((entry) => entry.item);
+}
+
+/**
+ * Wat nog bevestigd moet worden voordat de scan kan draaien.
+ *
+ * Een ja of nee (`allValidated`) zegt de merchant niet wáár hij moet kijken; bij
+ * tien categorieën zoekt hij dan blok voor blok. Dit noemt het: de algemene
+ * vragen, en de categorieën met eigen vragen die nog open staan.
+ */
+export function stillToConfirm(state: QuestionSetState): { base: boolean; categories: string[] } {
+  return {
+    base: !state.baseValidated,
+    categories: state.sets
+      .filter((set) => hasOwnQuestions(set) && !set.validated)
+      .map((set) => set.label.nl),
+  };
+}
