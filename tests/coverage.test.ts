@@ -7,7 +7,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { byCoverage, disableUncovered, disableUncoveredBase, stillToConfirm, toggleBaseValidated, toggleValidated } from '../src/questions/mutate';
+import { byCoverage, disableUncovered, disableUncoveredBase, enableUncovered, enableUncoveredBase, stillToConfirm, toggleBaseValidated, toggleQuestion, toggleValidated } from '../src/questions/mutate';
 import type { Question, QuestionSetState } from '../src/domain/types';
 
 const AT = '2026-09-14T12:00:00.000Z';
@@ -63,4 +63,15 @@ test('wat nog bevestigd moet worden, wordt bij naam genoemd', () => {
 
   const deels = toggleBaseValidated(toggleValidated(open, 'meubel'));
   assert.deepEqual(stillToConfirm(deels), { base: false, categories: ['Gordijn'] });
+});
+
+test('weer aanzetten is het omgekeerde, en raakt alleen vragen zonder dekking', () => {
+  const uit_ = uit;
+  const eerst = disableUncovered(disableUncoveredBase(stand(), AT), AT, 'meubel');
+  // Een vraag met dekking die de merchant zelf uitzette, blijft uit.
+  const handmatig = toggleQuestion(eerst, AT, 'meubel', 'M-twee');
+
+  const terug = enableUncoveredBase(enableUncovered(handmatig, AT, 'meubel'), AT);
+  assert.deepEqual(uit_(terug, 'meubel'), ['M-twee']);
+  assert.deepEqual(uit_(terug, 'gordijn'), []);
 });

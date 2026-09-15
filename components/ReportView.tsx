@@ -7,7 +7,8 @@
 // hier gemeten wordt is één ding: kan de catalogus de vragen beantwoorden die
 // een koper in deze markt stelt.
 
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
 import { Download } from 'lucide-react';
 import { adviceKey, advisoryItems, mergedGaps, scoreRows, topBlockers, unansweredQuestions } from '../src/report/derive';
 import { toSnapshot } from '../src/engine/snapshot';
@@ -566,6 +567,7 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
   canSave?: boolean;
 }) {
   const { accountId } = useAuth();
+  const router = useRouter();
   /** Ingelogd bewaren we in het account, anders in deze browser. */
   const target = useMemo(() => snapshotStoreFor(supabase(), accountId), [accountId]);
   const [saveState, setSaveState] = useState<'idle' | 'busy' | 'saved' | 'failed'>('idle');
@@ -609,22 +611,6 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
     }
   }
 
-  /**
-   * Ingelogd bewaart het rapport zichzelf.
-   *
-   * Een merchant die zijn analyses later wil terugzien, hoort niet te moeten
-   * weten dat hij op een knop moest drukken. Zonder login blijft het een keuze:
-   * dan staat het alleen in deze browser, en dat hoort hij bewust te doen.
-   * Dezelfde scan twee keer bewaren overschrijft hem, dus opnieuw openen kan geen
-   * dubbele rij opleveren.
-   */
-  const autoSaved = useRef(false);
-  useEffect(() => {
-    if (!canSave || target.where !== 'account' || autoSaved.current) return;
-    autoSaved.current = true;
-    void (async () => { await Promise.resolve(); await save(); })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSave, target]);
 
   // Niet-bevroren banken dragen allebei een voorbehoud, maar niet hetzelfde.
   // Een voorlopige bank is ónze terugval uit vakkennis; een ingelezen lijst zonder
@@ -738,21 +724,35 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
       {/* Bewaren zonder dat er data weggaat: de pdf wordt in de browser gemaakt
           en rechtstreeks gedownload. */}
       <Card>
-        <p className="text-sm leading-relaxed text-muted">{s.report.shareNote}</p>
+        <p className="text-sm leading-relaxed text-muted">
+          {canSave && target.where === 'account' ? s.report.shareNoteAccount : s.report.shareNote}
+        </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {canSave && target.where === 'browser' ? (
             <Button variant="secondary" onClick={() => void save()} disabled={saveState === 'saved'} loading={saveState === 'busy'}>
               {saveState === 'saved' ? s.report.savedScan : s.report.saveScan}
             </Button>
           ) : null}
+          {/* Opslaan is een handeling van de merchant, geen stille bijzaak: hij
+              hoort te weten dat dit rapport in zijn account staat, en waar hij
+              het terugvindt. */}
           {canSave && target.where === 'account' ? (
-            saveState === 'failed' ? (
-              <Button variant="secondary" onClick={() => void save()}>{s.report.saveAccountRetry}</Button>
-            ) : (
-              <span className="text-sm text-muted" role="status">
-                {saveState === 'saved' ? s.report.savedAccount : s.report.savingAccount}
-              </span>
-            )
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => void save()}
+                loading={saveState === 'busy'}
+                disabled={saveState === 'saved'}
+              >
+                {saveState === 'saved' ? `✓ ${s.report.savedAccount}`
+                  : saveState === 'failed' ? s.report.saveAccountRetry
+                  : saveState === 'busy' ? s.report.savingAccount
+                  : s.report.saveAccount}
+              </Button>
+              {saveState === 'saved' ? (
+                <Button variant="quiet" onClick={() => router.push('/dashboard/scans')}>{s.report.viewAnalyses}</Button>
+              ) : null}
+            </>
           ) : null}
           <Button variant="secondary" onClick={() => void savePdf()} loading={pdf === 'busy'}>
             <Download className="size-4" aria-hidden />

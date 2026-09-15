@@ -581,8 +581,10 @@ deze wijziging worden teruggevonden op markt en versie.
 
 **Eerdere analyses staan in het account (15 september 2026).** Een ingelogde
 merchant ziet zijn analyses terug zonder alle stappen opnieuw te doorlopen, op
-elk apparaat. Het rapport bewaart zichzelf zodra hij ingelogd is; zonder login
-blijft het de knop, in de browser. Het overzicht en "Scans" lezen uit het account
+elk apparaat. Ingelogd staat onder het rapport "Opslaan in je account", daarna
+"Bekijk je analyses"; zonder login blijft het de knop, in de browser. Eerst
+bewaarde het rapport zichzelf, maar dat las niet als iets wat de merchant deed
+(15 september: expliciete knop op verzoek). Het overzicht en "Scans" lezen uit het account
 (`SupabaseSnapshotStore`, migratie 0011 op de tabel `scan_snapshots` die er sinds
 0001 ongebruikt stond) en een analyse is te openen (`SnapshotReport`).
 
@@ -602,6 +604,12 @@ een subcategorie met een losstaande vragenset geen ouder (`isStandaloneOverlay` 
 `generate.ts`): ze staat als eigen regel, en een product dat alleen daar hangt
 telt in het rapport als eigen categorie (`placeProduct`). Een gewone subcategorie
 blijft onder haar tak. "Niet meenemen" zoekt zo'n categorie op elke diepte.
+
+**Het wijzigingslog staat in het dashboard (15 september 2026).** Onder
+"Wijzigingen", per vragenbank en nieuwste eerst, gelezen uit het bewaarde werk per
+account (`SettingsStore.list`). Van het vragensetscherm weg: daar maakte het de
+lijst onderaan alleen langer, en het is iets wat je terugleest en niet iets wat je
+tijdens het valideren doet.
 
 ## Bewust afgevallen
 

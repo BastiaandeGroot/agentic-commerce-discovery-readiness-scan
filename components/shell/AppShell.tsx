@@ -8,7 +8,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { ChevronDown, Inbox, LayoutGrid, Library, ListChecks, Radar, Settings, ArrowLeft } from 'lucide-react';
+import { ChevronDown, History, Inbox, LayoutGrid, Library, ListChecks, Radar, Settings, ArrowLeft } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { STRINGS } from '../../src/i18n/strings';
 import { authHeader } from '../../src/auth/client';
@@ -18,6 +18,7 @@ import { useLocale } from '../../src/i18n/useLocale';
 const LINKS = [
   { href: '/dashboard', key: 'overview', Icon: LayoutGrid },
   { href: '/dashboard/scans', key: 'scans', Icon: ListChecks },
+  { href: '/dashboard/wijzigingen', key: 'changes', Icon: History },
   // Alleen zichtbaar voor beheerders. De pagina zelf beslist dat serverzijdig;
   // dit is navigatie en geen slot.
   { href: '/dashboard/aanvragen', key: 'requests', Icon: Inbox, admin: true },
