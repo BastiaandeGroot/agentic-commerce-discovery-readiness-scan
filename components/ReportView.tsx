@@ -7,11 +7,13 @@
 // hier gemeten wordt is één ding: kan de catalogus de vragen beantwoorden die
 // een koper in deze markt stelt.
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { Download } from 'lucide-react';
 import { adviceKey, advisoryItems, mergedGaps, scoreRows, topBlockers, unansweredQuestions } from '../src/report/derive';
 import { toSnapshot } from '../src/engine/snapshot';
-import { LOCAL_ACCOUNT, snapshotStore } from '../src/storage/snapshots';
+import { snapshotStoreFor } from '../src/storage/snapshots';
+import { supabase } from '../src/auth/client';
+import { useAuth } from './auth/AuthProvider';
 import type { Locale, ScanReport } from '../src/domain/types';
 import { requirementLabel } from '../src/spec/fields';
 import type { Strings } from '../src/i18n/strings';
@@ -563,7 +565,10 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
   /** Een voorbeeldrapport hoort niet tussen je eigen scans te belanden. */
   canSave?: boolean;
 }) {
-  const [saved, setSaved] = useState(false);
+  const { accountId } = useAuth();
+  /** Ingelogd bewaren we in het account, anders in deze browser. */
+  const target = useMemo(() => snapshotStoreFor(supabase(), accountId), [accountId]);
+  const [saveState, setSaveState] = useState<'idle' | 'busy' | 'saved' | 'failed'>('idle');
   /** Het pdf-bestand: bezig, of mislukt met de weg eromheen. */
   const [pdf, setPdf] = useState<'idle' | 'busy' | 'failed'>('idle');
 
@@ -587,17 +592,39 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
   }
 
   async function save() {
-    // Alleen de uitkomst gaat de opslag in, niet de producten of het bronbestand.
-    await snapshotStore.save(
-      toSnapshot(report, {
-        id: `${report.stamp.scannedAt}-${report.sources.catalog.filename}`,
-        accountId: LOCAL_ACCOUNT,
-        savedAt: new Date().toISOString(),
-        label: report.sources.catalog.filename,
-      }),
-    );
-    setSaved(true);
+    setSaveState('busy');
+    try {
+      // Alleen de uitkomst gaat de opslag in, niet de producten of het bronbestand.
+      await target.store.save(
+        toSnapshot(report, {
+          id: `${report.stamp.scannedAt}-${report.sources.catalog.filename}`,
+          accountId: target.accountId,
+          savedAt: new Date().toISOString(),
+          label: report.sources.catalog.filename,
+        }),
+      );
+      setSaveState('saved');
+    } catch {
+      setSaveState('failed');
+    }
   }
+
+  /**
+   * Ingelogd bewaart het rapport zichzelf.
+   *
+   * Een merchant die zijn analyses later wil terugzien, hoort niet te moeten
+   * weten dat hij op een knop moest drukken. Zonder login blijft het een keuze:
+   * dan staat het alleen in deze browser, en dat hoort hij bewust te doen.
+   * Dezelfde scan twee keer bewaren overschrijft hem, dus opnieuw openen kan geen
+   * dubbele rij opleveren.
+   */
+  const autoSaved = useRef(false);
+  useEffect(() => {
+    if (!canSave || target.where !== 'account' || autoSaved.current) return;
+    autoSaved.current = true;
+    void (async () => { await Promise.resolve(); await save(); })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canSave, target]);
 
   // Niet-bevroren banken dragen allebei een voorbehoud, maar niet hetzelfde.
   // Een voorlopige bank is ónze terugval uit vakkennis; een ingelezen lijst zonder
@@ -713,10 +740,19 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
       <Card>
         <p className="text-sm leading-relaxed text-muted">{s.report.shareNote}</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {canSave ? (
-            <Button variant="secondary" onClick={() => void save()} disabled={saved}>
-              {saved ? s.report.savedScan : s.report.saveScan}
+          {canSave && target.where === 'browser' ? (
+            <Button variant="secondary" onClick={() => void save()} disabled={saveState === 'saved'} loading={saveState === 'busy'}>
+              {saveState === 'saved' ? s.report.savedScan : s.report.saveScan}
             </Button>
+          ) : null}
+          {canSave && target.where === 'account' ? (
+            saveState === 'failed' ? (
+              <Button variant="secondary" onClick={() => void save()}>{s.report.saveAccountRetry}</Button>
+            ) : (
+              <span className="text-sm text-muted" role="status">
+                {saveState === 'saved' ? s.report.savedAccount : s.report.savingAccount}
+              </span>
+            )
           ) : null}
           <Button variant="secondary" onClick={() => void savePdf()} loading={pdf === 'busy'}>
             <Download className="size-4" aria-hidden />
@@ -724,6 +760,9 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
           </Button>
           <Button variant="quiet" onClick={onRestart}>{restartLabel ?? s.report.startOver}</Button>
         </div>
+        {saveState === 'failed' && target.where === 'account' ? (
+          <p className="mt-2 text-sm text-warn">{s.report.saveAccountFailed}</p>
+        ) : null}
         {pdf === 'failed' ? (
           <div className="mt-3">
             <ErrorState title={s.report.pdfFailed} body={s.report.pdfFailedBody} next={s.report.pdfFailedNext} />

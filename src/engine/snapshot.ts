@@ -18,9 +18,12 @@ export interface SnapshotGap {
   affected: number;
 }
 
+export interface SnapshotAverage { answered: number; total: number }
+
 export interface SnapshotCategory {
   setId: string;
   category: string;
+  subcategory?: string;
   total: number;
   qualified: number;
   findable: number;
@@ -28,6 +31,32 @@ export interface SnapshotCategory {
   avgApplicable: number;
   avgEarned: number;
   avgWeight: number;
+  /** De drie gemiddelden waar een merchant op stuurt. Ontbreekt bij oudere snapshots. */
+  critical?: SnapshotAverage;
+  general?: SnapshotAverage;
+  all?: SnapshotAverage;
+}
+
+/**
+ * Een onbeantwoorde vraag, met waar hij strandt.
+ *
+ * De tekst van de vraag komt uit de vragenbank en de getallen zijn tellingen:
+ * dit is de werklijst van de merchant zonder één product erin.
+ */
+export interface SnapshotQuestion {
+  setId: string;
+  questionId: string;
+  label: Bilingual;
+  importance: string;
+  layer?: 'base' | 'category';
+  answered: number;
+  applicable: number;
+  /** Het veld bestaat maar staat leeg. */
+  empty: number;
+  /** Gevuld maar te mager, of deels beantwoord. */
+  weak: number;
+  /** Geen veld voor. */
+  absent: number;
 }
 
 export interface ScanSnapshot {
@@ -58,10 +87,16 @@ export interface ScanSnapshot {
   distance: { open: number; products: number }[];
   categories: SnapshotCategory[];
   gaps: SnapshotGap[];
+  /** Onbeantwoorde gescoorde vragen, beste eerst. Ontbreekt bij oudere snapshots. */
+  questions?: SnapshotQuestion[];
+  /** Vragen buiten de score, één keer per vraag met de sets waar ze spelen. */
+  advisory?: { questionId: string; label: Bilingual; importance: string; setIds: string[] }[];
 }
 
 /** Hoeveel gaten we bewaren. Genoeg om te vergelijken, niet de hele staart. */
 const MAX_GAPS = 30;
+/** Hoeveel onbeantwoorde vragen we bewaren. Ruim genoeg voor de werklijst van een grote bank. */
+const MAX_QUESTIONS = 300;
 
 export function toSnapshot(
   report: ScanReport,
@@ -91,6 +126,10 @@ export function toSnapshot(
     categories: report.categories.map((category) => ({
       setId: category.setId,
       category: category.category,
+      subcategory: category.subcategory,
+      critical: { ...category.critical },
+      general: { ...category.general },
+      all: { ...category.all },
       total: category.total,
       qualified: category.qualified,
       findable: category.findable,
@@ -105,5 +144,27 @@ export function toSnapshot(
       cause: gap.cause,
       affected: gap.affected,
     })),
+    questions: report.questionCoverage
+      .filter((row) => row.scored && row.answered < row.applicable)
+      .sort((a, b) => b.answered / Math.max(b.applicable, 1) - a.answered / Math.max(a.applicable, 1))
+      .slice(0, MAX_QUESTIONS)
+      .map((row) => ({
+        setId: row.setId,
+        questionId: row.questionId,
+        label: row.label,
+        importance: row.importance,
+        layer: row.layer,
+        answered: row.answered,
+        applicable: row.applicable,
+        empty: row.empty,
+        weak: row.unusable + row.incomplete,
+        absent: row.absent,
+      })),
+    advisory: [...report.advisory.reduce((byId, row) => {
+      const entry = byId.get(row.questionId) ?? { questionId: row.questionId, label: row.label, importance: row.importance, setIds: [] as string[] };
+      if (!entry.setIds.includes(row.setId)) entry.setIds.push(row.setId);
+      byId.set(row.questionId, entry);
+      return byId;
+    }, new Map<string, { questionId: string; label: Bilingual; importance: string; setIds: string[] }>()).values()],
   };
 }

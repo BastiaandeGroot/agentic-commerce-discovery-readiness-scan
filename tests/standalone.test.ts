@@ -62,3 +62,37 @@ test('een gecorrigeerd label sluit aan op de nieuwe én de oude naam', () => {
   assert.equal(ownOverlayFor(toegepast, 'Onderhoudsproducten')?.id, onderhoud);
   assert.equal(ownOverlayFor(toegepast, 'Care products')?.id, onderhoud);
 });
+
+test('een losstaande subcategorie staat als eigen categorie, op het scherm en in het rapport', async () => {
+  const { ingest } = await import('../src/intake/index');
+  const { generateQuestionSets } = await import('../src/questions/generate');
+  const { placeProduct } = await import('../src/engine/join');
+
+  const catalogus = ingest('c.csv', [
+    'sku;categorie',
+    '1;Meubelstoffen',
+    '2;Gordijnstoffen',
+    '3;Meubelstoffen/Universele naaigarens',
+    '4;Meubelstoffen/Onderhoudsprodukten',
+  ].join('\n'));
+  const garen = idVan('Universele naaigarens');
+  const toegepast = applyOverlaySettings(bank(), { standalone: [garen] });
+  const state = generateQuestionSets(catalogus, [toegepast]);
+
+  const garenSet = state.sets.find((set) => set.category === 'Universele naaigarens');
+  const onderhoudSet = state.sets.find((set) => set.category === 'Onderhoudsprodukten');
+  assert.ok(garenSet && onderhoudSet, 'beide subcategorieën hebben een eigen set');
+  // Losstaand hangt nergens onder; een gewone subcategorie blijft onder haar tak.
+  assert.equal(garenSet.parent, undefined);
+  assert.equal(onderhoudSet.parent, 'Meubelstoffen');
+  assert.deepEqual(garenSet.questions.map((question) => question.id), ['G1']);
+
+  const level = state.segmentLevel ?? 0;
+  const plekGaren = placeProduct(catalogus.products[2], state.sets, level);
+  assert.equal(plekGaren.category, 'Universele naaigarens');
+  assert.equal(plekGaren.subcategory, undefined);
+
+  const plekOnderhoud = placeProduct(catalogus.products[3], state.sets, level);
+  assert.equal(plekOnderhoud.category, 'Meubelstoffen');
+  assert.equal(plekOnderhoud.subcategory, 'Onderhoudsprodukten');
+});

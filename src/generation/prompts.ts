@@ -18,7 +18,7 @@ import type { GroupingEntry, Phase, RunState, Topic } from './state';
 import { isStandaloneCategory, overlayCategories } from './state';
 
 /** Omhoog zodra een prompt de uitkomst op dezelfde markt kan verschuiven. */
-export const GENERATION_VERSION = '1.4.0';
+export const GENERATION_VERSION = '1.5.0';
 
 /**
  * Wat een vraag moet bevatten, en in welke vorm.
@@ -227,10 +227,12 @@ klos garen), dan is de categorie losstaand. Hangt de categorie in de boom van de
 winkel onder een kernproduct, dan verandert dat niets: waar een winkel iets in
 zijn menu zet, zegt niet wat het is.
 
-**De toets voor een overlay.** Een eigen vragenset is alleen terecht als je
-minstens DRIE vragen kunt noemen die in deze categorie gesteld worden en in geen
-enkele andere categorie van deze markt. Zet die drie in "distinct". Lukt dat
-niet, dan is het een toepassingsprofiel: dezelfde vragen, andere drempels.
+**De toets voor een overlay.** Een eigen vragenset is alleen terecht als er
+minstens ÉÉN consumentenvraag is die in deze categorie gesteld wordt en in geen
+enkele andere categorie van deze markt, én die op minstens één panelsite
+voorkomt. Zet die vragen in "distinct". Kun je er geen enkele noemen die een
+panelsite behandelt, dan is het een toepassingsprofiel: dezelfde vragen, andere
+drempels.
 
 Die toets is er omdat een reden altijd te vinden is en dit de duurste fout is
 die je kunt maken. Een overlay die geen eigen vragen heeft, geeft de producten
@@ -252,7 +254,7 @@ Antwoord met dit JSON-object:
     "standards": ["ETIM, ISO/EN-normen, ... — alleen wat je kunt onderbouwen"],
     "legal": ["alleen echte verplichtingen"]
   },
-  "grouping": [{"category": "exact zoals hierboven", "count": 0, "kind": "overlay|profiel|facet|losstaand", "parent": "alleen bij profiel", "reason": "in één zin; bij losstaand welke algemene vragen er niet op slaan", "distinct": ["alleen bij overlay: drie vragen die hier gesteld worden en nergens anders"]}],
+  "grouping": [{"category": "exact zoals hierboven", "count": 0, "kind": "overlay|profiel|facet|losstaand", "parent": "alleen bij profiel", "reason": "in één zin; bij losstaand welke algemene vragen er niet op slaan", "distinct": ["alleen bij overlay: vragen die hier gesteld worden en nergens anders, en op een panelsite voorkomen"]}],
   "findings": ["wat een mens hierover moet weten voordat hij dit vaststelt"]
 }`,
       };
@@ -400,6 +402,8 @@ Twee dingen apart:
   basisvraag mogen veranderen, dan meten twee categorieën verschillende dingen
   onder hetzelfde id.
 - "questions": de vragen die alleen hier gelden. Ids in de vorm ${(category.slice(0, 3) || 'CAT').toUpperCase()}-01.
+  Minstens één daarvan moet op een panelsite voorkomen (dekking > 0); zonder zo'n
+  vraag krijgt deze categorie in de app geen eigen vragenset.
 
 De toepassingen hierboven krijgen GEEN eigen vragen. Zij verschillen in drempels
 en berekeningen bij dezelfde vragen; noem dat verschil in "note" bij de vraag

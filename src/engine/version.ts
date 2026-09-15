@@ -9,4 +9,9 @@
  *
  * Puur cosmetische wijzigingen aan teksten of opmaak raken dit nummer niet.
  */
-export const SCAN_VERSION = '5.0.0';
+// 5.1.0 — een losstaande vragenset (geen basislaag) is een eigen categorie in het
+// rapport, ook als de winkel hem dieper in de boom hangt. Eerst was dat een
+// subrij van de tak erboven ("Meubelstoffen › Universele naaigarens").
+// 5.2.0 — een categorie krijgt alleen een eigen vragenset als minstens één eigen
+// vraag dekking > 0 heeft (in een bank die dekking draagt).
+export const SCAN_VERSION = '5.2.0';

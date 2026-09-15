@@ -232,7 +232,8 @@ werelden.
 ## Opslag
 
 Bewaarde scans gaan via `SnapshotStore` in `src/storage/`, nooit rechtstreeks via
-`localStorage` vanuit een component. Hetzelfde geldt voor het oordeel van de
+`localStorage` vanuit een component. Ingelogd staan ze in het account
+(`scan_snapshots`, via `snapshotStoreFor`), anders in de browser. Hetzelfde geldt voor het oordeel van de
 merchant over zijn categorieboom (`VerdictStore`): dat blijft bewaard omdat een
 modelvoorstel niet elke keer hetzelfde is, en twee scans anders op verschillende
 definities zouden kunnen rusten. Er wordt een **snapshot** bewaard en geen

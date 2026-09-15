@@ -313,10 +313,14 @@ export function placeProduct(
   for (const hit of ordered) if (!unique.some((one) => one.index === hit.index)) unique.push(hit);
 
   const lead = unique[0];
+  // Een set die dieper in de boom hangt maar nergens onder valt, is een eigen
+  // categorie: een losstaande vragenset ("Universele naaigarens" onder
+  // Meubelstoffen). Dan is dát de rij, en niet een subrij van de tak erboven.
+  const own = lead.depth > lead.top && sets[lead.index].parent === undefined;
   return {
     sets: unique.map((hit) => sets[hit.index]),
-    category: lead.path[lead.top],
-    subcategory: lead.depth > lead.top ? lead.path[lead.depth] : undefined,
+    category: own ? lead.path[lead.depth] : lead.path[lead.top],
+    subcategory: !own && lead.depth > lead.top ? lead.path[lead.depth] : undefined,
     facetOnly: false,
   };
 }

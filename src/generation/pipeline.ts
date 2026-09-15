@@ -196,50 +196,29 @@ function readGrouping(raw: unknown, state: RunState): GroupingEntry[] {
     .filter((one): one is GroupingEntry => one !== null);
 }
 
-/** Hoeveel eigen vragen een categorie moet noemen om een eigen vragenset te krijgen. */
-const OVERLAY_BAR = 3;
-
 /**
- * De lat voor een overlay, nagerekend in plaats van geloofd.
+ * De indeling zoals het model hem gaf, zonder eis op het aantal genoemde vragen.
  *
- * De prompt vraagt om drie vragen die in deze categorie gesteld worden en in
- * geen enkele andere. Noemt hij er geen enkele, dan is de toets niet afgelegd
- * en wordt het een toepassingsprofiel — dezelfde vragen, andere drempels, en
- * dat is bijna altijd het juiste antwoord. Noemt hij er één of twee, dan blijft
- * het een overlay maar staat het als bevinding op het scherm: dat is een
- * grensgeval en daar hoort een mens naar te kijken.
- *
- * Dat onderscheid — omzetten bij nul, melden bij te weinig — komt voort uit wat
- * er misgaat als je het fout doet. Een overlay ten onrechte omzetten kost een
- * markt zijn eigen vragen; een profiel ten onrechte laten staan kost een rij in
- * het rapport die niets onderscheidt. Het eerste is erger, dus we grijpen alleen
- * in waar het model niets heeft aan te voeren.
+ * Tot 15 september moest een categorie hier drie vragen noemen die nergens
+ * anders gesteld worden, anders werd ze een profiel. Die eis is vervangen door
+ * een die na te rekenen is: een categorie krijgt een eigen vragenset als
+ * minstens één eigen vraag op een panelsite voorkomt (dekking > 0). Dat is pas
+ * te zien als de vragen geschreven zijn, dus de controle staat bij de
+ * categoriefase (`uncoveredFinding`) en in de app (`withCoveredOverlays`).
  */
 function applyOverlayBar(grouping: GroupingEntry[]): { grouping: GroupingEntry[]; findings: string[] } {
-  const findings: string[] = [];
+  return { grouping, findings: [] };
+}
 
-  const next = grouping.map((entry) => {
-    if (entry.kind !== 'overlay') return entry;
-    const distinct = entry.distinct ?? [];
-
-    if (distinct.length === 0) {
-      findings.push(
-        `${entry.category} kreeg geen eigen vragenset: er is geen enkele vraag genoemd die hier gesteld wordt en nergens anders. `
-        + 'Hij telt nu als toepassingsprofiel — dezelfde vragen, andere drempels.',
-      );
-      return { ...entry, kind: 'profiel' as const };
-    }
-
-    if (distinct.length < OVERLAY_BAR) {
-      findings.push(
-        `${entry.category} kreeg een eigen vragenset op ${distinct.length} eigen vra${distinct.length === 1 ? 'ag' : 'gen'} `
-        + `in plaats van ${OVERLAY_BAR}: ${distinct.join(' · ')}. Kijk na of dat werkelijk een eigen vragenset rechtvaardigt.`,
-      );
-    }
-    return entry;
-  });
-
-  return { grouping: next, findings };
+/**
+ * Een bevinding als geen enkele eigen vraag van deze categorie op een panelsite
+ * voorkomt. De vragen blijven in de bank staan; de app geeft zo'n categorie geen
+ * eigen vragenset, en dat hoort de beheerder te weten vóór het vrijgeven.
+ */
+function uncoveredFinding(category: string, questions: { coverage: number | null }[]): string | undefined {
+  if (questions.some((question) => typeof question.coverage === 'number' && question.coverage > 0)) return undefined;
+  return `${category} heeft geen eigen vraag die een panelsite behandelt (dekking > 0). In de app krijgt deze categorie `
+    + 'daardoor geen eigen vragenset: een subcategorie wordt onder haar categorie gemeten, een hoofdcategorie krijgt alleen de algemene vragen.';
 }
 
 /**
@@ -535,6 +514,7 @@ export function applyReply(
       // Een losstaande categorie erft de basislaag niet, en herwegen van een
       // basisvraag die hier niet gesteld wordt heeft dan geen betekenis.
       const standalone = isStandaloneCategory(state, category);
+      const uncovered = uncoveredFinding(category, questions);
       updated = {
         ...state,
         overlays: [
@@ -543,7 +523,7 @@ export function applyReply(
             ? { category, questions, reweight: [], standalone: true }
             : { category, questions, reweight },
         ],
-        findings: [...state.findings, ...findingsOf(answer)],
+        findings: [...state.findings, ...findingsOf(answer), ...(uncovered ? [uncovered] : [])],
       };
       break;
     }

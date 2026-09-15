@@ -133,6 +133,12 @@ Vuistregel: bij stoffen was een derde van de vragen categorieoverstijgend. Verwa
 
 Een overlay mag een basisvraag **herwegen** of uitschakelen, maar niet herschrijven. Anders lopen dezelfde vragen uit de pas.
 
+### Een eigen vragenset vraagt een vraag die de markt stelt
+
+Een categorie krijgt alleen een eigen vragenset als minstens één eigen consumentenvraag op een panelsite voorkomt: dekking groter dan nul. Kun je die niet vinden, dan stelt de markt in deze categorie geen andere vragen dan elders, en is het een toepassingsprofiel. Een subcategorie die de toets niet haalt, wordt onder haar categorie gemeten; een hoofdcategorie houdt alleen de basislaag.
+
+De toets geldt alleen als er gemeten is. Zonder sitepanel is de dekking niet onderzocht, en dat is iets anders dan nul.
+
 ### Losstaande categorieën krijgen geen basislaag
 
 Niet alles wat een winkel verkoopt is het kernproduct van de markt. Een stoffenwinkel verkoopt ook naaigaren, onderhoudsmiddelen en gereedschap; een fietsenwinkel verlichting en sloten. Voor zulke producten slaan de algemene vragen nergens op — "hoe breed is de stof" bij een klos garen — en ze meetellen meet iets wat er niet is.

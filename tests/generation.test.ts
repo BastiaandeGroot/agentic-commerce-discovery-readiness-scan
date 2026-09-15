@@ -244,11 +244,10 @@ test('het JSON-object komt ook uit een antwoord met een zin ervoor', () => {
   assert.throws(() => extractJson('{"a": 1'), /niet afgesloten/);
 });
 
-test('een overlay zonder eigen vragen wordt een toepassingsprofiel', async () => {
-  // De prompt vraagt om drie vragen die hier gesteld worden en nergens anders.
-  // Een reden is altijd te vinden; dit is de toets die je kunt zakken. Noemt
-  // het model er geen enkele, dan is de toets niet afgelegd — en dan is
-  // "profiel" bijna altijd het juiste antwoord.
+test('een categorie zonder genoemde eigen vragen blijft zoals het model hem indeelde', async () => {
+  // Tot 15 september werd zo'n categorie een profiel omdat ze geen drie vragen
+  // noemde. Die eis is vervangen door dekking > 0, en die is pas na de
+  // categoriefase te zien.
   const ask: Ask = async (task) => {
     if (task.phase !== 'panel') return { json: antwoord(task.phase), usage: { input: 0, output: 0, cached: 0 } };
     const panel = antwoord('panel') as { grouping: { category: string; distinct?: string[] }[] };
@@ -263,14 +262,32 @@ test('een overlay zonder eigen vragen wordt een toepassingsprofiel', async () =>
     };
   };
 
-  const result = await advance(emptyState(BRIEF), FIRST_PHASE, ask, '2026-09-10');
+  const result = await advance(emptyState(BRIEF), FIRST_PHASE, ask, '2026-09-15');
   const gordijn = result.state.grouping.find((entry) => entry.category === 'Gordijnstoffen');
+  assert.equal(gordijn?.kind, 'overlay');
+});
 
-  assert.equal(gordijn?.kind, 'profiel');
-  assert.ok(
-    result.state.findings.some((finding) => finding.includes('Gordijnstoffen')),
-    'en het staat als bevinding op het scherm',
-  );
+test('een categorie zonder eigen vraag met dekking krijgt een bevinding', async () => {
+  const ask: Ask = async (task) => {
+    const json = antwoord(task.phase) as Record<string, unknown>;
+    if (task.phase === 'overlay:1') {
+      const questions = (json.questions as Record<string, unknown>[]).map((question) => ({ ...question, coverage: 0, coverageSites: [] }));
+      return { json: { ...json, questions }, usage: { input: 0, output: 0, cached: 0 } };
+    }
+    return { json, usage: { input: 0, output: 0, cached: 0 } };
+  };
+
+  let state = emptyState(BRIEF);
+  let phase: Phase = FIRST_PHASE;
+  for (let stap = 0; stap < 40 && phase.kind !== 'done'; stap++) {
+    const result = await advance(state, phase, ask, '2026-09-15');
+    state = result.state;
+    phase = result.next;
+  }
+
+  // overlay:1 is Gordijnstoffen; Meubelstoffen (overlay:0) heeft dekking en krijgt niets.
+  assert.ok(state.findings.some((finding) => finding.startsWith('Gordijnstoffen heeft geen eigen vraag')));
+  assert.equal(state.findings.some((finding) => finding.startsWith('Meubelstoffen heeft geen eigen vraag')), false);
 });
 
 test('een stap die het antwoord van een andere stap krijgt, loopt niet stil door', async () => {
