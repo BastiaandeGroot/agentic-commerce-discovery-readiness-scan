@@ -23,6 +23,7 @@
 
 import type { Bilingual, Dataset, Question, QuestionSet, QuestionSetState } from '../domain/types';
 import type { AttributeDef, QuestionBank } from './bank';
+import { withCoveredOverlays } from './bank';
 import { bankFor, resolveBanks } from './banks';
 import { composeSet, ownOverlayFor } from './compose';
 import { str } from '../intake/normalize';
@@ -38,6 +39,18 @@ const MAX_SETS = 30;
 export interface CategoryStat {
   name: string;
   count: number;
+}
+
+/**
+ * Staat deze vragenset los van het kernproduct van de markt?
+ *
+ * Losstaand is een overlay die de hele basislaag uitschakelt: `laag: standalone`
+ * uit een vragenlijst, of een categorie die de beheerder losstaand maakte.
+ */
+export function isStandaloneOverlay(bank: QuestionBank, overlayId: string | undefined): boolean {
+  if (!overlayId || bank.questions.length === 0) return false;
+  const suppressed = new Set(bank.overlays.find((overlay) => overlay.id === overlayId)?.suppress ?? []);
+  return bank.questions.every((question) => suppressed.has(question.id));
 }
 
 /**
@@ -243,7 +256,9 @@ export function generateQuestionSets(
   }
   const mapped = new Map<string, AttributeMatch[]>();
   const banks = resolveBanks(imported).map((bank) => {
-    const result = mapToCatalog(applyMapping(bank, manual, catalog), catalog);
+    // Alleen categorieën met minstens één eigen vraag die een webshop in de markt
+    // behandelt, krijgen een eigen vragenset.
+    const result = mapToCatalog(applyMapping(withCoveredOverlays(bank), manual, catalog), catalog);
     mapped.set(bank.meta.vertical, result.matches);
     return result.bank;
   });
@@ -299,7 +314,11 @@ export function generateQuestionSets(
     taken.add(id);
     used.set(bank.meta.vertical, bank);
     const set = composeSet(bank, { id, name: sub.name, count: sub.count }, own);
-    sets.push({ ...set, parent: sub.parent, questions: set.questions.filter(applicable) });
+    // Een losstaande vragenset hangt nergens onder. Garen is geen meubelstof,
+    // ook al hangt de winkel het in zijn menu onder Meubelstoffen: dan is het
+    // een eigen categorie, en zo staat het op het scherm en in het rapport.
+    const standalone = isStandaloneOverlay(bank, set.overlayId);
+    sets.push({ ...set, parent: standalone ? undefined : sub.parent, questions: set.questions.filter(applicable) });
   }
 
   // Elke subcategorie direct onder haar categorie, zodat het koppelscherm de

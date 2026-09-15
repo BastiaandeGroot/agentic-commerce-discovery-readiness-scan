@@ -27,3 +27,5 @@ import './exclusion.test';
 import './gaplabel.test';
 import './report.test';
 import './standalone.test';
+import './snapshot.test';
+import './coveredoverlays.test';

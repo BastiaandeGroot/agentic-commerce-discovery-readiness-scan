@@ -41,13 +41,25 @@ export function DeltaValue({ delta, decimals = 0, higherIsBetter = true, none }:
   );
 }
 
-export function SnapshotRow({ s, locale, snapshot, onRemove }: {
+export function SnapshotRow({ s, locale, snapshot, onRemove, onOpen }: {
   s: Strings; locale: Locale; snapshot: ScanSnapshot; onRemove?: () => void;
+  /** De analyse openen. Zonder deze handler is de rij alleen een regel in een lijst. */
+  onOpen?: () => void;
 }) {
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line py-3">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{snapshot.label}</p>
+        {onOpen ? (
+          <button
+            type="button"
+            onClick={onOpen}
+            className="block max-w-full truncate text-left text-sm font-medium underline-offset-2 hover:underline"
+          >
+            {snapshot.label}
+          </button>
+        ) : (
+          <p className="truncate text-sm font-medium">{snapshot.label}</p>
+        )}
         <p className="tnum text-xs text-muted">
           {datum(snapshot.savedAt, locale)} · {n(snapshot.productCount)} {s.upload.products}
           {snapshot.catalogName ? ` · ${snapshot.catalogName}` : ''}
@@ -58,6 +70,9 @@ export function SnapshotRow({ s, locale, snapshot, onRemove }: {
         <span className="block">{n(snapshot.findable)} {s.report.findable}</span>
       </div>
       <Badge tone="neutral">v{snapshot.scanVersion}</Badge>
+      {onOpen ? (
+        <Button variant="secondary" onClick={onOpen}>{s.pages.dashboard.open}</Button>
+      ) : null}
       {onRemove ? (
         <Button variant="quiet" onClick={onRemove}>{s.pages.dashboard.remove}</Button>
       ) : null}

@@ -154,6 +154,13 @@ export default function Home() {
       let cut = -1;
       if (target.parent === undefined) {
         if (same(segmentAt(segments, level), target.category)) cut = top;
+        // Een losstaande categorie hangt dieper dan het marktniveau, maar staat
+        // als eigen regel. Dan op elke diepte zoeken.
+        else {
+          for (let depth = top + 1; depth < segments.length; depth++) {
+            if (same(segments[depth], target.category)) { cut = depth; break; }
+          }
+        }
       } else if (same(segments[top], target.parent)) {
         for (let depth = top + 1; depth < segments.length; depth++) {
           if (same(segments[depth], target.category)) { cut = depth; break; }

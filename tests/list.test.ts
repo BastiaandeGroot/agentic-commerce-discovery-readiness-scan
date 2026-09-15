@@ -579,17 +579,19 @@ test('een subcategorie krijgt alleen een eigen niveau als de lijst hem kent', ()
 
   const state = generateQuestionSets(catalogus, [bank!], {}, { Meubelstoffen: 'meubelstoffen' });
 
-  // Naaigarens krijgt een eigen set, onder zijn categorie, met zijn eigen vragen.
+  // Naaigarens krijgt een eigen set met zijn eigen vragen. In deze lijst is het
+  // losstaand, en dan hangt het nergens onder: garen is geen meubelstof, ook al
+  // zet de winkel het in zijn menu onder Meubelstoffen (scanversie 5.1.0).
   const garen = state.sets.find((entry) => entry.category === 'Naaigarens');
-  assert.equal(garen?.parent, 'Meubelstoffen');
+  assert.equal(garen?.parent, undefined);
   assert.notEqual(garen?.overlayId, state.sets.find((entry) => entry.category === 'Meubelstoffen')?.overlayId);
   // Effen niet: dat zou dezelfde meting zijn op minder producten.
   assert.equal(state.sets.some((entry) => entry.category === 'Effen'), false);
 
-  // En de scan volgt dat: garens komen in hun eigen rij, met hun eigen vragen.
+  // En de scan volgt dat: garens komen in hun eigen rij, als eigen categorie.
   const report = runScan(catalogus, state, { scannedAt: '2026-01-01T00:00:00Z' });
-  const rij = report.categories.find((row) => row.subcategory === 'Naaigarens');
-  assert.equal(rij?.category, 'Meubelstoffen');
+  const rij = report.categories.find((row) => row.category === 'Naaigarens');
+  assert.equal(rij?.subcategory, undefined);
   assert.equal(rij?.total, 2);
 });
 

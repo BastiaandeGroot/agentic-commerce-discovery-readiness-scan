@@ -414,6 +414,41 @@ export function applyAttributeShapes(bank: QuestionBank, shapes: Record<string, 
   };
 }
 
+/**
+ * Heeft deze overlay een eigen vraag die een onderzochte webshop behandelt?
+ *
+ * Dat is de toets voor een eigen vragenset: minstens één consumentenvraag die
+ * alleen in deze categorie gesteld wordt en die op minstens één panelsite
+ * voorkomt. Een categorie waarvan geen enkele eigen vraag ergens in de markt
+ * terugkomt, zou een rij krijgen voor vragen die niemand stelt.
+ */
+export function overlayHasCoverage(overlay: Overlay): boolean {
+  return (overlay.questions ?? []).some((question) => typeof question.coverage === 'number' && question.coverage > 0);
+}
+
+/** Draagt deze bank onderzochte dekking, of is er niet gekeken? */
+export function bankHasCoverage(bank: QuestionBank): boolean {
+  return [...bank.questions, ...bank.overlays.flatMap((overlay) => overlay.questions ?? [])]
+    .some((question) => typeof question.coverage === 'number');
+}
+
+/**
+ * Alleen de overlays die een eigen vragenset verdienen.
+ *
+ * Een overlay zonder eigen vraag met dekking > 0 valt weg: een subcategorie
+ * krijgt dan geen eigen regel en wordt onder haar categorie gemeten, een
+ * hoofdcategorie houdt alleen de algemene vragen.
+ *
+ * Alleen als de bank dekking draagt. Een lijst zonder sitepanel heeft overal
+ * dekking `null` — niet onderzocht, en dat is iets anders dan 0 — en daar zou de
+ * regel elke categorie laten verdwijnen omdat er niet gekeken is.
+ */
+export function withCoveredOverlays(bank: QuestionBank): QuestionBank {
+  if (!bankHasCoverage(bank)) return bank;
+  const overlays = bank.overlays.filter(overlayHasCoverage);
+  return overlays.length === bank.overlays.length ? bank : { ...bank, overlays };
+}
+
 /** Wat de beheerder per categorie van een bank besliste, naast de CSV bewaard. */
 export interface OverlaySettings {
   /** Overlay-id's die los staan van het kernproduct: alleen eigen vragen. */

@@ -11,6 +11,7 @@
 // Elke rij draagt nu al een accountId, ook al is er nog geen login. Achteraf
 // toevoegen betekent een migratie op data die er al staat.
 
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ScanSnapshot } from '../engine/snapshot';
 
 export const LOCAL_ACCOUNT = 'lokaal';
@@ -67,5 +68,72 @@ export class LocalSnapshotStore implements SnapshotStore {
   }
 }
 
+/**
+ * Bewaarde analyses in het account (migratie 0011).
+ *
+ * De snapshot gaat in zijn geheel in één kolom; de losse kolommen ernaast zijn
+ * er om te kunnen sorteren en filteren zonder json uit te pakken. Row level
+ * security bepaalt wie wat ziet: een vergeten where-clausule is geen datalek.
+ */
+export class SupabaseSnapshotStore implements SnapshotStore {
+  constructor(private readonly client: SupabaseClient) {}
+
+  async list(accountId: string): Promise<ScanSnapshot[]> {
+    const { data, error } = await this.client
+      .from('scan_snapshots')
+      .select('snapshot')
+      .eq('account_id', accountId)
+      .not('snapshot', 'is', null)
+      .order('saved_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row) => ({ ...(row.snapshot as ScanSnapshot), accountId }));
+  }
+
+  async save(snapshot: ScanSnapshot): Promise<void> {
+    const { error } = await this.client.from('scan_snapshots').upsert(
+      {
+        account_id: snapshot.accountId,
+        snapshot_key: snapshot.id,
+        saved_at: snapshot.savedAt,
+        label: snapshot.label,
+        scan_version: snapshot.scanVersion,
+        spec_snapshot: snapshot.fieldRegister,
+        question_set_version: snapshot.questionSetVersion,
+        catalog_name: snapshot.catalogName,
+        product_count: snapshot.productCount,
+        unmatched_count: snapshot.unmatchedCount,
+        snapshot,
+      },
+      { onConflict: 'account_id,snapshot_key' },
+    );
+    if (error) throw new Error(error.message);
+  }
+
+  async remove(accountId: string, id: string): Promise<void> {
+    const { error } = await this.client.from('scan_snapshots').delete().eq('account_id', accountId).eq('snapshot_key', id);
+    if (error) throw new Error(error.message);
+  }
+
+  async clear(accountId: string): Promise<void> {
+    const { error } = await this.client.from('scan_snapshots').delete().eq('account_id', accountId);
+    if (error) throw new Error(error.message);
+  }
+}
+
 /** Eén gedeelde instantie; de opslag zelf heeft geen state om te delen. */
 export const snapshotStore: SnapshotStore = new LocalSnapshotStore();
+
+/**
+ * Waar bewaarde analyses staan voor deze bezoeker.
+ *
+ * Ingelogd: in het account, zodat hij ze op elk apparaat terugziet. Anders in
+ * deze browser, onder het lokale account. Het scherm zegt welke van de twee het
+ * is, want dat bepaalt wat de merchant ermee kan.
+ */
+export function snapshotStoreFor(
+  client: SupabaseClient | null | undefined,
+  accountId: string | undefined,
+): { store: SnapshotStore; accountId: string; where: 'account' | 'browser' } {
+  if (client && accountId) return { store: new SupabaseSnapshotStore(client), accountId, where: 'account' };
+  return { store: snapshotStore, accountId: LOCAL_ACCOUNT, where: 'browser' };
+}

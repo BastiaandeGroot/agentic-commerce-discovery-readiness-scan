@@ -74,12 +74,20 @@ eerst genoemd als grootste besparing en dat klopte niet: het systeemdeel is
 ~1.200 tokens, onder de minimale cachegrootte. Zie `ONTWERP-vragenbank-keten.md`
 paragraaf 3a.
 
-**Een overlay moet drie eigen vragen noemen (11 september 2026).** Het model
-geeft een categorie alleen een eigen vragenset als het drie vragen noemt die
-nergens anders in de markt gesteld worden. Nul: het wordt een profiel. Eén of
-twee: het blijft een overlay met een bevinding. Minder overlays is niet minder
-kwaliteit; een overlay zonder eigen vragen geeft zijn producten juist een
-dunnere set dan de moedercategorie.
+**Een eigen vragenset vraagt één eigen vraag met dekking > 0 (15 september 2026,
+scanversie 5.2.0, generatie 1.5.0).** Dit vervangt de eis van 11 september dat
+het model drie vragen moest noemen die nergens anders gesteld worden. Die eis
+was niet na te rekenen — een reden is altijd te vinden — en hij stond op de
+verkeerde plek: in de indeling, vóórdat er vragen waren. Nu krijgt een categorie
+of subcategorie een eigen vragenset als minstens één eigen consumentenvraag op
+een panelsite voorkomt. In de app (`withCoveredOverlays`): valt een subcategorie
+af, dan wordt ze onder haar categorie gemeten; een hoofdcategorie houdt alleen
+de algemene vragen. In de generatie wordt een categorie niet meer omgezet, maar
+krijgt ze na de categoriefase een bevinding als geen eigen vraag dekking heeft.
+
+Alleen voor een bank die dekking draagt. Een lijst zonder sitepanel heeft overal
+`null`, en niet onderzocht is iets anders dan niemand behandelt dit; daar zou de
+regel elke categorie laten verdwijnen omdat er niet gekeken is.
 
 **Overgeslagen vragen blijven in de bank en tellen nergens mee (11 september
 2026).** `excludeFromScore` zet ze op `answerable: 'no'`, bij de merchant en bij
@@ -571,6 +579,30 @@ een eerder gekozen bank één keer per sessie opnieuw op zodra bekend is wie er 
 (alleen dezelfde versie; een nieuwere kiest de merchant zelf). Banken van vóór
 deze wijziging worden teruggevonden op markt en versie.
 
+**Eerdere analyses staan in het account (15 september 2026).** Een ingelogde
+merchant ziet zijn analyses terug zonder alle stappen opnieuw te doorlopen, op
+elk apparaat. Het rapport bewaart zichzelf zodra hij ingelogd is; zonder login
+blijft het de knop, in de browser. Het overzicht en "Scans" lezen uit het account
+(`SupabaseSnapshotStore`, migratie 0011 op de tabel `scan_snapshots` die er sinds
+0001 ongebruikt stond) en een analyse is te openen (`SnapshotReport`).
+
+Bewaard wordt een snapshot en geen rapport, zoals altijd: tellingen, gemiddelden
+per categorie, gaten, en nu ook de werklijst met onbeantwoorde vragen en het
+adviesblok — de teksten komen uit de bank, de getallen zijn tellingen. Geen
+productrij en geen bestand, dus per product kijken kan alleen met een nieuwe scan.
+Die gaat snel: koppeling, vragensets en keuzes staan per account klaar, alleen de
+catalogus wordt opnieuw ingelezen. Dezelfde scan twee keer bewaren overschrijft
+hem (sleutel per scan).
+
+**Een losstaande categorie is een eigen categorie (15 september 2026, scanversie
+5.1.0).** Losstaand haalde alleen de algemene vragen weg; de categorie bleef
+"onder Meubelstoffen" staan, op het vragensetscherm en als subrij in het rapport,
+omdat de winkel haar daar in zijn menu hangt. Garen is geen meubelstof. Nu krijgt
+een subcategorie met een losstaande vragenset geen ouder (`isStandaloneOverlay` in
+`generate.ts`): ze staat als eigen regel, en een product dat alleen daar hangt
+telt in het rapport als eigen categorie (`placeProduct`). Een gewone subcategorie
+blijft onder haar tak. "Niet meenemen" zoekt zo'n categorie op elke diepte.
+
 ## Bewust afgevallen
 
 Niet opnieuw voorstellen zonder dat er iets veranderd is.
@@ -590,6 +622,11 @@ Niet opnieuw voorstellen zonder dat er iets veranderd is.
 ---
 
 ## Open
+
+**Migratie 0011 draaien** — 15 september. Zonder die migratie mislukt bewaren in
+het account; het rapport zegt dat en biedt opnieuw bewaren aan. Scans die eerder
+alleen in de browser bewaard zijn, komen niet vanzelf in het account.
+
 
 **Voorstellen op het categoriescherm worden niet bewaard** — 14 september. Wat
 het model of de site voorstelde ("Motieven" is een kenmerk) staat alleen in het
