@@ -306,3 +306,27 @@ export function stillToConfirm(state: QuestionSetState): { base: boolean; catego
       .map((set) => set.label.nl),
   };
 }
+
+/**
+ * De eigen vragen zonder dekking weer aanzetten, het omgekeerde van
+ * `disableUncovered`.
+ *
+ * Zet elke eigen vraag met dekking 0 in deze categorie aan die nu uit staat. Wat
+ * met de knop uitging en wat de merchant eerder met de hand uitzette, is niet te
+ * onderscheiden; wie een van die vragen uit wil houden, zet hem daarna weer uit.
+ */
+export function enableUncovered(state: QuestionSetState, at: string, setId: string): QuestionSetState {
+  const set = state.sets.find((candidate) => candidate.id === setId);
+  if (!set) return state;
+  return set.questions
+    .filter((question) => question.layer === 'category' && isUncovered(question) && question.disabled)
+    .reduce((acc, question) => toggleQuestion(acc, at, setId, question.id), state);
+}
+
+/** De algemene vragen zonder dekking weer aanzetten, in elke categorie tegelijk. */
+export function enableUncoveredBase(state: QuestionSetState, at: string): QuestionSetState {
+  return baseQuestions(state)
+    .map((entry) => entry.question)
+    .filter((question) => isUncovered(question) && question.disabled)
+    .reduce((acc, question) => toggleBaseQuestion(acc, at, question.id), state);
+}

@@ -14,6 +14,7 @@ import { isScored } from '../src/questions/compose';
 import { FIELDS, requirementLabel } from '../src/spec/fields';
 import {
   addQuestion, allValidated, baseQuestions, byCoverage, disableUncovered, disableUncoveredBase,
+  enableUncovered, enableUncoveredBase,
   editBaseQuestion, editQuestion, hasOwnQuestions, isUncovered, stillToConfirm,
   toggleBaseQuestion, toggleBaseValidated, toggleQuestion, toggleValidated,
 } from '../src/questions/mutate';
@@ -248,6 +249,7 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onContinu
   // staat bovenaan bij het nalopen.
   const base = useMemo(() => byCoverage(baseQuestions(state), (entry) => entry.question.coverage), [state]);
   const baseUncovered = base.filter((entry) => isUncovered(entry.question) && !entry.question.disabled).length;
+  const baseUncoveredOff = base.filter((entry) => isUncovered(entry.question) && entry.question.disabled).length;
   const ready = allValidated(state);
 
   return (
@@ -357,6 +359,15 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onContinu
                   {s.questions.disableUncovered} · {s.questions.disableUncoveredCount.replace('{aantal}', String(baseUncovered))}
                 </Button>
               ) : null}
+              {/* Terug te draaien in één keer, zoals het uitzetten ging. */}
+              {baseUncoveredOff > 0 ? (
+                <Button
+                  variant="quiet"
+                  onClick={() => onChange(enableUncoveredBase(state, new Date().toISOString()))}
+                >
+                  {s.questions.enableUncovered} · {s.questions.enableUncoveredCount.replace('{aantal}', String(baseUncoveredOff))}
+                </Button>
+              ) : null}
               {state.baseValidated ? <Badge tone="ok">✓ {s.questions.validated}</Badge> : null}
               <Button
                 variant={state.baseValidated ? 'quiet' : 'secondary'}
@@ -395,6 +406,7 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onContinu
         const own = set.questions.filter((q) => q.layer === 'category');
         const active = own.filter((q) => !q.disabled).length;
         const uncovered = own.filter((q) => isUncovered(q) && !q.disabled).length;
+        const uncoveredOff = own.filter((q) => isUncovered(q) && q.disabled).length;
         return (
           <Card key={set.id}>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -433,6 +445,14 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onContinu
                     {s.questions.disableUncovered} · {s.questions.disableUncoveredCount.replace('{aantal}', String(uncovered))}
                   </Button>
                 ) : null}
+                {uncoveredOff > 0 ? (
+                  <Button
+                    variant="quiet"
+                    onClick={() => onChange(enableUncovered(state, new Date().toISOString(), set.id))}
+                  >
+                    {s.questions.enableUncovered} · {s.questions.enableUncoveredCount.replace('{aantal}', String(uncoveredOff))}
+                  </Button>
+                ) : null}
                 {hasOwnQuestions(set) ? (
                   <>
                     {set.validated ? <Badge tone="ok">✓ {s.questions.validated}</Badge> : null}
@@ -443,7 +463,14 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onContinu
                       {set.validated ? s.questions.unvalidate : s.questions.validate}
                     </Button>
                   </>
-                ) : null}
+                ) : (
+                  // Geen eigen vragen: deze categorie is helemaal de basislaag, en
+                  // is bevestigd zodra de algemene vragen dat zijn. Zonder deze
+                  // status leek hij nog open te staan.
+                  state.baseValidated
+                    ? <Badge tone="ok">✓ {s.questions.validatedViaBase}</Badge>
+                    : <Badge tone="neutral">{s.questions.waitsForBase}</Badge>
+                )}
               </div>
             </div>
 
@@ -501,27 +528,10 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onContinu
         );
       })}
 
-      <Card>
-        <CardTitle>{s.questions.changeLog}</CardTitle>
-        {state.changeLog.length === 0 ? (
-          <p className="text-sm text-muted">{s.questions.noChanges}</p>
-        ) : (
-          <ol className="space-y-1 text-sm">
-            {state.changeLog.map((entry, i) => (
-              <li key={i} className="flex flex-wrap gap-2 border-t border-line py-1.5">
-                <span className="tnum text-xs text-muted">
-                  {new Date(entry.at).toLocaleString(locale === 'nl' ? 'nl-NL' : 'en-GB')}
-                </span>
-                <span className="text-muted">{entry.setId} · {entry.questionId}</span>
-                <span>{s.questions.changeActions[entry.action]}</span>
-                {entry.before && entry.after ? (
-                  <span className="text-muted">“{entry.before}” → “{entry.after}”</span>
-                ) : null}
-              </li>
-            ))}
-          </ol>
-        )}
-      </Card>
+      {/* Het wijzigingslog staat in het dashboard, bij de andere dingen die je
+          terugleest. Hier zou het de lijst onderaan alleen maar langer maken. */}
+      <p className="text-xs leading-relaxed text-muted">{s.questions.changeLogMoved}</p>
+
 
       {/* Op slot tot alles bevestigd is, en dan zeggen wát nog open staat. Eerst
           ging dit verder zonder bevestiging, en stond de merchant op het

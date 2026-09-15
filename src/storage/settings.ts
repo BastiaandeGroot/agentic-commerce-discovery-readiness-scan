@@ -27,6 +27,8 @@ export interface SettingsStore {
   /** Waar het staat, voor het scherm: in het account of alleen in deze browser. */
   readonly where: 'account' | 'browser';
   load(accountId: string, vertical: string): Promise<BankSettings | undefined>;
+  /** Alles wat dit account per markt bewaarde; voor het wijzigingslog in het dashboard. */
+  list(accountId: string): Promise<BankSettings[]>;
   /** `false` als bewaren mislukte; dat hoort het scherm te zeggen. */
   save(accountId: string, settings: BankSettings): Promise<boolean>;
 }
@@ -44,6 +46,22 @@ export class LocalSettingsStore implements SettingsStore {
       // Privemodus of onleesbare inhoud: dan staat er niets bewaard.
       return undefined;
     }
+  }
+
+  async list(accountId: string): Promise<BankSettings[]> {
+    const prefix = `acdrs.settings.${accountId}.`;
+    const out: BankSettings[] = [];
+    try {
+      for (let index = 0; index < window.localStorage.length; index++) {
+        const key = window.localStorage.key(index);
+        if (!key || !key.startsWith(prefix)) continue;
+        const raw = window.localStorage.getItem(key);
+        if (raw) out.push(JSON.parse(raw) as BankSettings);
+      }
+    } catch {
+      // Geblokkeerde opslag of onleesbare inhoud: dan staat er niets bewaard.
+    }
+    return out;
   }
 
   async save(accountId: string, settings: BankSettings): Promise<boolean> {
@@ -76,6 +94,21 @@ export class SupabaseSettingsStore implements SettingsStore {
       categories: (data.categories as Record<string, string | null> | null) ?? {},
       work: (data.question_work as QuestionWork | null) ?? undefined,
     };
+  }
+
+  async list(accountId: string): Promise<BankSettings[]> {
+    const { data, error } = await this.client
+      .from('merchant_bank_settings')
+      .select('vertical, bank_version, mapping, categories, question_work')
+      .eq('account_id', accountId);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row) => ({
+      vertical: row.vertical as string,
+      bankVersion: (row.bank_version as string | null) ?? '',
+      mapping: (row.mapping as Record<string, string[]> | null) ?? {},
+      categories: (row.categories as Record<string, string | null> | null) ?? {},
+      work: (row.question_work as QuestionWork | null) ?? undefined,
+    }));
   }
 
   async save(accountId: string, settings: BankSettings): Promise<boolean> {
