@@ -89,7 +89,19 @@ export function MappingStep({
 
   // De keuze van nu telt mee, anders blijft de waarschuwing hieronder staan
   // bij een kenmerk dat de merchant zojuist gekoppeld heeft.
-  const rows = useMemo(() => attributeInventory(state, mapping), [state, mapping]);
+  //
+  // De volgorde ligt vast zodra een kenmerk op het scherm staat. De inventaris
+  // zet ongekoppelde kenmerken bovenaan, en zonder dit sprong een regel die de
+  // merchant op "geen kolom" zette onder zijn muis vandaan naar de top van de
+  // lijst — en de pagina mee. Nieuwe kenmerken komen achteraan.
+  const order = useRef(new Map<string, number>());
+  const rows = useMemo(() => {
+    const inventory = attributeInventory(state, mapping);
+    for (const row of inventory) {
+      if (!order.current.has(row.key)) order.current.set(row.key, order.current.size);
+    }
+    return inventory.sort((a, b) => order.current.get(a.key)! - order.current.get(b.key)!);
+  }, [state, mapping]);
   const columns = useMemo(
     () => [...catalog.columns].sort((a, b) => a.localeCompare(b)),
     [catalog.columns],
