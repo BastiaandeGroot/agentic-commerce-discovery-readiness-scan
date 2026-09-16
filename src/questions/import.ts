@@ -365,7 +365,7 @@ function questions(
       sources: strings(item.bron ?? item.sources)
         .map((source) => SOURCE[source.toLowerCase()] ?? 'expertise' as EvidenceSource),
       evidence,
-      mode: text(item.modus ?? item.mode) === 'any' ? 'any' : 'all',
+      mode: 'all',
       ruleId: text(item.beslisregel ?? item.rule),
       answerType: answerType(text(item.antwoordtype ?? item.answerType)),
       answerable,

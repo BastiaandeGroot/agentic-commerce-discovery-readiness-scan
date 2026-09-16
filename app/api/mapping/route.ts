@@ -23,12 +23,28 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
+import { PROPOSALS_SCHEMA, SYSTEM, SYSTEM_CATEGORIES, SYSTEM_FACETS, SYSTEM_MARKET, prompt, type Payload } from '../../../src/semantic/prompt';
 
-/** Klein en snel: dit is een vertaalklus over namen, geen redeneerwerk. */
+/** Categorieën, facetten en de markt: een vertaalklus over namen. */
 const MODEL = 'claude-haiku-4-5';
 
-/** Ruim genoeg voor honderd koppelregels; het antwoord is bewust kort. */
+/**
+ * Kenmerken op kolommen is wél redeneerwerk, en daar is een sterker model voor.
+ *
+ * De vraag is niet of twee namen op elkaar lijken, maar of een waarde in de
+ * kolom de vraag van de consument beantwoordt. Gemeten op De Groot met de
+ * woontextielbank (16 september 2026): Haiku 4.5 hing `martindale` aan
+ * weefdichtheid en `roll_length` aan voorraad, en kopieerde als bewijs de hele
+ * waardenrij; Opus 5 wees bij elk voorstel één waarde aan die klopte en vond
+ * `machine_washable` en `sustainable`, die Haiku miste. Ongeveer $0,20 per
+ * honderd kenmerken, één keer per catalogus.
+ */
+const ATTRIBUTE_MODEL = 'claude-opus-5';
+
+/** Ruim genoeg voor honderd koppelregels. */
 const MAX_TOKENS = 4096;
+/** Honderd koppelingen met bewijs en een zin uitleg, plus het denkwerk. */
+const ATTRIBUTE_MAX_TOKENS = 16000;
 
 const LIMITS = {
   attributes: 200,
@@ -36,18 +52,6 @@ const LIMITS = {
   /** Per tekst; genoeg voor een naam met een vraag of wat waarden erachter. */
   text: 400,
 };
-
-interface Payload {
-  attributes: { key: string; text: string }[];
-  columns: { key: string; text: string }[];
-  /**
-   * Twee soorten koppeling, dezelfde vorm. Kenmerken op kolommen, of de
-   * vragensets uit de lijst op de eigen categorieën van de merchant. Dat tweede
-   * is precies hetzelfde probleem — Engelse vaktaal tegen Nederlandse data — en
-   * het verdient geen tweede route, alleen een andere opdracht.
-   */
-  kind?: 'attributes' | 'categories' | 'facets' | 'market';
-}
 
 /** Weiger wat niet klopt vóór het geld kost, en zeg waarom. */
 function validate(body: unknown): Payload | string {
@@ -75,93 +79,6 @@ function validate(body: unknown): Payload | string {
     && typeof entry.text === 'string' && entry.text.length <= LIMITS.text);
   if (!clean(attributes) || !clean(columns)) return 'Een naam of omschrijving is leeg of te lang.';
   return { attributes, columns, kind: kind ?? 'attributes' };
-}
-
-const SYSTEM_CATEGORIES = [
-  'Je legt de categorieën van een vragenlijst op de categorieën van een productcatalogus.',
-  '',
-  'Regels:',
-  '- Koppel alleen wat je zeker weet. Een verkeerde koppeling zet de verkeerde vragen op een categorie, en dan meet de scan iets anders dan er verkocht wordt.',
-  '- Laat een categorie weg als er geen goede tegenhanger is. Die krijgt dan alleen de algemene vragen, en dat is een geldig antwoord.',
-  '- Gebruik uitsluitend namen die letterlijk in de lijst staan. Verzin er nooit een bij.',
-  '- De twee lijsten staan vaak in verschillende talen: "upholstery fabrics" en "Meubelstoffen" zijn hetzelfde, "curtain fabrics" en "Gordijnstoffen" ook.',
-  '',
-  'Antwoord met één regel per koppeling, in de vorm `vragenlijstcategorie: catalogus­categorie`. Geen inleiding, geen uitleg, geen opsommingstekens.',
-].join('\n');
-
-const SYSTEM_MARKET = [
-  'Je benoemt in welke markt een webshop handelt, op basis van zijn categorienamen.',
-  '',
-  'Regels:',
-  '- Antwoord met één korte naam voor de markt als geheel, niet voor een onderdeel ervan. "woontextiel", niet "gordijnstoffen".',
-  '- Gebruik de taal van de categorienamen zelf.',
-  '- Twee tot vier woorden, kleine letters. Geen merknaam en geen winkelnaam.',
-  '- Weet je het niet zeker, antwoord dan `onbekend`. Een verkeerde markt zet de verkeerde vragenlijst op de hele winkel.',
-  '',
-  'Antwoord met alleen die naam. Geen inleiding, geen uitleg, geen punt erachter.',
-].join('\n');
-
-const SYSTEM_FACETS = [
-  'Je bepaalt of een pad uit een categorieboom een productsoort is of een eigenschap.',
-  '',
-  'De test is talig: kun je zeggen "ik zoek een ..."?',
-  '- "Ik zoek een lampenkapstof" loopt. Dat is een categorie: het ding dat verkocht wordt, een zelfstandig naamwoord.',
-  '- "Ik zoek een effen" loopt niet; je zegt "een effen meubelstof". Dat is een kenmerk: een bijvoeglijk naamwoord dat iets zegt over het ding.',
-  '',
-  'Regels:',
-  '- Twijfel je, antwoord dan `onbekend`. Een verkeerd oordeel laat een gat verdwijnen dat er wél is, en dat is erger dan geen oordeel.',
-  '- Kwaliteits- en prijsniveaus (Premium, Essential, Basic) zijn kenmerken, geen productsoorten.',
-  '- Eigenschappen van het materiaal of de uitvoering (effen, gestreept, gemeleerd, vlamvertragend, waterafstotend, duurzaam, gerecycled) zijn kenmerken.',
-  '- Toepassingen en productsoorten (banken, stoelen, lampenkapstoffen, tassenstoffen, naaigaren) zijn categorieën.',
-  '- Ga af op het laatste deel van het pad; het deel ervoor is de context.',
-  '',
-  'Antwoord met één regel per pad, in de vorm `pad: categorie` of `pad: kenmerk` of `pad: onbekend`. Neem het pad letterlijk over. Geen inleiding, geen uitleg.',
-].join('\n');
-
-const SYSTEM = [
-  'Je legt kenmerken uit een vragenlijst op kolommen uit een productcatalogus.',
-  '',
-  'Regels:',
-  '- Koppel alleen wat je zeker weet. Een verkeerde koppeling laat een gat verdwijnen dat de merchant wél heeft, en dat is erger dan geen koppeling: die toont hooguit een gat dat er niet is.',
-  '- Laat een kenmerk weg als geen enkele kolom het draagt. Niets is een geldig antwoord, en vaak het juiste.',
-  '- Gebruik uitsluitend kolomnamen die letterlijk in de lijst staan. Verzin er nooit een bij.',
-  '- Een kolom draagt hoogstens één kenmerk.',
-  '- Let op omgekeerde begrippen: een kolom die dichtheid meet, beantwoordt een vraag over doorlatendheid. Die mag je koppelen.',
-  '- Let op vaktaal en op twee talen door elkaar: `rapport` en `patroon` zijn in textiel hetzelfde, `rolbreedte` en `roll width` ook.',
-  '',
-  'Antwoord met één regel per koppeling, in de vorm `kenmerk: kolom`. Geen inleiding, geen uitleg, geen opsommingstekens.',
-].join('\n');
-
-function prompt({ attributes, columns, kind }: Payload): string {
-  if (kind === 'market') {
-    return [
-      'CATEGORIEËN VAN DEZE WINKEL (naam, en het aantal producten):',
-      ...attributes.map((entry) => `- ${entry.key} — ${entry.text}`),
-    ].join('\n');
-  }
-  if (kind === 'facets') {
-    return [
-      'PADEN (pad, en het aantal producten erin):',
-      ...attributes.map((entry) => `- ${entry.key} — ${entry.text}`),
-      '',
-      // De filternamen van de site als context. Staat een woord daartussen, dan
-      // is het bijna zeker een eigenschap — maar dat is bewijs dat de app al
-      // gebruikt; hier helpt het alleen om de rest beter te plaatsen.
-      ...(columns.length > 0
-        ? ['FILTERS DIE DEZE WINKEL AANBIEDT (context):', ...columns.map((entry) => `- ${entry.key}`)]
-        : []),
-    ].join('\n');
-  }
-  const [links, rechts] = kind === 'categories'
-    ? ['CATEGORIEËN UIT DE VRAGENLIJST:', 'CATEGORIEËN UIT DE CATALOGUS (met het aantal producten):']
-    : ['KENMERKEN (naam, en de vraag die erop leunt):', 'KOLOMMEN (naam, en een paar waarden die erin staan):'];
-  return [
-    links,
-    ...attributes.map((entry) => `- ${entry.key} — ${entry.text}`),
-    '',
-    rechts,
-    ...columns.map((entry) => `- ${entry.key} — ${entry.text}`),
-  ].join('\n');
 }
 
 export async function POST(request: Request) {
@@ -192,16 +109,36 @@ export async function POST(request: Request) {
     const client = new Anthropic(
       workspace ? { defaultHeaders: { 'anthropic-workspace-id': workspace } } : {},
     );
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system: payload.kind === 'market'
-        ? SYSTEM_MARKET
-        : payload.kind === 'facets'
-          ? SYSTEM_FACETS
-          : payload.kind === 'categories' ? SYSTEM_CATEGORIES : SYSTEM,
-      messages: [{ role: 'user', content: prompt(payload) }],
-    });
+    const response = payload.kind === 'attributes'
+      // Een vaste vorm met een bewijs per koppeling, zodat de client kan nagaan
+      // of die waarde echt in de kolom staat. Zie `readProposals`.
+      ? await client.messages.create({
+        model: ATTRIBUTE_MODEL,
+        max_tokens: ATTRIBUTE_MAX_TOKENS,
+        system: SYSTEM,
+        messages: [{ role: 'user', content: prompt(payload) }],
+        output_config: {
+          effort: 'medium',
+          format: { type: 'json_schema', schema: PROPOSALS_SCHEMA as unknown as Record<string, unknown> },
+        },
+      })
+      : await client.messages.create({
+        model: MODEL,
+        max_tokens: MAX_TOKENS,
+        system: payload.kind === 'market'
+          ? SYSTEM_MARKET
+          : payload.kind === 'facets'
+            ? SYSTEM_FACETS
+            : SYSTEM_CATEGORIES,
+        messages: [{ role: 'user', content: prompt(payload) }],
+      });
+
+    // Een afgebroken antwoord is geen lege koppeling maar een storing; anders
+    // lijkt "niets gevonden" op een uitkomst.
+    if (response.stop_reason === 'refusal' || response.stop_reason === 'max_tokens') {
+      console.error('mapping route: gestopt met', response.stop_reason);
+      return NextResponse.json({ error: 'Het model gaf geen volledig antwoord.' }, { status: 502 });
+    }
 
     // De inhoud is een unie; alleen de tekstblokken zeggen hier iets.
     const text = response.content

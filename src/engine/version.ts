@@ -18,4 +18,6 @@
 // procesvraag, of niet uit kenmerken te beantwoorden) of een berekening is
 // (antwoordtype afgeleid) telt als hoog, ook als een categorie haar herweegt; en
 // het belang dat een beheerder corrigeerde telt mee.
-export const SCAN_VERSION = '5.3.0';
+// 6.0.0 — een vraag is pas beantwoord als élk attribuut waar hij op leunt er
+// staat. Eerst volstond er één zodra de vraag geen beslisregel had.
+export const SCAN_VERSION = '6.0.0';

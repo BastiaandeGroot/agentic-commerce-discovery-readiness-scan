@@ -28,8 +28,9 @@ mens ziet en bevestigt — geen oordeel dat stilzwijgend doorwerkt.
 
 1. Het **koppelscherm** (`components/MappingStep.tsx`, met `src/semantic/` en
    `app/api/mapping/`). Daar bepaalt een model welk kenmerk in welke kolom staat:
-   Claude Haiku 4.5 via de serverroute, en anders een embeddingmodel in de
-   browser. Er gaan kenmerknamen, vraagteksten en kolomnamen de deur uit, geen
+   Claude Opus 5 via de serverroute, en anders een embeddingmodel in de
+   browser. Een voorstel van Claude telt alleen als het een waarde uit die kolom
+   aanwijst die de vraag beantwoordt (`readProposals` in `src/semantic/prompt.ts`). Er gaan kenmerknamen, vraagteksten en kolomnamen de deur uit, geen
    productrij en geen veldwaarde.
 2. De **generatie van een vragenbank** (`src/generation/`, met
    `src/server/generator.ts` en `app/api/bank-run/`), plus de losse stap die de
@@ -157,16 +158,17 @@ de vraag-id's dragen het werk van elke merchant. Geen gewogen
 percentagedrempel — zie de afgevallen richtingen in `NOTES.md`.
 
 De vragenlijsten komen in het Engels; kolomnamen én waarden worden op **alias**
-herkend en nooit op positie, in beide talen. De modus van een vraag volgt zijn
-beslisregel: mét regel zijn alle attributen nodig (een som heeft al zijn termen),
-zonder regel volstaat er één (bewijs stapelt, en een agent antwoordt met wat hij
-heeft). Een kolom `modus` gaat daarvoor.
+herkend en nooit op positie, in beide talen. Een vraag is **pas beantwoord als
+élk attribuut waar hij op leunt er staat** — ook zonder beslisregel, en ook als
+de lijst `modus: een` zegt. Eén van vier volstaat niet: een materiaalsamenstelling
+beantwoordt niet of een stof echt voor buiten is. Binnen één attribuut volstaat
+wél één van zijn kolommen.
 
 Wat een lijst niet draagt, vult de lezer niet aan: geen sitepanel betekent
 `dekking: null` en status `in-review`, en een beslisregel zonder bron blijft
 beredeneerd en wordt niet gerekend. Elke aanname die de lezer wél doet — het
 zoekpatroon per attribuut, de weging uit de methode boven een eigen `gewicht`,
-`modus: alle` als de lijst geen modus noemt — staat als waarschuwing in de
+een `modus: een` die niet gevolgd wordt — staat als waarschuwing in de
 uitkomst.
 
 Een gat draagt zijn oorzaak, en die volgt uit één bron: `unfilled` (de kolom

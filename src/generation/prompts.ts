@@ -39,12 +39,15 @@ const QUESTION_FIELDS = `- de vraag in het Nederlands én het Engels, allebei al
 - dekking en dekking_bronnen, overgenomen uit het onderwerp waar hij op rust
 - bewijs: de canonieke attribuutnamen die nodig zijn om hem te beantwoorden.
   Eigen namen in snake_case (rolbreedte_cm, schuurweerstand_martindale), nooit
-  de veldnaam van een site. Eén vraag mag meerdere attributen nodig hebben.
+  de veldnaam van een site. Eén vraag mag meerdere attributen nodig hebben, en
+  dan zijn ze állemaal nodig: de scan telt de vraag pas als beantwoord als elk
+  genoemd attribuut er staat. Noem dus alleen wat het antwoord werkelijk draagt,
+  geen attribuut dat er zijdelings iets over zegt. Twee eenheden voor hetzelfde
+  gegeven zijn één attribuut.
 - synoniemen: hoe de sites in het panel dit kenmerk noemen. Dit is vaktaal en
   die hoort bij de markt; de app gebruikt het om het kenmerk in de catalogus
   terug te vinden.
-- modus: "alle" als er gerekend wordt (een som heeft al zijn termen nodig),
-  "een" als bewijs stapelt (één attribuut dat de vraag draagt volstaat)
+- modus: altijd "alle"
 - antwoordtype: enum, getal, boolean, tekst, relatie, proces of afgeleid
 - beantwoordbaar: true, gedeeltelijk of false. Zet false bij proces-, structuur-
   en levenscyclusvragen; die tellen niet mee in de score.

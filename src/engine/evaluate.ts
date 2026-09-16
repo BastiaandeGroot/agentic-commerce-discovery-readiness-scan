@@ -123,9 +123,12 @@ function groupSatisfied(product: ProductRecord, group: RequirementGroup): boolea
 function answersQuestion(product: ProductRecord, question: Question) {
   const groups = evidenceGroups(question);
   const satisfied = groups.map((group) => groupSatisfied(product, group));
-  const answered = question.mode === 'any'
-    ? satisfied.some(Boolean)
-    : satisfied.every(Boolean);
+  // Pas beantwoord als élk kenmerk er staat. Eén van de vier volstaat niet: een
+  // materiaalsamenstelling zegt niet of een stof echt voor buiten is, en een
+  // vraag die op vier kenmerken leunt vraagt die vier. De modus van een vraag
+  // telt hier niet meer; binnen één kenmerk volstaat nog steeds één van zijn
+  // kolommen (`groupSatisfied`).
+  const answered = satisfied.every(Boolean);
 
   const fields = groups.flatMap((group) => group.fields);
   return {

@@ -396,6 +396,9 @@ export function importQuestionCsv(files: BankFile[]): ImportResult {
   if (columns.layer === undefined) {
     warnings.push('Er is geen kolom `laag`. Alle vragen zijn als basislaag ingelezen en gelden dus voor élke categorie in je catalogus.');
   }
+  if (columns.mode !== undefined && rows.some((row) => /^(een|één|any|one)/i.test(cell(row, columns, 'mode')))) {
+    warnings.push('De kolom `modus` noemt bij sommige vragen "een". Dat wordt niet gevolgd: een vraag is pas beantwoord als al zijn attributen er staan.');
+  }
   if (columns.coverage === undefined) {
     warnings.push('Er is geen kolom `dekking`. De dekking staat op "niet onderzocht" — iets anders dan dekking nul, wat zou betekenen dat geen enkele site in het panel dit behandelt.');
   }
@@ -575,36 +578,15 @@ export function importQuestionCsv(files: BankFile[]): ImportResult {
 }
 
 /**
- * Moeten álle genoemde attributen aanwezig zijn, of volstaat er één?
+ * Een vraag is pas beantwoord als álle genoemde attributen er staan.
  *
- * Dit volgt de beslisregel, en dat is geen willekeurige keuze maar een navolging
- * van wat een agent doet met dezelfde vraag.
- *
- * **Zonder regel antwoordt een agent met wat hij heeft.** "Is deze stof duurzaam
- * geproduceerd?" leunt op certificeringen, gerecycled percentage en
- * vezelsamenstelling. Een agent die alleen het OEKO-TEX-keurmerk kent, geeft
- * antwoord — hij zwijgt niet omdat het derde veld leeg is. Alle drie eisen zou
- * een merchant die het keurmerk netjes publiceert laten zakken op een vraag die
- * hij beantwoordt. Bewijs stapelt; één attribuut dat de vraag draagt volstaat.
- * `garendikte_tex` en `garendikte_nm` maken dat onontkoombaar: dat zijn twee
- * eenheden voor hetzelfde getal, en allebei eisen is onzin.
- *
- * **Met een regel wordt er gerekend, en een som heeft al zijn termen nodig.**
- * "Hoeveel meter heb ik nodig voor mijn bank?" is baanbreedte én rapporthoogte
- * én vleug; ontbreekt er één, dan is de uitkomst niet onzeker maar fout. Bij een
- * stof die op maat geknipt wordt en niet retour kan, is een verkeerd getal
- * erger dan geen getal. Deels aanwezig bewijs valt dan in de toestand
- * "onvolledig" — zichtbaar als aanvulwerk, en niet als antwoord.
- *
- * Een expliciete kolom `modus` gaat hier altijd voor: de lijst kent zijn vak
- * beter dan deze afleiding.
+ * Een kolom `modus` met "een" wordt niet meer gevolgd. Bewijs stapelen klinkt
+ * redelijk, maar in de praktijk telde "is dit echt een buitenstof" als
+ * beantwoord zodra alleen de materiaalsamenstelling er stond — en die zegt dat
+ * niet. Binnen één attribuut volstaat nog steeds één van zijn kolommen.
  */
-function modeOf(row: Row, columns: ColumnMap): 'any' | 'all' {
-  const declared = cell(row, columns, 'mode').toLowerCase();
-  if (declared !== '') {
-    return declared.startsWith('een') || declared === 'any' || declared === 'one' ? 'any' : 'all';
-  }
-  return cell(row, columns, 'rule') !== '' ? 'all' : 'any';
+function modeOf(): 'all' {
+  return 'all';
 }
 
 /** Eén rij als bankvraag. */
@@ -672,7 +654,7 @@ function toQuestion(row: Row, id: string, columns: ColumnMap, warnings: string[]
       .filter((value) => !value.startsWith('('))
       .map((value) => SOURCE[normalizeHeader(value)] ?? 'expertise'),
     evidence,
-    mode: modeOf(row, columns),
+    mode: modeOf(),
     coverageSites: splitList(cell(row, columns, 'coverageSites')),
     ruleId: cell(row, columns, 'rule') || undefined,
     answerType: answerType(cell(row, columns, 'answerType')),

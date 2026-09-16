@@ -323,8 +323,8 @@ test('een overlay matcht ook op de categorienamen uit `geldt_voor`', () => {
 
 // --- De modus ---------------------------------------------------------------
 
-test('een vraag met een beslisregel vraagt al zijn attributen, een zonder niet', () => {
-  // Een som heeft al zijn termen nodig; bewijs stapelt. Zie `modeOf`.
+test('een vraag vraagt altijd al zijn attributen, ook als de lijst "een" zegt', () => {
+  // Eén van de genoemde attributen beantwoordt de vraag niet. Zie `modeOf`.
   const kop = `${HEADER};modus`;
   const tekst = [kop,
     `${row({ id: 'REKEN', categorie: 'basis', laag: 'basis', vraag: 'Hoeveel meter?',
@@ -336,12 +336,13 @@ test('een vraag met een beslisregel vraagt al zijn attributen, een zonder niet',
       belang: 'hoog', benodigde_attributen: 'garendikte_tex, garendikte_nm',
       beslisregel: 'iets' })};een`,
   ].join('\n');
-  const { bank } = lees(tekst);
+  const { bank, warnings } = lees(tekst);
   const modes = Object.fromEntries((bank?.questions ?? []).map((q) => [q.id, q.mode]));
   assert.equal(modes.REKEN, 'all');
-  assert.equal(modes.BEWIJS, 'any');
-  // Een expliciete kolom gaat altijd voor de afleiding.
-  assert.equal(modes.EIGEN, 'any');
+  assert.equal(modes.BEWIJS, 'all');
+  assert.equal(modes.EIGEN, 'all');
+  // Dat "een" niet gevolgd wordt, zegt de lezer erbij.
+  assert.ok(warnings.some((warning) => warning.includes('`modus`')));
 });
 
 // --- De onomkeerbare fout ---------------------------------------------------
