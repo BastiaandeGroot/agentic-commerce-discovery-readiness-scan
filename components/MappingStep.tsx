@@ -8,12 +8,11 @@
 // doet een taalmodel in de browser; en de merchant wijst zelf aan, wat van
 // allebei wint.
 //
-// Wat het model oplevert zijn **voorstellen** en geen koppelingen. Ze staan
-// gemarkeerd in de lijst tot de merchant ze laat staan of wijzigt. Dat verschil
-// is niet cosmetisch: een model geeft altijd een beste kandidaat, ook als er
-// geen goede is, en een verkeerde koppeling laat een gat verdwijnen dat er wél
-// is. Ongemarkeerd overnemen zou precies de fout maken die deze scan hoort te
-// voorkomen.
+// Wat het model oplevert zijn voorstellen, en de hele lijst is dat: elke
+// gevulde keuze is er een om na te lopen. Een apart label per regel voegde
+// daar niets aan toe. De veiligheid zit in wat er doorkomt: Claude moet per
+// koppeling een waarde uit de kolom aanwijzen (`readProposals`), en een vorm die
+// niet past valt af (`keepFitting`).
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Sparkles } from 'lucide-react';
@@ -26,7 +25,7 @@ import { suggestMappings } from '../src/semantic/suggest';
 import { embed, ModelUnavailable, type LoadProgress } from '../src/semantic/model';
 import { MappingNotConfigured, requestMapping } from '../src/semantic/remote';
 import type { Strings } from '../src/i18n/strings';
-import { Badge, Button, Card, CardTitle, ErrorState } from './ui';
+import { Button, Card, CardTitle, ErrorState } from './ui';
 
 interface Props {
   s: Strings;
@@ -398,7 +397,6 @@ export function MappingStep({
         <ul className="mt-2">
           {rows.map((row) => {
             const current = mapping[row.key]?.[0] ?? row.fields[0] ?? NONE;
-            const isProposal = proposed[row.key] !== undefined;
             return (
               <li
                 key={row.key}
@@ -464,7 +462,6 @@ export function MappingStep({
                     );
                   })() : null}
                 </div>
-                {isProposal ? <Badge tone="accent">{s.mapping.proposed}</Badge> : null}
                 <select
                   aria-label={row.key}
                   value={current}

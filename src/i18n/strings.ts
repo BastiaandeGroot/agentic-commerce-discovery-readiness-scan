@@ -355,7 +355,6 @@ export const STRINGS = {
         'De download is niet gelukt. Dat kan aan je verbinding liggen of aan een netwerk dat hem tegenhoudt.',
       suggestFailedNext:
         'Probeer het opnieuw, of wijs de kenmerken hieronder zelf aan — dat werkt altijd en het resultaat is hetzelfde.',
-      proposed: 'Voorstel',
       proposedCount: 'voorstellen. Loop ze na en gooi weg wat niet klopt.',
       setsHeading: 'Welke vragenset hoort bij welke categorie',
       setsNote:
@@ -1498,7 +1497,6 @@ export const STRINGS = {
         'The download failed. That may be your connection, or a network blocking it.',
       suggestFailedNext:
         'Try again, or point the characteristics at their column yourself below — that always works and the result is the same.',
-      proposed: 'Proposal',
       proposedCount: 'proposals. Check them and discard what is wrong.',
       setsHeading: 'Which question set belongs to which category',
       setsNote:
