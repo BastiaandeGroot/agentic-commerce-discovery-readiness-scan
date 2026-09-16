@@ -31,3 +31,4 @@ import './snapshot.test';
 import './coveredoverlays.test';
 import './rescore.test';
 import './critical.test';
+import './proposals.test';

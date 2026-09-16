@@ -130,7 +130,8 @@ de groep en meet je elke stoel als bank.
 
 **Eén vraag mag meerdere attributen plus een regel nodig hebben.** Dat is normaal
 en het is precies waar de waarde zit. "Hoeveel meter heb ik nodig" vraagt breedte
-plus rapport plus een berekening. Zet `modus: alle` bij zo'n som.
+plus rapport plus een berekening. De scan telt een vraag pas als beantwoord als
+élk genoemd attribuut er staat, dus noem alleen wat het antwoord werkelijk draagt.
 
 **Markeer wat niet uit attributen te beantwoorden is.** Procesvragen ("kan ik een
 staal krijgen"), structuurvragen en levenscyclusvragen blijven in de bank omdat

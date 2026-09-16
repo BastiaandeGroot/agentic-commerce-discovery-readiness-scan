@@ -66,8 +66,8 @@ export function applyMapping(
 /**
  * Een vraag die op dit kenmerk leunt maar er niet mee beantwoord is.
  *
- * Alleen bij `mode: 'all'`: dan is de vraag een som en heeft hij al zijn termen
- * nodig. Koppel je de rolbreedte en laat je de rapporthoogte leeg, dan blijft
+ * Een vraag heeft al zijn kenmerken nodig. Koppel je de rolbreedte en laat je
+ * de rapporthoogte leeg, dan blijft
  * "hoeveel meter heb ik nodig" onbeantwoordbaar — en dat is precies het moment
  * waarop de merchant er nog iets aan kan doen. Zonder deze lijst ziet hij een
  * gekoppeld kenmerk, denkt hij dat de vraag rond is, en ontdekt hij het gat pas
@@ -140,8 +140,8 @@ export interface MappingSummary {
  * vraag tientallen keren voorbij zag komen. Welke vragen het precies zijn staat
  * in het rapport, waar elk gat de vragen noemt die het blokkeert.
  *
- * Een som (`all`) staat open zodra één term ongekoppeld is; bij `any` pas als
- * geen enkel kenmerk gekoppeld is.
+ * Een vraag staat open zodra één van zijn kenmerken ongekoppeld is: hij is pas
+ * beantwoord als ze er allemaal staan.
  */
 export function mappingSummary(state: QuestionSetState, pending?: Mapping): MappingSummary {
   const questions = new Set<string>();
@@ -153,8 +153,7 @@ export function mappingSummary(state: QuestionSetState, pending?: Mapping): Mapp
       const groups = question.evidence ?? [];
       if (groups.length === 0) continue;
       const open = groups.filter((group) => !isLinked(group.attributeKey, group.fields, pending));
-      const unanswerable = question.mode === 'all' ? open.length > 0 : open.length === groups.length;
-      if (!unanswerable) continue;
+      if (open.length === 0) continue;
       questions.add(question.id);
       for (const group of open) attributes.add(group.attributeKey);
     }
@@ -210,15 +209,12 @@ export function attributeInventory(
         if (!row.questions.some((entry) => entry.nl === question.label.nl)) {
           row.questions.push(question.label);
 
-          // Een som heeft al zijn termen. Bij `any` stapelt bewijs en volstaat
-          // dit kenmerk op zichzelf, dus dan valt er niets te blokkeren.
-          if (question.mode === 'all') {
-            const missing = groups
-              .filter((other) => other.attributeKey !== group.attributeKey)
-              .filter((other) => !linked(other.attributeKey, other.fields))
-              .map((other) => ({ key: other.attributeKey, label: other.label }));
-            if (missing.length > 0) row.blocked.push({ question: question.label, missing });
-          }
+          // Een vraag heeft al zijn kenmerken nodig; dit ene draagt hem niet alleen.
+          const missing = groups
+            .filter((other) => other.attributeKey !== group.attributeKey)
+            .filter((other) => !linked(other.attributeKey, other.fields))
+            .map((other) => ({ key: other.attributeKey, label: other.label }));
+          if (missing.length > 0) row.blocked.push({ question: question.label, missing });
         }
         row.weight += set.productCount ?? 0;
         rows.set(group.attributeKey, row);

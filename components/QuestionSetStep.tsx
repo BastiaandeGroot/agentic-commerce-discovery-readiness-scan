@@ -144,7 +144,7 @@ function QuestionRow({
               {question.evidence && question.evidence.length > 0
                 ? question.evidence
                   .map((group) => group.label[locale])
-                  .join(question.mode === 'all' ? ' + ' : ' / ')
+                  .join(' + ')
                 : question.requires.map((r) => requirementLabel(r, locale)).join(' · ')}
             </p>
             <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted">

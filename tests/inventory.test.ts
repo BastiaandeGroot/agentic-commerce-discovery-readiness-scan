@@ -50,15 +50,16 @@ test('een som meldt de term die nog ontbreekt', () => {
   assert.deepEqual(width?.blocked[0]?.missing.map((one) => one.key), ['rapporthoogte']);
 });
 
-test('bewijs dat stapelt blokkeert niets', () => {
-  // Bij `any` volstaat één attribuut: een agent antwoordt met wat hij heeft.
+test('ook zonder beslisregel heeft een vraag al zijn kenmerken nodig', () => {
+  // Een oude `any` op de vraag telt niet meer: één kenmerk draagt hem niet alleen.
   const state = stateWith(question('h20', 'any', [
     group('uv-bestendigheid', ['attr:^uv$']),
     group('toepassing', []),
   ]));
 
   const rows = attributeInventory(state);
-  assert.deepEqual(rows.map((row) => row.blocked.length), [0, 0]);
+  const uv = rows.find((row) => row.key === 'uv-bestendigheid');
+  assert.deepEqual(uv?.blocked[0]?.missing.map((one) => one.key), ['toepassing']);
 });
 
 test('de keuze van nu telt mee, ook voordat hij toegepast is', () => {
@@ -77,7 +78,7 @@ test('de keuze van nu telt mee, ook voordat hij toegepast is', () => {
   assert.equal(cleared.find((row) => row.key === 'rolbreedte')?.blocked.length, 1);
 });
 
-test('de telling onderaan: een som staat open bij één ontbrekende term, bewijs pas als niets gekoppeld is', () => {
+test('de telling onderaan: een vraag staat open zodra één kenmerk ongekoppeld is', () => {
   const som = question('som', 'all', [group('rolbreedte', ['dimensions']), group('rapporthoogte', [])]);
   const bewijs = question('bewijs', 'any', [group('keurmerk', ['certifications']), group('gerecycled', [])]);
   const state = {
@@ -86,8 +87,11 @@ test('de telling onderaan: een som staat open bij één ontbrekende term, bewijs
     version: 1,
   } as unknown as QuestionSetState;
 
-  assert.deepEqual(mappingSummary(state), { questions: 1, attributes: 1 });
-  assert.deepEqual(mappingSummary(state, { rapporthoogte: ['pattern_repeat'] }), { questions: 0, attributes: 0 });
+  assert.deepEqual(mappingSummary(state), { questions: 2, attributes: 2 });
+  assert.deepEqual(
+    mappingSummary(state, { rapporthoogte: ['pattern_repeat'], gerecycled: ['recycled_pct'] }),
+    { questions: 0, attributes: 0 },
+  );
   assert.deepEqual(mappingSummary(state, { keurmerk: [] }), { questions: 2, attributes: 3 });
 });
 

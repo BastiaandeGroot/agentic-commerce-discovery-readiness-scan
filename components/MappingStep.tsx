@@ -63,9 +63,11 @@ const SAMPLES_SHOWN = 3;
  * Hoeveel kenmerken er per aanvraag naar de koppelroute gaan.
  *
  * Onder de grens van 200 in de route, en klein genoeg dat het korte antwoord
- * (4.096 tokens) er niet halverwege afbreekt.
+ * (16.000 tokens, met bewijs per koppeling) er niet halverwege afbreekt.
  */
 const ATTRIBUTE_BATCH = 100;
+/** Hoeveel blokken er tegelijk naar de koppelroute gaan. */
+const PARALLEL_BLOCKS = 4;
 /** De grens van de koppelroute voor kolommen per aanvraag. */
 const MAX_COLUMNS = 300;
 
@@ -255,27 +257,31 @@ export function MappingStep({
         .map((column) => ({ key: column, text: describeColumn(column, catalog, profiles[column]) }));
       const pairs: { key: string; columns: string[] }[] = [];
       const seenNotes: string[] = [];
-      let model = '';
+      const blocks: (typeof described)[] = [];
       for (let start = 0; start < described.length; start += ATTRIBUTE_BATCH) {
-        // Een kolom die een eerder blok al kreeg, gaat niet opnieuw mee; anders
-        // grijpen twee kenmerken naar dezelfde kolom.
-        const used = new Set(pairs.flatMap((pair) => pair.columns.slice(0, 1)));
-        const result = await requestMapping(
-          {
-            attributes: described.slice(start, start + ATTRIBUTE_BATCH),
-            columns: describedColumns.filter((column) => !used.has(column.key)),
-          },
-          catalog.columns,
-        );
-        const fitting = keepFitting(result.pairs);
-        pairs.push(...fitting.kept);
-        seenNotes.push(...result.notes, ...result.rejected, ...fitting.dropped);
-        model = result.model;
-        // Wat binnen is, staat er meteen; bij 700 kenmerken hoort niemand een
-        // halve minuut naar een lege lijst te kijken.
-        setNotes([...seenNotes]);
-        accept(pairs, model);
+        blocks.push(described.slice(start, start + ATTRIBUTE_BATCH));
       }
+      // Een paar blokken tegelijk: het model weegt per koppeling een waarde af
+      // en doet daar per blok een halve minuut of langer over.
+      let next = 0;
+      const worker = async () => {
+        while (next < blocks.length) {
+          const block = blocks[next++];
+          // Elk blok ziet alle kolommen. Wat een eerder blok al gebruikte
+          // weghalen liet latere kenmerken kiezen uit wat overbleef — de
+          // kolommen waar niemand iets aan had. Een kolom mag meer kenmerken
+          // dragen; het bewijs per koppeling houdt dat eerlijk.
+          const result = await requestMapping({ attributes: block, columns: describedColumns }, catalog.columns);
+          const fitting = keepFitting(result.pairs);
+          pairs.push(...fitting.kept);
+          seenNotes.push(...result.notes, ...result.rejected, ...fitting.dropped);
+          // Wat binnen is, staat er meteen; bij 700 kenmerken hoort niemand
+          // minuten naar een lege lijst te kijken.
+          setNotes([...seenNotes]);
+          accept([...pairs], result.model);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(PARALLEL_BLOCKS, blocks.length) }, worker));
       setBusy(undefined);
       return;
     } catch (caught) {

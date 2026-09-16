@@ -16,6 +16,7 @@
 // mag niet als hetzelfde langskomen.
 
 import { parseMappingAnswer, type MappingPair } from '../spec/mapping';
+import { readProposals } from './prompt';
 
 export class MappingNotConfigured extends Error {}
 export class MappingFailed extends Error {}
@@ -71,6 +72,24 @@ export async function requestMapping(
   }
 
   const body = await response.json() as { text?: string; model?: string };
+
+  // Kenmerken komen terug met een bewijs per koppeling. Alleen wat een waarde
+  // aanwijst die echt in die kolom staat, wordt een voorstel.
+  if ((input.kind ?? 'attributes') === 'attributes') {
+    const known = new Set(knownColumns);
+    const read = readProposals(
+      body.text ?? '',
+      input.attributes,
+      input.columns.filter((column) => known.has(column.key)),
+    );
+    return {
+      pairs: read.proposals.map((proposal) => ({ key: proposal.key, columns: [proposal.column] })),
+      model: body.model ?? 'onbekend',
+      rejected: read.rejected,
+      notes: [],
+    };
+  }
+
   const parsed = parseMappingAnswer(
     body.text ?? '',
     input.attributes.map((attribute) => attribute.key),

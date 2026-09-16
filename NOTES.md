@@ -645,6 +645,44 @@ account (`SettingsStore.list`). Van het vragensetscherm weg: daar maakte het de
 lijst onderaan alleen langer, en het is iets wat je terugleest en niet iets wat je
 tijdens het valideren doet.
 
+**Een vraag is pas beantwoord als élk kenmerk er staat (16 september 2026,
+scanversie 6.0.0).** Eerst volstond er één zodra een vraag geen beslisregel had
+("bewijs stapelt"). In het rapport telde "is dit werkelijk een buitenstof" daardoor
+als beantwoord bij 123 van de 124 outdoorstoffen, alleen omdat de
+materiaalsamenstelling er stond. Bastiaan: pas volledig als alle kenmerken er
+zijn. `modus: een` in een lijst wordt niet meer gevolgd en staat als waarschuwing
+in de uitkomst; binnen één kenmerk volstaat nog steeds één van zijn kolommen. Een
+bank die alternatieven als losse kenmerken noemt (twee eenheden voor hetzelfde
+gegeven) meet daardoor strenger dan bedoeld — de generatieprompt zegt nu dat
+alleen wat het antwoord werkelijk draagt erin hoort.
+
+**Kenmerken koppelen doet Opus 5, met een bewijs per koppeling (16 september
+2026).** Op het live koppelscherm stond `gebruiksdoel` op `martindale` en
+`vochtgedrag_buiten` op `country_of_manufacture`. Twee oorzaken. Het model
+koppelde op naam en niet op wat er in de kolom staat. En elk volgend blok van
+honderd kenmerken kreeg alleen de kolommen die nog niemand had, zodat de latere
+kenmerken moesten kiezen uit de restjes. Nu:
+
+- elk blok ziet alle kolommen, en een kolom mag meer kenmerken dragen (een
+  wassymbolenlijst draagt temperatuur, drogen en chemisch reinigen);
+- het model geeft per koppeling een waarde uit de kolom als bewijs, en
+  `readProposals` houdt alleen wat een enkele, echt getoonde waarde aanwijst;
+- `claude-opus-5` op effort medium in plaats van Haiku 4.5.
+
+Gemeten met `scripts/mapping-eval.ts` op De Groot en de woontextielbank (98 open
+kenmerken, 118 kolommen). Haiku 4.5 met de nieuwe opdracht: 31 voorstellen, o.a.
+`weefdichtheid → martindale`, `voorraad_m → roll_length`,
+`wrijfechtheid_droog → washing_label`, en als bewijs vaak de hele waardenrij.
+Sonnet 5: 38, met `meubeltype → categories` en `toplaag → coated`. Opus 5: 31–33,
+vond `machine_washable` en `sustainable` die de anderen misten; twijfelgevallen
+`merk → supplier` en `meubeltype_advies → categories`. ~$0,20 en ~80 seconden per
+blok van honderd kenmerken; vier blokken lopen tegelijk.
+
+Wat er nog niet in zit: een koppeling die eerder al bewaard is, blijft staan. Het
+model stelt alleen voor wat open staat, dus foute koppelingen van vóór deze
+wijziging haalt de merchant zelf weg. Het browsermodel (zonder sleutel) werkt nog
+zoals het werkte en is de zwakste van de drie.
+
 ## Bewust afgevallen
 
 Niet opnieuw voorstellen zonder dat er iets veranderd is.
