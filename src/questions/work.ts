@@ -185,3 +185,22 @@ export function applyWork(pristine: QuestionSetState, work: QuestionWork | undef
     droppedEdits,
   };
 }
+
+/**
+ * Werk bijwerken vanuit één samenstelling, zonder werk elders weg te gooien.
+ *
+ * Een bewaarde analyse kent alleen de categorieën van die scan. `extractWork`
+ * zou het werk op elke andere categorie laten vallen — een vraag die de merchant
+ * in een latere scan elders uitzette, stond dan ineens weer aan. Wat deze
+ * samenstelling niet kent, blijft staan zoals het was.
+ */
+export function mergeWork(
+  previous: QuestionWork | undefined,
+  current: QuestionSetState,
+  pristine: QuestionSetState,
+): QuestionWork {
+  const next = extractWork(current, pristine);
+  const known = new Set(pristine.sets.map(setKey));
+  const kept = Object.fromEntries(Object.entries(previous?.sets ?? {}).filter(([key]) => !known.has(key)));
+  return { ...next, sets: { ...kept, ...next.sets } };
+}

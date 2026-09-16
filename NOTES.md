@@ -1,7 +1,7 @@
 # Werknotities
 
 Sessiestand: wat er staat, wat er besloten is, wat er open is.
-Laatst bijgewerkt: 2026-09-14.
+Laatst bijgewerkt: 2026-09-16.
 
 Structurele regels die altijd gelden staan **niet** hier maar in `CLAUDE.md`.
 
@@ -73,6 +73,40 @@ batch-API voor de halve prijs; panel en oogst lopen direct. Promptcaching was
 eerst genoemd als grootste besparing en dat klopte niet: het systeemdeel is
 ~1.200 tokens, onder de minimale cachegrootte. Zie `ONTWERP-vragenbank-keten.md`
 paragraaf 3a.
+
+**Kritiek volgt een toets van vier criteria (16 september 2026, scanversie 5.3.0,
+generatie 1.6.0).** De oude maat — "voorkomt de fout die de koper niet kan
+terugdraaien" — onderscheidde niets in een markt waar alles op maat geknipt wordt.
+Woontextiel v4 had 31 van de 171 vragen kritiek, na herweging 6 tot 11 per
+categorie, en "waar is deze stof van gemaakt", "kan ik retourneren" en "kan ik
+bijbestellen" waren poorten voor basisgeschikt. Nu alleen bij vier keer ja:
+beslissend (ongeschikt, niet tegenvallend), onherstelbaar, over het product, en
+uit de catalogus (een kenmerk, geen berekening met maten van de koper). Een
+vraag die alleen informatie geeft waaruit een ander antwoord volgt, is zelf niet
+beslissend. Het derde en vierde criterium past de lezer automatisch toe (koopzekerheid,
+procesvraag, niet beantwoordbaar, antwoordtype afgeleid → hoog, ook in een
+herweging). Het vierde kwam erbij nadat "hoeveel meter heb ik nodig" als
+kritieke vraag basisgeschikt op De Groot van 1.523 naar 136 zette: een rekenvraag
+die geen catalogus kan dragen is als poort een muur die elke andere kritieke vraag
+verbergt. De generatie moet
+per kritieke vraag de toets invullen, anders hoog. Een beheerder corrigeert het
+belang naast de bank (migratie 0013) en niet door opnieuw te genereren: nieuwe
+vraag-id's zouden het werk van de merchant losknippen. Met de opdrachtgever
+afgesproken.
+
+**Een bewaarde analyse is bij te werken zonder catalogus (16 september 2026).**
+Een merchant die zijn resultaten terugkijkt, hoort een vraag te kunnen uitzetten
+zonder elke keer zijn export opnieuw in te lezen en alle stappen door te lopen.
+Daarom bewaart de scan naast de snapshot de samenstelling van de vragensets en
+per product de toestand van elke vraag (migratie 0012, `src/engine/rescore.ts`),
+en telt het rapport na een wijziging opnieuw op. Dit verruimt de afspraak dat een
+snapshot alleen tellingen, categorienamen en veldnamen draagt: er staat nu een
+rij per product in, maar zonder sleutel, titel of waarde. Bewust gekozen met de
+opdrachtgever. Afgevallen alternatief: alleen de vragensets bewaren en het rapport
+pas bij de volgende scan laten bijwerken — dan zet je een vraag uit en verandert
+er niets, en dat leest als een knop die niet werkt. Op De Groot: ~290 KB metingen
+en ~290 KB vragensets per analyse; herberekenen kost ~160 ms en geeft exact het
+rapport van de scan.
 
 **Een eigen vragenset vraagt één eigen vraag met dekking > 0 (15 september 2026,
 scanversie 5.2.0, generatie 1.5.0).** Dit vervangt de eis van 11 september dat
@@ -630,6 +664,20 @@ Niet opnieuw voorstellen zonder dat er iets veranderd is.
 ---
 
 ## Open
+
+**Woontextiel v4 gecorrigeerd; opnieuw scannen** — 16 september. Migratie 0013
+is gedraaid. v4 heeft 32 correcties in `importance_corrections`: de voorstellen
+naar hoog, plus de vragen die na de toets kritiek blijven expliciet bevestigd. De
+rekenvragen (BAS-05, GOR-03, GOR-04, TAF-04, SCH-06, PAN-01, TAS-01) gaan door het
+vierde criterium vanzelf naar hoog. Open: BAS-21 (brandvertragend) vraagt vier
+kenmerken tegelijk (`modus: alle`, ook het certificaat) en houdt daardoor
+Gordijnstoffen tegen; dat is een modelleerkeuze in de bank, geen kwestie van de
+toets. Merchant: opnieuw scannen en de vragensets opnieuw bevestigen.
+
+**Migratie 0012 draaien** — 16 september. Voegt de kolom `detail` toe aan
+`scan_snapshots`. Zonder die kolom wordt een analyse wel bewaard, maar zonder
+vragensets: het rapport zegt dat erbij, en "Vraag uitzetten" leidt dan via een
+nieuwe scan. Analyses van vóór deze datum hebben geen detail en blijven zo.
 
 **Migratie 0011 draaien** — 15 september. Zonder die migratie mislukt bewaren in
 het account; het rapport zegt dat en biedt opnieuw bewaren aan. Scans die eerder

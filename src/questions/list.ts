@@ -33,6 +33,7 @@ import type {
   EvidenceSource, Importance, Intent, Overlay, QuestionBank,
 } from './bank';
 import { IMPORTANCE_WEIGHT } from './bank';
+import { enforceCriticalCriteria } from './critical';
 import {
   foldWarnings, importBankSet, patternFor, UNMAPPED,
   type BankFile, type ImportResult,
@@ -119,6 +120,8 @@ const COLUMNS = {
   synonyms: ['synoniemen', 'synonyms', 'benoemd_als', 'named_as', 'kolommen', 'columns'],
   /** De fout die een koper niet kan terugdraaien; fase 0 van de methode. */
   mistake: ['onomkeerbare_fout', 'irreversible_mistake', 'irreversible_error'],
+  /** Per kritieke vraag de drie criteria van de toets; zie `src/questions/critical.ts`. */
+  criticalTest: ['kritiek_toets', 'critical_test', 'kritiek_onderbouwing'],
 } satisfies Record<string, string[]>;
 
 type Column = keyof typeof COLUMNS;
@@ -676,6 +679,7 @@ function toQuestion(row: Row, id: string, columns: ColumnMap, warnings: string[]
     answerable,
     caution: caution ? same(caution) : undefined,
     weightNote: note ? same(note) : undefined,
+    criticalTest: cell(row, columns, 'criticalTest') || undefined,
   };
 }
 
@@ -812,19 +816,26 @@ function applyReweights(
   for (const group of groups) {
     for (const { row, id } of group.rows) {
       for (const part of splitList(cell(row, columns, 'reweight'))) {
-        const at = part.lastIndexOf(':');
+        // De dubbele punt vóór een eventuele toets tussen haken; daarbinnen staan er meer.
+        const head = part.includes('[') ? part.slice(0, part.indexOf('[')) : part;
+        const at = head.lastIndexOf(':');
         if (at === -1) {
           warnings.push(`vraag ${id}: herweging "${part}" mist de categorie of het belang. Schrijf hem als "categorie: belang".`);
           continue;
         }
         const category = part.slice(0, at).trim();
-        const importance = IMPORTANCE[part.slice(at + 1).trim().toLowerCase()];
+        // "Gordijnstoffen: kritiek [beslissend: … | onherstelbaar: … | product: …]":
+        // de toets tussen haken is de onderbouwing van deze herweging.
+        const rest = part.slice(at + 1).trim();
+        const bracket = rest.indexOf('[');
+        const importance = IMPORTANCE[(bracket === -1 ? rest : rest.slice(0, bracket)).trim().toLowerCase()];
+        const why = bracket === -1 ? '' : rest.slice(bracket + 1).replace(/\]\s*$/, '').trim();
         if (category === '' || !importance) {
           warnings.push(`vraag ${id}: herweging "${part}" noemt geen geldige categorie met een belang.`);
           continue;
         }
         const overlay = ensureOverlay(category);
-        overlay.reweight = { ...overlay.reweight, [id]: { importance } };
+        overlay.reweight = { ...overlay.reweight, [id]: why ? { importance, why: same(why) } : { importance } };
       }
     }
   }
@@ -840,6 +851,24 @@ function applyReweights(
  * `import.ts` blijft werken omdat de methode die vorm ook oplevert.
  */
 export function importQuestionList(files: BankFile[]): ImportResult {
+  const result = readQuestionList(files);
+  if (!result.bank) return result;
+  // Het derde en vierde criterium van de kritiek-toets zijn na te gaan uit de
+  // lijst zelf, en dus past de lezer ze toe. Dat is een aanname van de lezer, en
+  // die staat in de uitkomst.
+  const { bank, lowered } = enforceCriticalCriteria(result.bank);
+  const list = (ids: string[]) => `${ids.slice(0, 8).join(', ')}${ids.length > 8 ? ` en ${ids.length - 8} meer` : ''}`;
+  const warnings = [...result.warnings];
+  if (lowered.product.length > 0) {
+    warnings.push(`${lowered.product.length} kritieke vra${lowered.product.length === 1 ? 'ag gaat' : 'gen gaan'} niet over het product maar over beleid, levering of voorraad (koopzekerheid, een procesvraag, of niet uit kenmerken te beantwoorden). Die tellen als hoog: kritiek is de poort voor basisgeschikt, en die hangt niet af van het retourbeleid of de voorraad van een winkel. Het gaat om: ${list(lowered.product)}.`);
+  }
+  if (lowered.catalogue.length > 0) {
+    warnings.push(`${lowered.catalogue.length} kritieke vra${lowered.catalogue.length === 1 ? 'ag is' : 'gen zijn'} een berekening (antwoordtype afgeleid): de catalogus levert de invoer, maar het antwoord vraagt ook de maten of keuzes van de koper. Die tellen als hoog: een poort die een goed gevulde catalogus niet kan halen, verbergt elke andere kritieke vraag. Het gaat om: ${list(lowered.catalogue)}.`);
+  }
+  return warnings.length === result.warnings.length ? result : { ...result, bank, warnings };
+}
+
+function readQuestionList(files: BankFile[]): ImportResult {
   if (files.length === 0) return { errors: ['Geen bestand gekozen.'], warnings: [] };
 
   const tables = files.filter((file) => looksLikeQuestionList(file.text));

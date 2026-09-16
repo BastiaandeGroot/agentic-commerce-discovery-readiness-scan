@@ -8,14 +8,15 @@
 // een koper in deze markt stelt.
 
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
-import { Download } from 'lucide-react';
-import { adviceKey, advisoryItems, mergedGaps, scoreRows, topBlockers, unansweredQuestions } from '../src/report/derive';
-import { toSnapshot } from '../src/engine/snapshot';
-import { snapshotStoreFor } from '../src/storage/snapshots';
+import { useMemo, useState, type ReactNode } from 'react';
+import { ArrowUpRight, Download } from 'lucide-react';
+import { adviceKey } from '../src/report/derive';
+import { modelFromReport, type ModelQuestion, type ReportModel } from '../src/report/model';
+import { toSnapshot, toSnapshotDetail } from '../src/engine/snapshot';
+import { DetailNotSaved, snapshotStoreFor } from '../src/storage/snapshots';
 import { supabase } from '../src/auth/client';
 import { useAuth } from './auth/AuthProvider';
-import type { Locale, ScanReport } from '../src/domain/types';
+import type { Locale, QuestionSetState, ScanReport } from '../src/domain/types';
 import { requirementLabel } from '../src/spec/fields';
 import type { Strings } from '../src/i18n/strings';
 import { Badge, Bar, Button, Card, CardTitle, ErrorState, InfoButton, InfoPanel, Select, TrafficLight, statusOf } from './ui';
@@ -25,8 +26,8 @@ function n(value: number): string {
   return value.toLocaleString('nl-NL');
 }
 
-function FunnelCard({ s, report }: { s: Strings; report: ScanReport }) {
-  const { funnel } = report;
+function FunnelCard({ s, model }: { s: Strings; model: ReportModel }) {
+  const { funnel } = model;
   const status = statusOf(funnel.avgAnswered, funnel.avgApplicable);
   // Eén uitleg tegelijk open: twee tegelijk maakt de kaart onleesbaar.
   const [openInfo, setOpenInfo] = useState<string>();
@@ -34,8 +35,7 @@ function FunnelCard({ s, report }: { s: Strings; report: ScanReport }) {
   // en zegt hij niets. Dat gebeurt bij een voorlopige bank: welke fout in deze
   // markt onomkeerbaar is, volgt uit onderzoek. Hem dan stilzwijgend op "iedereen
   // geslaagd" zetten zou een poort suggereren die er niet is.
-  const hasCritical = report.questionCoverage
-    .some((row) => row.scored && row.importance === 'critical');
+  const { hasCritical } = model;
 
   const rows = [
     { label: s.report.total, value: funnel.total, tone: 'neutral' as const, explain: undefined, info: undefined },
@@ -125,38 +125,38 @@ function FunnelCard({ s, report }: { s: Strings; report: ScanReport }) {
  * zegt hoeveel werk er ligt, 30% niet. En het doel is nooit verzonnen — het is
  * telkens "alles", omdat de twee treden van de trechter precies dat vragen.
  */
-function CategoryScores({ s, report }: { s: Strings; report: ScanReport }) {
+function CategoryScores({ s, model }: { s: Strings; model: ReportModel }) {
   const [category, setCategory] = useState('all');
+  // Eén uitleg tegelijk open, zoals bij de trechter.
+  const [openInfo, setOpenInfo] = useState<string>();
 
   // Hoofdcategorieën eerst, hun subcategorieën eronder: dat is de volgorde
   // waarin een merchant zijn eigen boom leest.
   const options = useMemo(() => [
     { value: 'all', label: s.report.scoreAllCategories },
-    ...report.categories.map((row) => ({
+    ...model.categories.map((row) => ({
       value: `${row.setId}|${row.subcategory ?? ''}`,
       label: row.subcategory ? `   ${row.category} › ${row.subcategory}` : row.category,
     })),
-  ], [report.categories, s.report.scoreAllCategories]);
+  ], [model.categories, s.report.scoreAllCategories]);
 
   // De afleiding staat in `src/report/derive.ts`, zodat de pdf hetzelfde zegt.
-  const rowsByKey = useMemo(
-    () => new Map(scoreRows(report, s.report.scoreAllCategories).map((row) => [row.key, row])),
-    [report, s.report.scoreAllCategories],
-  );
+  const rowsByKey = useMemo(() => new Map(model.scoreRows.map((row) => [row.key, row])), [model.scoreRows]);
   const shown = rowsByKey.get(category);
 
-  if (report.categories.length === 0 || !shown) return null;
+  if (model.categories.length === 0 || !shown) return null;
 
   // Heeft deze catalogus subcategorieën, en maakt de vragenlijst er onderscheid
   // in? Die twee zijn los: het eerste komt uit de data, het tweede uit de lijst.
-  const hasSubcategories = report.products.some((product) => product.subcategory !== undefined);
-  const hasLevels = report.categories.some((row) => row.subcategory !== undefined);
+  const hasSubcategories = model.hasSubcategories === true;
+  const hasLevels = model.categories.some((row) => row.subcategory !== undefined);
 
-  const bars: { label: string; goal: string; value: { answered: number; total: number } }[] = [
-    { label: s.report.scoreCritical, goal: s.report.scoreCriticalGoal, value: shown.critical },
-    { label: s.report.scoreGeneral, goal: s.report.scoreGeneralGoal, value: shown.general },
-    { label: s.report.scoreAll, goal: s.report.scoreAllGoal, value: shown.all },
-  ];
+  // Een oudere bewaarde analyse kent niet alle drie; wat ontbreekt staat er niet.
+  const bars = [
+    { label: s.report.scoreCritical, goal: s.report.scoreCriticalGoal, info: s.report.scoreCriticalInfo, value: shown.critical },
+    { label: s.report.scoreGeneral, goal: s.report.scoreGeneralGoal, info: s.report.scoreGeneralInfo, value: shown.general },
+    { label: s.report.scoreAll, goal: s.report.scoreAllGoal, info: undefined, value: shown.all },
+  ].flatMap((bar) => (bar.value ? [{ ...bar, value: bar.value }] : []));
 
   return (
     <Card>
@@ -185,7 +185,18 @@ function CategoryScores({ s, report }: { s: Strings; report: ScanReport }) {
           return (
             <div key={bar.label}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-sm font-medium">{bar.label}</span>
+                <span className="flex items-center gap-1.5 text-sm font-medium">
+                  {bar.label}
+                  {bar.info ? (
+                    <InfoButton
+                      label={s.report.infoLabel}
+                      open={openInfo === bar.label}
+                      onToggle={() => setOpenInfo(openInfo === bar.label ? undefined : bar.label)}
+                      onOpen={() => setOpenInfo(bar.label)}
+                      onClose={() => setOpenInfo(undefined)}
+                    />
+                  ) : null}
+                </span>
                 <span className="text-sm">
                   <span className="tnum font-semibold">{fmt(bar.value.answered)}</span>
                   <span className="text-muted"> {s.report.scoreOf} </span>
@@ -196,15 +207,21 @@ function CategoryScores({ s, report }: { s: Strings; report: ScanReport }) {
                     <span className="ml-2 text-xs text-ok">✓ {s.report.scoreDone}</span>
                   ) : (
                     <span className="ml-2 text-xs text-muted">
-                      <span className="tnum">{fmt(togo)}</span> {s.report.scoreToGo}
+                      {/* Onder 0,05 zou één decimaal "0.0" tonen terwijl er nog
+                          producten openstaan; dan twee decimalen. */}
+                      <span className="tnum">{togo < 0.05 ? togo.toFixed(2) : fmt(togo)}</span> {s.report.scoreToGo}
                     </span>
                   )}
                 </span>
               </div>
               <div className="mt-1">
-                <Bar value={bar.value.answered} total={goal} tone={done ? 'ok' : 'warn'} />
+                {/* Groen: de balk toont wat beantwoord is, zoals bij de vragen
+                    hieronder. Wat nog openstaat is het lege deel en het getal
+                    ernaast, niet een waarschuwingskleur. */}
+                <Bar value={bar.value.answered} total={goal} tone="ok" />
               </div>
               <p className="mt-1 text-xs leading-relaxed text-muted">{bar.goal}</p>
+              {bar.info && openInfo === bar.label ? <InfoPanel>{bar.info}</InfoPanel> : null}
             </div>
           );
         })}
@@ -223,13 +240,11 @@ function CategoryScores({ s, report }: { s: Strings; report: ScanReport }) {
   );
 }
 
-function NextStep({ s, report, locale }: {
-  s: Strings; report: ScanReport; locale: Locale;
-}) {
-  const { funnel } = report;
+function NextStep({ s, model }: { s: Strings; model: ReportModel }) {
+  const { funnel } = model;
   // Welke vragen de meeste producten tegenhouden, en wat het oplevert als juist
   // die beantwoord worden. Afgeleid in `src/report/derive.ts`.
-  const { top, wouldBecome, nearest } = topBlockers(report, locale);
+  const { top, wouldBecome, nearest } = model.blockers;
 
   if (top.length === 0) return null;
 
@@ -271,6 +286,8 @@ function NextStep({ s, report, locale }: {
         </ul>
       </div>
 
+      {/* Een oudere bewaarde analyse weet dit niet: het vraagt de producten. */}
+      {wouldBecome === undefined ? null : (
       <div className="mt-4 rounded-md bg-surface-2 px-3 py-2.5">
         <h3 className="text-xs font-medium text-muted">{s.report.startWinHeading}</h3>
         {wouldBecome > 0 ? (
@@ -283,16 +300,20 @@ function NextStep({ s, report, locale }: {
           <p className="mt-1 text-sm leading-relaxed text-muted">{s.report.startWinNone}</p>
         )}
       </div>
+      )}
     </Card>
   );
 }
 
-function QuestionCoverageCard({ s, report, locale }: {
-  s: Strings; report: ScanReport; locale: Locale;
+function QuestionCoverageCard({ s, model, locale, onReviewQuestion }: {
+  s: Strings; model: ReportModel; locale: Locale;
+  onReviewQuestion?: (question: { setId: string; questionId: string; base: boolean }) => void;
 }) {
   const [setId, setSetId] = useState('all');
   const [openRow, setOpenRow] = useState<string>();
-  const categories = report.categories;
+  /** Waarmee beantwoord: los van "waarom niet", want je wilt ze naast elkaar kunnen zien. */
+  const [openAnswered, setOpenAnswered] = useState<string>();
+  const categories = model.categories;
 
   // Toon de categorienaam van de merchant, niet onze interne set-id.
   const categoryName = new Map(categories.map((c) => [c.setId, c.category]));
@@ -300,13 +321,21 @@ function QuestionCoverageCard({ s, report, locale }: {
   // Beste eerst. Een merchant leest dan van boven naar beneden af waar hij al
   // ver is en waar het werk begint, in plaats van meteen tegen het slechtste
   // nieuws aan te kijken.
-  const rows = unansweredQuestions(report, setId);
+  const rows = (model.questions ?? []).filter((row) => setId === 'all' || row.setId === setId);
 
   // Zonder categoriekeuze zou de lijst over alle sets heen te lang worden; met
   // een gekozen categorie hoort hij compleet te zijn.
   const shown = setId === 'all' ? rows.slice(0, 14) : rows;
 
-  if (report.questionCoverage.length === 0) return null;
+  if (model.questions === undefined) {
+    return (
+      <Card>
+        <CardTitle sub={s.report.questionsIntro}>{s.report.questionsHeading}</CardTitle>
+        <p className="text-sm text-muted">{s.pages.dashboard.snapshotOld}</p>
+      </Card>
+    );
+  }
+  if (model.questions.length === 0 && categories.length === 0) return null;
 
   return (
     <Card>
@@ -332,6 +361,7 @@ function QuestionCoverageCard({ s, report, locale }: {
         <ul className="space-y-2.5">
           {shown.map((row) => {
             const rowKey = `${row.setId}-${row.questionId}`;
+            const weak = row.weak ?? (row.unusable ?? 0) + (row.incomplete ?? 0);
             return (
             <li key={rowKey}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -370,25 +400,42 @@ function QuestionCoverageCard({ s, report, locale }: {
                 />
                 <div
                   className="h-full bg-warn/50"
-                  style={{ width: `${((row.unusable + row.incomplete) / Math.max(row.applicable, 1)) * 100}%` }}
+                  style={{ width: `${(weak / Math.max(row.applicable, 1)) * 100}%` }}
                 />
               </div>
               <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted">
                 <span>{categoryName.get(row.setId) ?? row.setId}</span>
-                <span className="tnum">
-                  <span className="text-ok">{n(row.answered)}</span> {s.report.fromFeed}
-                </span>
+                {/* Klikbaar zodra bekend is waarmee beantwoord is. Een vinkje zonder
+                    herkomst is een oordeel dat de merchant moet geloven; met de
+                    kolommen erbij kan hij het nakijken. */}
+                {row.answered > 0 && row.answeredBy ? (
+                  <button
+                    type="button"
+                    aria-expanded={openAnswered === rowKey}
+                    onClick={() => setOpenAnswered(openAnswered === rowKey ? undefined : rowKey)}
+                    className="tnum underline decoration-dotted underline-offset-2 hover:text-ink"
+                  >
+                    <span className="text-ok">{n(row.answered)}</span> {s.report.fromFeed}
+                  </button>
+                ) : (
+                  <span className="tnum">
+                    <span className="text-ok">{n(row.answered)}</span> {s.report.fromFeed}
+                  </span>
+                )}
                 {row.empty > 0 ? (
                   <span className="tnum" title={s.report.statesExplain.empty}>
                     <span className="text-warn">{n(row.empty)}</span> {s.report.enrichable}
                   </span>
                 ) : null}
-                {row.unusable > 0 ? (
+                {row.weak !== undefined && row.weak > 0 ? (
+                  <span className="tnum">{n(row.weak)} {s.pages.dashboard.snapshotWeak}</span>
+                ) : null}
+                {row.unusable !== undefined && row.unusable > 0 ? (
                   <span className="tnum" title={s.report.statesExplain.unusable}>
                     {n(row.unusable)} {s.report.states.unusable.toLowerCase()}
                   </span>
                 ) : null}
-                {row.incomplete > 0 ? (
+                {row.incomplete !== undefined && row.incomplete > 0 ? (
                   <span className="tnum" title={s.report.statesExplain.incomplete}>
                     {n(row.incomplete)} {s.report.states.incomplete.toLowerCase()}
                   </span>
@@ -396,14 +443,34 @@ function QuestionCoverageCard({ s, report, locale }: {
                 <span className="tnum" title={s.report.statesExplain.absent}>
                   {n(row.absent)} {s.report.neither}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setOpenRow(rowKey === openRow ? undefined : rowKey)}
-                  className="underline decoration-dotted underline-offset-2 hover:text-ink"
-                >
-                  {rowKey === openRow ? s.report.qDetailClose : s.report.qDetail}
-                </button>
+                {row.evidence ? (
+                  <button
+                    type="button"
+                    onClick={() => setOpenRow(rowKey === openRow ? undefined : rowKey)}
+                    className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                  >
+                    {rowKey === openRow ? s.report.qDetailClose : s.report.qDetail}
+                  </button>
+                ) : null}
+                {/* Een vraag die hier niet klopt, meteen kunnen uitzetten: naar
+                    het vragensetscherm, op deze vraag. */}
+                {onReviewQuestion ? (
+                  <button
+                    type="button"
+                    onClick={() => onReviewQuestion({
+                      setId: row.setId, questionId: row.questionId, base: row.layer !== 'category',
+                    })}
+                    className="inline-flex items-center gap-1 underline decoration-dotted underline-offset-2 hover:text-ink"
+                  >
+                    {s.report.qReview}
+                    <ArrowUpRight className="size-3" aria-hidden />
+                  </button>
+                ) : null}
               </p>
+
+              {openAnswered === rowKey && row.answeredBy ? (
+                <AnsweredPanel s={s} locale={locale} row={row} />
+              ) : null}
 
               {/* Waaróp de vraag strandt, in de taal van de merchant: welk
                   kenmerk hij nodig heeft, welke kolom daaraan hangt, en wat de
@@ -440,11 +507,82 @@ function QuestionCoverageCard({ s, report, locale }: {
   );
 }
 
-function GapTable({ s, report, locale }: { s: Strings; report: ScanReport; locale: Locale }) {
+/** Hoeveel producten we bij naam noemen; daarboven "en nog zoveel". */
+const ANSWERED_LISTED = 12;
+
+/**
+ * Waarmee een vraag beantwoord is: per kenmerk de kolommen die het antwoord
+ * droegen, met hoeveel producten, en — na een verse scan — welke producten.
+ */
+function AnsweredPanel({ s, locale, row }: { s: Strings; locale: Locale; row: ModelQuestion }) {
+  const counts = new Map((row.answeredBy ?? []).map((entry) => [entry.field, entry.products]));
+  const grouped = (row.evidence ?? []).map((group) => ({
+    ...group,
+    carried: group.fields.filter((field) => counts.has(field)),
+  })).filter((group) => group.carried.length > 0);
+  const listed = new Set(grouped.flatMap((group) => group.carried));
+  const loose = [...counts.keys()].filter((field) => !listed.has(field));
+  const products = row.answeredProducts;
+
+  return (
+    <div className="mt-2 rounded-lg bg-surface-2 p-3 text-xs">
+      <p className="font-medium text-muted">{s.report.qAnsweredVia}</p>
+      {counts.size === 0 ? (
+        <p className="mt-1 text-muted">{s.report.qAnsweredNoFields}</p>
+      ) : (
+        <ul className="mt-1 space-y-1">
+          {grouped.map((group) => (
+            <li key={group.attributeKey} className="flex flex-wrap items-baseline gap-x-2">
+              <span className="font-medium">{group.label[locale]}</span>
+              <span aria-hidden className="text-muted">→</span>
+              <span className="text-muted">
+                {group.carried.map((field, index) => (
+                  <span key={field}>
+                    {index > 0 ? ', ' : ''}
+                    <span className="font-mono">{requirementLabel(field, locale)}</span>
+                    <span className="tnum"> ({n(counts.get(field) ?? 0)})</span>
+                  </span>
+                ))}
+              </span>
+            </li>
+          ))}
+          {loose.map((field) => (
+            <li key={field} className="text-muted">
+              <span className="font-mono">{requirementLabel(field, locale)}</span>
+              <span className="tnum"> ({n(counts.get(field) ?? 0)})</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-1 leading-relaxed text-muted">{s.report.qAnsweredCountNote}</p>
+
+      <p className="mt-2 font-medium text-muted">{s.report.qAnsweredProducts}</p>
+      {products === undefined ? (
+        <p className="mt-0.5 leading-relaxed text-muted">{s.report.qAnsweredNoProducts}</p>
+      ) : (
+        <ul className="mt-1 space-y-0.5">
+          {products.slice(0, ANSWERED_LISTED).map((product) => (
+            <li key={product.key} className="flex flex-wrap gap-x-2">
+              <span className="font-mono text-muted">{product.key}</span>
+              {product.title ? <span>{product.title}</span> : null}
+            </li>
+          ))}
+          {products.length > ANSWERED_LISTED ? (
+            <li className="text-muted">
+              {s.report.qAnsweredMore.replace('{aantal}', n(products.length - ANSWERED_LISTED))}
+            </li>
+          ) : null}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale: Locale }) {
   // Eén kolomuitleg tegelijk; twee open panelen boven een tabel is onleesbaar.
   const [openInfo, setOpenInfo] = useState<string>();
 
-  const rows = mergedGaps(report);
+  const rows = model.gaps;
   if (rows.length === 0) return null;
 
   // Op inspanning en niet op ernst: invulwerk is de goedkoopste winst die er is,
@@ -501,7 +639,7 @@ function GapTable({ s, report, locale }: { s: Strings; report: ScanReport; local
                 <td className="py-2 pr-3">
                   {/* Welke vragen hierdoor blijven liggen. Een gat zonder vraag
                       bestaat niet: dat is het verschil met een lege-veldenlijst. */}
-                  <span className="text-xs text-muted">{row.questions.length}</span>
+                  <span className="text-xs text-muted">{row.questions ?? '—'}</span>
                 </td>
                 <td className="py-2 pr-3">
                   <Badge tone={causeTone[row.cause as keyof typeof causeTone]}>
@@ -534,10 +672,10 @@ function GapTable({ s, report, locale }: { s: Strings; report: ScanReport; local
  * het rapport halen — juist hier ligt het antwoord bij de website of de
  * klantenservice, en niet bij de catalogus.
  */
-function Advisory({ s, report, locale }: { s: Strings; report: ScanReport; locale: Locale }) {
+function Advisory({ s, model }: { s: Strings; model: ReportModel }) {
   // Ontdubbeld op vraag, met de categorieën erachter: dezelfde procesvraag komt
   // in meerdere categorieën terug en hoeft maar één keer als advies te staan.
-  const items = advisoryItems(report, locale);
+  const items = model.advisory;
   if (items.length === 0) return null;
 
   return (
@@ -546,7 +684,7 @@ function Advisory({ s, report, locale }: { s: Strings; report: ScanReport; local
       <ul className="space-y-2">
         {items.map((entry) => (
           <li key={entry.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line pt-2">
-            <Badge tone="neutral">{s.questions.importance[entry.importance]}</Badge>
+            <Badge tone="neutral">{s.questions.importance[entry.importance as keyof typeof s.questions.importance] ?? entry.importance}</Badge>
             <span className="min-w-0 flex-1 text-sm">{entry.label}</span>
             <span className="text-xs text-muted">{entry.categories.join(', ')}</span>
           </li>
@@ -556,10 +694,146 @@ function Advisory({ s, report, locale }: { s: Strings; report: ScanReport; local
   );
 }
 
-export function ReportView({ s, locale, report, onRestart, restartLabel, canSave = true }: {
+/**
+ * Het rapport zelf, getekend uit het model.
+ *
+ * Een verse scan en een bewaarde analyse gebruiken allebei dit deel, zodat ze er
+ * hetzelfde uitzien. Wat alleen met de producten kan — de verkenner, bewaren en
+ * de pdf — komt van buiten binnen.
+ */
+export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestion }: {
+  s: Strings;
+  locale: Locale;
+  model: ReportModel;
+  /** Naar een vraag op het vragensetscherm. Alleen waar dat scherm bereikbaar is. */
+  onReviewQuestion?: (question: { setId: string; questionId: string; base: boolean }) => void;
+  /** Per product kijken, of de uitleg waarom dat hier niet kan. */
+  explorer?: ReactNode;
+  footer?: ReactNode;
+}) {
+  // Niet-bevroren banken dragen allebei een voorbehoud, maar niet hetzelfde.
+  // Een voorlopige bank is ónze terugval uit vakkennis; een ingelezen lijst zonder
+  // sitepanel is de lijst van de merchant zelf. Die over één kam scheren vertelt
+  // hem dat zijn eigen vragen uit onze vakkennis komen, en dat klopt niet.
+  const unfrozen = model.stamp.banks.filter((bank) => bank.status !== 'frozen');
+  const anyProvisional = unfrozen.some((bank) => bank.status === 'provisional');
+
+  return (
+    <div className="space-y-4">
+      {/* Bovenaan en niet in het stempel onderaan: wie een cijfer leest hoort
+          meteen te weten dat de lat beredeneerd is en niet onderzocht. */}
+      {unfrozen.length > 0 ? (
+        <div className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3">
+          <p className="font-medium text-warn">
+            {s.report.bankHeading}: {unfrozen.map((bank) => bank.label?.[locale] ?? bank.id).join(', ')}
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-ink">
+            {anyProvisional ? s.report.bankProvisional : s.report.bankInReview}
+          </p>
+        </div>
+      ) : null}
+
+      {model.stamp.blindAttributes.length > 0 ? (
+        <div className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3">
+          <p className="font-medium text-warn">
+            {s.report.blindHeading} —{' '}
+            <span className="tnum">{model.stamp.blindAttributes.length}</span>{' '}
+            {s.report.blindCount}
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-ink">{s.report.blindBody}</p>
+          <p className="mt-2 text-sm leading-relaxed text-ink">{s.report.blindNext}</p>
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {model.stamp.blindAttributes.slice(0, 16).map((attribute) => (
+              <li key={attribute.key}>
+                <Badge tone="neutral">{attribute.key}</Badge>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <FunnelCard s={s} model={model} />
+        <NextStep s={s} model={model} />
+        <CategoryScores s={s} model={model} />
+      </div>
+
+      {model.unmatchedCount > 0 ? (
+        <div className="rounded-md bg-warn-soft px-3 py-2">
+          <p className="text-sm">
+            <span className="tnum font-semibold">{n(model.unmatchedCount)}</span>{' '}
+            {s.report.unmatched}
+          </p>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted">{s.report.unmatchedExplain}</p>
+        </div>
+      ) : null}
+
+      <QuestionCoverageCard s={s} model={model} locale={locale} onReviewQuestion={onReviewQuestion} />
+
+      <GapTable s={s} model={model} locale={locale} />
+
+      {explorer}
+
+      {/* Vragen die geen enkel attribuut kan dragen. Ze staan ná de meting: het
+          is advies over je website en je dienstverlening, geen bevinding over je
+          catalogus. */}
+      <Advisory s={s} model={model} />
+
+      <Card>
+        <CardTitle sub={s.report.stampExplain}>{s.report.stampHeading}</CardTitle>
+        <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <dt className="text-xs text-muted">{s.report.scanVersion}</dt>
+            <dd className="tnum font-medium">v{model.stamp.scanVersion}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted">{s.report.specSnapshot}</dt>
+            <dd className="tnum font-medium">{model.stamp.fieldRegister}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted">{s.report.bankVersion}</dt>
+            <dd className="font-medium">
+              {model.stamp.banks.length === 0 ? '—' : model.stamp.banks.map((bank) => (
+                <span key={bank.id} className="mr-2 inline-flex items-center gap-1.5">
+                  <span className="tnum">{bank.label?.[locale] ?? bank.id} {bank.version}</span>
+                  {bank.status !== 'frozen' ? (
+                    <Badge tone="warn">{s.bank.status[bank.status as keyof typeof s.bank.status] ?? bank.status}</Badge>
+                  ) : null}
+                </span>
+              ))}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted">{s.report.questionVersion}</dt>
+            <dd className="tnum font-medium">v{model.stamp.questionSetVersion}</dd>
+          </div>
+          {model.stamp.scannedAt ? (
+            <div>
+              <dt className="text-xs text-muted">{s.report.scannedAt}</dt>
+              <dd className="tnum font-medium">
+                {new Date(model.stamp.scannedAt).toLocaleString(locale === 'nl' ? 'nl-NL' : 'en-GB')}
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+      </Card>
+
+      <Card>
+        <p className="text-xs leading-relaxed text-muted">{s.report.disclaimer}</p>
+      </Card>
+
+      {footer}
+    </div>
+  );
+}
+
+export function ReportView({ s, locale, report, onRestart, restartLabel, canSave = true, onReviewQuestion, pristine }: {
   s: Strings;
   locale: Locale;
   report: ScanReport;
+  /** De samenstelling zonder werk; gaat mee bij bewaren zodat de analyse later bij te werken is. */
+  pristine?: QuestionSetState;
+  onReviewQuestion?: (question: { setId: string; questionId: string; base: boolean }) => void;
   onRestart: () => void;
   /** Op /demo is de weg terug niet "nieuwe scan" maar "doe dit zelf". */
   restartLabel?: string;
@@ -571,6 +845,8 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
   /** Ingelogd bewaren we in het account, anders in deze browser. */
   const target = useMemo(() => snapshotStoreFor(supabase(), accountId), [accountId]);
   const [saveState, setSaveState] = useState<'idle' | 'busy' | 'saved' | 'failed'>('idle');
+  /** Bewaard, maar zonder wat nodig is om later zonder catalogus bij te werken. */
+  const [detailFailed, setDetailFailed] = useState(false);
   /** Het pdf-bestand: bezig, of mislukt met de weg eromheen. */
   const [pdf, setPdf] = useState<'idle' | 'busy' | 'failed'>('idle');
 
@@ -604,125 +880,32 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
           savedAt: new Date().toISOString(),
           label: report.sources.catalog.filename,
         }),
+        pristine ? toSnapshotDetail(report, pristine) : undefined,
       );
       setSaveState('saved');
-    } catch {
-      setSaveState('failed');
+    } catch (caught) {
+      if (caught instanceof DetailNotSaved) {
+        setSaveState('saved');
+        setDetailFailed(true);
+      } else {
+        setSaveState('failed');
+      }
     }
   }
 
 
-  // Niet-bevroren banken dragen allebei een voorbehoud, maar niet hetzelfde.
-  // Een voorlopige bank is ónze terugval uit vakkennis; een ingelezen lijst zonder
-  // sitepanel is de lijst van de merchant zelf. Die over één kam scheren vertelt
-  // hem dat zijn eigen vragen uit onze vakkennis komen, en dat klopt niet.
-  const unfrozen = report.stamp.banks.filter((bank) => bank.status !== 'frozen');
-  const anyProvisional = unfrozen.some((bank) => bank.status === 'provisional');
+  const model = useMemo(() => modelFromReport(report, locale, s.report.scoreAllCategories), [report, locale, s.report.scoreAllCategories]);
 
   return (
-    <div className="space-y-4">
-      {/* Bovenaan en niet in het stempel onderaan: wie een cijfer leest hoort
-          meteen te weten dat de lat beredeneerd is en niet onderzocht. */}
-      {unfrozen.length > 0 ? (
-        <div className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3">
-          <p className="font-medium text-warn">
-            {s.report.bankHeading}: {unfrozen.map((bank) => bank.label[locale]).join(', ')}
-          </p>
-          <p className="mt-1 text-sm leading-relaxed text-ink">
-            {anyProvisional ? s.report.bankProvisional : s.report.bankInReview}
-          </p>
-        </div>
-      ) : null}
-
-      {report.stamp.blindAttributes.length > 0 ? (
-        <div className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3">
-          <p className="font-medium text-warn">
-            {s.report.blindHeading} —{' '}
-            <span className="tnum">{report.stamp.blindAttributes.length}</span>{' '}
-            {s.report.blindCount}
-          </p>
-          <p className="mt-1 text-sm leading-relaxed text-ink">{s.report.blindBody}</p>
-          <p className="mt-2 text-sm leading-relaxed text-ink">{s.report.blindNext}</p>
-          <ul className="mt-2 flex flex-wrap gap-1.5">
-            {report.stamp.blindAttributes.slice(0, 16).map((attribute) => (
-              <li key={attribute.key}>
-                <Badge tone="neutral">{attribute.key}</Badge>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <FunnelCard s={s} report={report} />
-        <NextStep s={s} report={report} locale={locale} />
-        <CategoryScores s={s} report={report} />
-      </div>
-
-      {report.unmatchedCount > 0 ? (
-        <div className="rounded-md bg-warn-soft px-3 py-2">
-          <p className="text-sm">
-            <span className="tnum font-semibold">{n(report.unmatchedCount)}</span>{' '}
-            {s.report.unmatched}
-          </p>
-          <p className="mt-0.5 text-xs leading-relaxed text-muted">{s.report.unmatchedExplain}</p>
-        </div>
-      ) : null}
-
-      <QuestionCoverageCard s={s} report={report} locale={locale} />
-
-      <GapTable s={s} report={report} locale={locale} />
-
-      <Explorer s={s} locale={locale} report={report} />
-
-      {/* Vragen die geen enkel attribuut kan dragen. Ze staan ná de meting: het
-          is advies over je website en je dienstverlening, geen bevinding over je
-          catalogus. */}
-      <Advisory s={s} report={report} locale={locale} />
-
-      <Card>
-        <CardTitle sub={s.report.stampExplain}>{s.report.stampHeading}</CardTitle>
-        <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <dt className="text-xs text-muted">{s.report.scanVersion}</dt>
-            <dd className="tnum font-medium">v{report.stamp.scanVersion}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted">{s.report.specSnapshot}</dt>
-            <dd className="tnum font-medium">{report.stamp.fieldRegister}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted">{s.report.bankVersion}</dt>
-            <dd className="font-medium">
-              {report.stamp.banks.length === 0 ? '—' : report.stamp.banks.map((bank) => (
-                <span key={bank.id} className="mr-2 inline-flex items-center gap-1.5">
-                  <span className="tnum">{bank.label[locale]} {bank.version}</span>
-                  {bank.status !== 'frozen' ? (
-                    <Badge tone="warn">{s.bank.status[bank.status]}</Badge>
-                  ) : null}
-                </span>
-              ))}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted">{s.report.questionVersion}</dt>
-            <dd className="tnum font-medium">v{report.stamp.questionSetVersion}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted">{s.report.scannedAt}</dt>
-            <dd className="tnum font-medium">
-              {new Date(report.stamp.scannedAt).toLocaleString(locale === 'nl' ? 'nl-NL' : 'en-GB')}
-            </dd>
-          </div>
-        </dl>
-      </Card>
-
-      <Card>
-        <p className="text-xs leading-relaxed text-muted">{s.report.disclaimer}</p>
-      </Card>
-
-      {/* Bewaren zonder dat er data weggaat: de pdf wordt in de browser gemaakt
-          en rechtstreeks gedownload. */}
+    <ReportBody
+      s={s}
+      locale={locale}
+      model={model}
+      onReviewQuestion={onReviewQuestion}
+      explorer={<Explorer s={s} locale={locale} report={report} />}
+      // Bewaren zonder dat er data weggaat: de pdf wordt in de browser gemaakt
+      // en rechtstreeks gedownload.
+      footer={
       <Card>
         <p className="text-sm leading-relaxed text-muted">
           {canSave && target.where === 'account' ? s.report.shareNoteAccount : s.report.shareNote}
@@ -760,6 +943,9 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
           </Button>
           <Button variant="quiet" onClick={onRestart}>{restartLabel ?? s.report.startOver}</Button>
         </div>
+        {detailFailed ? (
+          <p className="mt-2 text-sm text-warn">{s.report.saveDetailFailed}</p>
+        ) : null}
         {saveState === 'failed' && target.where === 'account' ? (
           <p className="mt-2 text-sm text-warn">{s.report.saveAccountFailed}</p>
         ) : null}
@@ -769,6 +955,7 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
           </div>
         ) : null}
       </Card>
-    </div>
+      }
+    />
   );
 }

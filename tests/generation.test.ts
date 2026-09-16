@@ -9,13 +9,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { advance, EmptyPhase, taskFor, type Ask } from '../src/generation/pipeline';
+import { advance, EmptyPhase, enforceCriticalTest, taskFor, type Ask } from '../src/generation/pipeline';
 import { extractJson } from '../src/generation/json';
 import {
   decodePhase,
   emptyState,
   encodePhase,
   FIRST_PHASE,
+  type DraftQuestion,
   type Phase,
   type RunState,
 } from '../src/generation/state';
@@ -405,4 +406,22 @@ test('een losstaande categorie krijgt een eigen fase en komt zonder basislaag in
   const overlay = read.bank?.overlays.find((one) => one.label.nl.toLowerCase().includes('naaigaren'));
   assert.ok(overlay, 'de losstaande categorie staat in de bank');
   assert.deepEqual([...(overlay?.suppress ?? [])].sort(), (read.bank?.questions ?? []).map((question) => question.id).sort());
+});
+
+test('kritiek zonder volledige toets, of over beleid of voorraad, wordt hoog', () => {
+  const vraag = (id: string, extra: Partial<DraftQuestion>): DraftQuestion => ({
+    id, questionNl: id, questionEn: id, intent: 'geschiktheid', importance: 'kritiek', coverage: 3,
+    coverageSites: [], sources: [], evidence: ['x'], synonyms: [], answerType: 'getal', answerable: 'true', ...extra,
+  });
+  const toets = { decisive: 'ongeschikt voor een bank', irreversible: 'geknipt', product: 'schuurweerstand', catalogue: 'martindale' };
+  const { questions, findings } = enforceCriticalTest([
+    vraag('A', { criticalTest: toets }),
+    vraag('B', {}),
+    vraag('C', { criticalTest: toets, intent: 'koopzekerheid' }),
+    vraag('D', { importance: 'hoog', criticalTest: toets }),
+    vraag('E', { criticalTest: toets, answerType: 'afgeleid' }),
+  ], 'Basislaag');
+  assert.deepEqual(questions.map((q) => q.importance), ['kritiek', 'hoog', 'hoog', 'hoog', 'hoog']);
+  assert.equal(questions[3].criticalTest, undefined);
+  assert.match(findings[0], /B, C, E/);
 });

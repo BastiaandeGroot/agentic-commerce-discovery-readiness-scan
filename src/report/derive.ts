@@ -132,11 +132,13 @@ export type AdviceKey = 'qNextUnlinked' | 'qNextEmpty' | 'qNextAbsent' | 'qNextW
  * Wat een merchant nu kan doen aan deze vraag, op volgorde van goedkoopst: een
  * ontbrekende koppeling, een leeg veld, een ontbrekende kolom, een te mager veld.
  */
-export function adviceKey(row: Coverage): AdviceKey {
+export function adviceKey(row: Pick<Coverage, 'evidence' | 'empty' | 'absent'> & {
+  unusable?: number; incomplete?: number; weak?: number;
+}): AdviceKey {
   if ((row.evidence ?? []).some((group) => group.fields.length === 0)) return 'qNextUnlinked';
   if (row.empty >= row.absent && row.empty > 0) return 'qNextEmpty';
   if (row.absent > 0) return 'qNextAbsent';
-  if (row.unusable > 0 || row.incomplete > 0) return 'qNextWeak';
+  if ((row.unusable ?? 0) > 0 || (row.incomplete ?? 0) > 0 || (row.weak ?? 0) > 0) return 'qNextWeak';
   return 'qNextEmpty';
 }
 

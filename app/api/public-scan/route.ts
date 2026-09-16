@@ -17,6 +17,7 @@ import { ingest } from '../../../src/intake/index';
 import { generateQuestionSets } from '../../../src/questions/generate';
 import { runScan } from '../../../src/engine/report';
 import { excludeFromScore, type QuestionBank, applyOverlaySettings } from '../../../src/questions/bank';
+import { applyImportanceCorrections } from '../../../src/questions/critical';
 
 /**
  * Dezelfde vraag over alle vragensets heen optellen.
@@ -143,8 +144,17 @@ export async function POST(request: Request) {
     }
     // Wat de beheerder oversloeg telt hier net zomin mee als bij de merchant:
     // het rapport dat een winkeleigenaar krijgt hoort op dezelfde lat te staan.
+    // Apart: zonder migratie 0013 bestaat de kolom niet, en dan zonder correcties.
+    const corrections = await supabase
+      .from('question_banks')
+      .select('importance_corrections')
+      .eq('id', body.bankId)
+      .maybeSingle();
     banks = [applyOverlaySettings(
-      excludeFromScore(read.bank, bankRow.excluded ?? []),
+      excludeFromScore(
+        applyImportanceCorrections(read.bank, corrections.error ? {} : corrections.data?.importance_corrections ?? {}),
+        bankRow.excluded ?? [],
+      ),
       { standalone: bankRow.standalone ?? [], labels: bankRow.overlay_labels ?? {} },
     )];
     bankLabel = `${bankRow.vertical} v${bankRow.version}`;

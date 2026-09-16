@@ -100,7 +100,7 @@ export function catalogKnows(catalog: Dataset, requirement: string): boolean {
  * de velden die het kunnen dragen. Een vraag die de merchant zelf toevoegde heeft
  * die lagen niet; die wordt één groep met zijn eigen modus.
  */
-function evidenceGroups(question: Question): RequirementGroup[] {
+export function evidenceGroups(question: Question): RequirementGroup[] {
   if (question.evidence && question.evidence.length > 0) return question.evidence;
   return [{
     attributeKey: question.id,
@@ -170,7 +170,7 @@ function answerState(
  * agent die de stof voor een bank aanraadt, stelt de slijtagevraag als kritiek,
  * ook als dezelfde stof ook als gordijn verkocht wordt.
  */
-function questionsFor(sets: QuestionSet[]): Question[] {
+export function questionsFor(sets: QuestionSet[]): Question[] {
   const byId = new Map<string, Question>();
   for (const set of sets) {
     for (const question of set.questions) {
@@ -225,15 +225,56 @@ export function evaluateProduct(
   excluded: ReadonlySet<string> = new Set(),
 ): ProductResult {
   const placement = placeProduct(product, sets, level, facets, excluded);
-  const set = placement.sets[0];
+  return assembleResult(
+    {
+      key: product.key,
+      title: str(product.values.title),
+      image: str(product.values.image),
+      category: placement.category,
+      subcategory: placement.subcategory,
+      sets: placement.sets,
+      facetOnly: placement.facetOnly,
+    },
+    (question) => {
+      const outcome = answersQuestion(product, question);
+      return { state: answerState(outcome, catalog), missing: outcome.missing, found: outcome.found };
+    },
+    (key, questionId) => gapFor(key, questionId, catalog),
+  );
+}
+
+/**
+ * Van metingen per vraag naar de uitkomst van één product.
+ *
+ * Los van het meten zelf, zodat een bewaarde analyse dezelfde regels toepast
+ * als de scan: een vraag die de merchant na de scan uitzette valt dan precies zo
+ * weg als hij bij een nieuwe scan zou doen. `measure` geeft `undefined` voor een
+ * vraag die niet gemeten is; die telt dan nergens mee.
+ */
+export function assembleResult(
+  product: {
+    key: string;
+    title?: string;
+    image?: string;
+    category?: string;
+    subcategory?: string;
+    /** De sets waar het product onder valt, de voorste eerst. */
+    sets: QuestionSet[];
+    facetOnly?: boolean;
+  },
+  measure: (question: Question) => { state: AnswerState; missing: string[]; found: string[] } | undefined,
+  gapOf: (key: string, questionId: string) => Gap,
+): ProductResult {
+  const set = product.sets[0];
   const questions: QuestionOutcome[] = [];
   const gaps = new Map<string, Gap>();
 
   if (set) {
-    for (const question of questionsFor(placement.sets)) {
+    for (const question of questionsFor(product.sets)) {
       if (question.disabled) continue;
-      const outcome = answersQuestion(product, question);
-      const state = answerState(outcome, catalog);
+      const outcome = measure(question);
+      if (!outcome) continue;
+      const { state } = outcome;
       questions.push({
         questionId: question.id,
         label: question.label,
@@ -263,7 +304,7 @@ export function evaluateProduct(
       for (const key of outcome.missing) {
         const existing = gaps.get(key);
         if (existing) existing.questions.push(question.id);
-        else gaps.set(key, gapFor(key, question.id, catalog));
+        else gaps.set(key, gapOf(key, question.id));
       }
     }
   }
@@ -276,15 +317,15 @@ export function evaluateProduct(
 
   return {
     key: product.key,
-    title: str(product.values.title),
-    image: str(product.values.image),
-    category: placement.category,
-    subcategory: placement.subcategory,
+    title: product.title,
+    image: product.image,
+    category: product.category,
+    subcategory: product.subcategory,
     setId: set?.id,
     // Alle sets waar hij onder valt, de voorste eerst. De rij in het rapport
     // volgt de voorste; welke vragen gesteld zijn volgt ze allemaal.
-    setIds: placement.sets.length > 1 ? placement.sets.map((one) => one.id) : undefined,
-    facetOnly: placement.facetOnly || undefined,
+    setIds: product.sets.length > 1 ? product.sets.map((one) => one.id) : undefined,
+    facetOnly: product.facetOnly || undefined,
     unmatched: set === undefined,
     findable: set !== undefined && scored.length > 0 && scored.every((q) => q.answered),
     // Kent een set geen kritieke vragen, dan is deze trede leeg en zegt het

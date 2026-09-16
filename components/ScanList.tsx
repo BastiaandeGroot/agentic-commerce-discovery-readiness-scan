@@ -3,10 +3,12 @@
 // Gedeelde onderdelen voor het dashboard: de lijst met bewaarde scans en het
 // verschil tussen twee ervan.
 
+import { useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import type { Locale, Strings } from '../src/i18n/strings';
 import type { ScanSnapshot } from '../src/engine/snapshot';
 import type { Comparison, Delta } from '../src/engine/compare';
-import { Badge, Bar, Button, Card, CardTitle } from './ui';
+import { Badge, Bar, Button, Card, CardTitle, Dialog } from './ui';
 
 export function n(value: number): string {
   return value.toLocaleString('nl-NL');
@@ -41,8 +43,73 @@ export function DeltaValue({ delta, decimals = 0, higherIsBetter = true, none }:
   );
 }
 
+/**
+ * Een bewaarde analyse verwijderen, pas na bevestiging.
+ *
+ * Verwijderen is niet terug te draaien, en het haalt ook de vragensets en
+ * metingen weg die bij deze analyse bewaard zijn. Daarom eerst een vraag, met de
+ * naam en datum erin: wie twee analyses van dezelfde catalogus heeft, hoort te
+ * zien wélke weggaat. Mislukt het, dan blijft de dialoog open met de melding.
+ */
+export function RemoveSnapshotButton({ s, locale, snapshot, onRemove }: {
+  s: Strings; locale: Locale; snapshot: ScanSnapshot;
+  /** Gooit bij een fout; dan blijft de analyse staan en zegt de dialoog dat. */
+  onRemove: () => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function confirm() {
+    setBusy(true);
+    setFailed(false);
+    try {
+      await onRemove();
+      setOpen(false);
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <Button variant="quiet" onClick={() => { setFailed(false); setOpen(true); }}>
+        <Trash2 className="size-4" aria-hidden />
+        {s.pages.dashboard.remove}
+      </Button>
+      <Dialog
+        open={open}
+        onClose={() => { if (!busy) setOpen(false); }}
+        title={s.pages.dashboard.removeTitle}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setOpen(false)} disabled={busy}>
+              {s.pages.dashboard.removeCancel}
+            </Button>
+            <Button variant="danger" onClick={() => void confirm()} loading={busy}>
+              {s.pages.dashboard.removeConfirm}
+            </Button>
+          </>
+        }
+      >
+        <p>
+          {s.pages.dashboard.removeBody
+            .replace('{naam}', snapshot.label)
+            .replace('{datum}', datum(snapshot.savedAt, locale))}
+        </p>
+        <p className="mt-2 text-muted">{s.pages.dashboard.removeKeeps}</p>
+        {failed ? <p className="mt-2 text-danger">{s.pages.dashboard.removeFailed}</p> : null}
+      </Dialog>
+    </>
+  );
+}
+
 export function SnapshotRow({ s, locale, snapshot, onRemove, onOpen }: {
-  s: Strings; locale: Locale; snapshot: ScanSnapshot; onRemove?: () => void;
+  s: Strings; locale: Locale; snapshot: ScanSnapshot;
+  /** Verwijderen na bevestiging; gooit bij een fout. */
+  onRemove?: () => Promise<void>;
   /** De analyse openen. Zonder deze handler is de rij alleen een regel in een lijst. */
   onOpen?: () => void;
 }) {
@@ -74,7 +141,7 @@ export function SnapshotRow({ s, locale, snapshot, onRemove, onOpen }: {
         <Button variant="secondary" onClick={onOpen}>{s.pages.dashboard.open}</Button>
       ) : null}
       {onRemove ? (
-        <Button variant="quiet" onClick={onRemove}>{s.pages.dashboard.remove}</Button>
+        <RemoveSnapshotButton s={s} locale={locale} snapshot={snapshot} onRemove={onRemove} />
       ) : null}
     </li>
   );

@@ -216,6 +216,12 @@ export interface BankQuestion {
    * die niemand kan narekenen.
    */
   weightNote?: Bilingual;
+  /**
+   * Waarom deze vraag kritiek is, per criterium van de toets in
+   * `src/questions/critical.ts`: beslissend, onherstelbaar, over het product.
+   * Zonder dit is kritiek een oordeel dat niemand kan nalopen.
+   */
+  criticalTest?: string;
 }
 
 // --- Overlays en profielen -------------------------------------------------

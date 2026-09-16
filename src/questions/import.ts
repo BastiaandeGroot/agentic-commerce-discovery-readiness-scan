@@ -42,6 +42,18 @@ type Dict = Record<string, YamlValue>;
 const isDict = (value: YamlValue): value is Dict =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+/** De kritiek-toets als één regel: `beslissend: … | onherstelbaar: … | product: …`. */
+function criticalTestOf(value: YamlValue): string | undefined {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const parts = Object.entries(value as Record<string, YamlValue>)
+      .map(([key, entry]) => [key, text(entry)] as const)
+      .filter(([, entry]) => entry)
+      .map(([key, entry]) => `${key}: ${entry}`);
+    return parts.length > 0 ? parts.join(' | ') : undefined;
+  }
+  return text(value);
+}
+
 function text(value: YamlValue): string | undefined {
   if (typeof value === 'string') return value.trim() || undefined;
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
@@ -358,6 +370,7 @@ function questions(
       answerType: answerType(text(item.antwoordtype ?? item.answerType)),
       answerable,
       weightNote: bilingual(item, 'toelichting', warnings, `vraag ${id}`),
+      criticalTest: criticalTestOf(item.kritiek_toets ?? item.criticalTest),
     });
   }
   return out;

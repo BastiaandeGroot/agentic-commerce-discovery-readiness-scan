@@ -143,7 +143,17 @@ categorie tegelijk — anders meten twee categorieën verschillende dingen onder
 hetzelfde id.
 
 `belang` weegt mee in de trechter via een eigen trede: **basisgeschikt** is elke
-kritieke vraag beantwoord, **volledig** blijft élke gescoorde vraag. Geen gewogen
+kritieke vraag beantwoord, **volledig** blijft élke gescoorde vraag.
+
+Kritiek is die poort en blijft dus smal: een vraag is alleen kritiek als hij
+**beslissend** is (een fout antwoord maakt het product ongeschikt, tegenvallen
+telt niet), **onherstelbaar** (na levering niet terug te draaien), **over het
+product** gaat (nooit retour, levering, voorraad of een staal) en **uit de
+catalogus** te beantwoorden is (een kenmerk, geen berekening met maten van de
+koper). Zie `src/questions/critical.ts`. Het derde en vierde criterium past de
+lezer zelf toe; de eerste twee onderbouwt de generatie per vraag in `kritiek_toets`, en een beheerder
+corrigeert het belang naast de bank (`importance_corrections`), nooit in de CSV —
+de vraag-id's dragen het werk van elke merchant. Geen gewogen
 percentagedrempel — zie de afgevallen richtingen in `NOTES.md`.
 
 De vragenlijsten komen in het Engels; kolomnamen én waarden worden op **alias**
@@ -240,6 +250,18 @@ definities zouden kunnen rusten. Er wordt een **snapshot** bewaard en geen
 rapport: tellingen, categorienamen en veldnamen, geen productdata en geen
 bronbestand. Dat houdt de belofte overeind dat de catalogus het apparaat niet
 verlaat, ook zodra er serverzijdig bewaard wordt.
+
+Naast de snapshot gaat een **detail** mee (`SnapshotDetail`, kolom `detail`): de
+vragensets zoals ze voor de scan zijn samengesteld, zonder het werk van de
+merchant, en per product de toestand van elke vraag (`src/engine/rescore.ts`).
+Zo kan een merchant na de scan een vraag uitzetten zonder zijn catalogus opnieuw
+in te lezen, en telt het rapport meteen opnieuw op. Per product staat er alleen
+een rij toestanden tegen vraag-id's, de sets waar het onder hing en de veldnamen
+die een antwoord misten — **nooit een sleutel, titel, waarde of prijs**. Wat bij
+de scan niet gemeten is, wordt bij herberekenen niet verzonnen: het telt niet mee
+en het scherm zegt dat een nieuwe scan nodig is. Herberekenen gebruikt dezelfde
+optelling als de scan (`assembleResult`, `aggregateScan`); maak daar nooit een
+tweede kopie van.
 
 ## Merchant-data
 

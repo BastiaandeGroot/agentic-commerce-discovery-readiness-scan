@@ -11,7 +11,7 @@ import { ingest } from '../src/intake/index';
 import { importQuestionList } from '../src/questions/list';
 import { generateQuestionSets } from '../src/questions/generate';
 import { addQuestion, editQuestion, toggleBaseValidated, toggleQuestion, toggleValidated } from '../src/questions/mutate';
-import { applyWork, extractWork, setKey } from '../src/questions/work';
+import { applyWork, extractWork, mergeWork, setKey } from '../src/questions/work';
 import type { QuestionSetState } from '../src/domain/types';
 
 const AT = '2026-09-14T12:00:00.000Z';
@@ -107,4 +107,23 @@ test('het werk draagt geen productdata', () => {
   const pristine = samenstellen();
   const tekst = JSON.stringify(extractWork(werk(pristine), pristine));
   for (const waarde of ['Blauw', 'Rood', 'Wit']) assert.doesNotMatch(tekst, new RegExp(waarde));
+});
+
+test('werk bijwerken vanuit een bewaarde analyse laat andere categorieën staan', () => {
+  const pristine = {
+    version: 1, changeLog: [], banks: [], blindAttributes: [], attributeMatches: [], overlays: [], categoriesWithoutOverlay: [],
+    sets: [{ id: 'gordijn', category: 'Gordijnstoffen', label: { nl: 'Gordijnstoffen', en: 'Curtain fabrics' },
+      questions: [{ id: 'G1', label: { nl: 'Licht?', en: 'Light?' }, requires: ['x'], layer: 'category' as const }] }],
+  };
+  const previous = {
+    format: 1 as const, stateVersion: 1, changeLog: [],
+    sets: {
+      Meubelstoffen: { disabled: ['M1'], edited: [], added: [] },
+      Gordijnstoffen: { disabled: ['G1'], edited: [], added: [] },
+    },
+  };
+  // In deze analyse zette de merchant G1 weer aan.
+  const merged = mergeWork(previous, pristine as never, pristine as never);
+  assert.deepEqual(merged.sets.Meubelstoffen, { disabled: ['M1'], edited: [], added: [] });
+  assert.equal(merged.sets.Gordijnstoffen, undefined);
 });

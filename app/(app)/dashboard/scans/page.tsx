@@ -9,9 +9,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { ScanSnapshot } from '../../../../src/engine/snapshot';
+import type { ScanSnapshot, SnapshotDetail } from '../../../../src/engine/snapshot';
+import type { QuestionWork } from '../../../../src/questions/work';
+import { verticalOf } from '../../../../src/report/saved';
+import { LocalSettingsStore, SupabaseSettingsStore, type SettingsStore } from '../../../../src/storage/settings';
 import { compareSnapshots } from '../../../../src/engine/compare';
-import { snapshotStoreFor } from '../../../../src/storage/snapshots';
+import { LOCAL_ACCOUNT, snapshotStoreFor } from '../../../../src/storage/snapshots';
 import { supabase } from '../../../../src/auth/client';
 import { STRINGS } from '../../../../src/i18n/strings';
 import { useLocale } from '../../../../src/i18n/useLocale';
@@ -26,6 +29,13 @@ export default function ScansPage() {
   const s = STRINGS[locale];
   const { user, accountId } = useAuth();
   const target = useMemo(() => snapshotStoreFor(supabase(), accountId), [accountId]);
+  /** Waar het werk op de vragensets staat; hetzelfde als tijdens de scan. */
+  const settingsStore = useMemo<SettingsStore>(() => {
+    const client = supabase();
+    return client && accountId ? new SupabaseSettingsStore(client) : new LocalSettingsStore();
+  }, [accountId]);
+  /** De vragensets en metingen van de open analyse, met het werk van nu. */
+  const [openedDetail, setOpenedDetail] = useState<{ id: string; detail?: SnapshotDetail; work?: QuestionWork }>();
 
   const [snapshots, setSnapshots] = useState<ScanSnapshot[]>();
   const [failed, setFailed] = useState(false);
@@ -59,6 +69,16 @@ export default function ScansPage() {
     if (fromHash) void (async () => { await Promise.resolve(); setOpenId(fromHash); })();
   }, []);
 
+  /**
+   * Een analyse verwijderen. Gooit bij een fout, zodat de bevestigingsdialoog
+   * open blijft en het zegt; de lijst blijft dan zoals hij was.
+   */
+  async function remove(id: string) {
+    await target.store.remove(target.accountId, id);
+    if (openId === id) open(undefined);
+    await refresh();
+  }
+
   function open(id: string | undefined) {
     setOpenId(id);
     window.history.replaceState(null, '', id ? `#${encodeURIComponent(id)}` : window.location.pathname);
@@ -79,13 +99,50 @@ export default function ScansPage() {
 
   const opened = openId ? snapshots?.find((x) => x.id === openId) : undefined;
 
+  // Het detail pas ophalen als de analyse open gaat: het is groot, en de lijst
+  // heeft het niet nodig. Ontbreekt het, dan toont het rapport wat er bewaard is.
+  useEffect(() => {
+    if (!opened) return;
+    let alive = true;
+    void (async () => {
+      await Promise.resolve();
+      const detail = await target.store.loadDetail(target.accountId, opened.id).catch(() => undefined);
+      const market = detail ? verticalOf(detail) : undefined;
+      const settings = market
+        ? await settingsStore.load(accountId ?? LOCAL_ACCOUNT, market.vertical).catch(() => undefined)
+        : undefined;
+      if (alive) setOpenedDetail({ id: opened.id, detail, work: settings?.work });
+    })();
+    return () => { alive = false; };
+  }, [opened, target, settingsStore, accountId]);
+
   // Eén analyse open.
   if (openId && snapshots !== undefined) {
     return (
       <div className="space-y-4">
         <Button variant="quiet" onClick={() => open(undefined)}>← {s.pages.dashboard.back}</Button>
-        {opened ? (
-          <SnapshotReport s={s} locale={locale} snapshot={opened} onRescan={() => router.push('/scan')} />
+        {opened && openedDetail?.id !== opened.id ? (
+          <Card><SkeletonLines lines={4} /></Card>
+        ) : opened ? (
+          <SnapshotReport
+            s={s}
+            locale={locale}
+            snapshot={opened}
+            detail={openedDetail?.detail}
+            work={openedDetail?.work}
+            onRescan={() => router.push('/scan')}
+            onRemove={() => remove(opened.id)}
+            // Met bewaarde vragensets meteen naar die vraag; anders eerst de catalogus opnieuw in.
+            onEditQuestions={openedDetail?.detail
+              ? () => router.push(`/dashboard/scans/vragen?analyse=${encodeURIComponent(opened.id)}`)
+              : undefined}
+            onReviewQuestion={(question) => {
+              const where = `vraag=${encodeURIComponent(question.questionId)}&set=${encodeURIComponent(question.setId)}${question.base ? '&algemeen=1' : ''}`;
+              router.push(openedDetail?.detail
+                ? `/dashboard/scans/vragen?analyse=${encodeURIComponent(opened.id)}&${where}`
+                : `/scan?${where}`);
+            }}
+          />
         ) : (
           <Card><p className="text-sm text-muted">{s.pages.dashboard.notFound}</p></Card>
         )}
@@ -134,7 +191,7 @@ export default function ScansPage() {
                 locale={locale}
                 snapshot={snapshot}
                 onOpen={() => open(snapshot.id)}
-                onRemove={() => void target.store.remove(target.accountId, snapshot.id).then(refresh, () => setFailed(true))}
+                onRemove={() => remove(snapshot.id)}
               />
             ))}
           </ul>

@@ -52,7 +52,7 @@ noodzakelijk een fout, wel iets om na te lopen.
 
 ### 4. Criticus tegen de anti-patronen
 
-Vink deze concrete fouten af. Dit zijn er zes en ze zijn hard:
+Vink deze concrete fouten af. Dit zijn er zeven en ze zijn hard:
 
 | Fout | Waaraan je hem herkent |
 |---|---|
@@ -62,6 +62,7 @@ Vink deze concrete fouten af. Dit zijn er zes en ze zijn hard:
 | Duurzaamheidsclaim zonder certificering | "milieuvriendelijk" zonder verifieerbaar label |
 | Gewicht dat afwijkt van het belang | de weging hoort vast te liggen: kritiek 5, hoog 3, middel 2, laag 1 |
 | Overlay die een basisvraag herschrijft | dezelfde `id` met een andere tekst; herwegen mag, herschrijven niet |
+| Kritiek zonder vier keer ja | een kritieke vraag zonder `kritiek_toets`, een vraag die alleen informatie geeft ("waar is het van gemaakt"), een vraag over retour, bijbestellen of een staal, of een berekening met maten van de koper ("hoeveel meter voor mijn raam") |
 
 ## Twee dingen die géén fout zijn
 

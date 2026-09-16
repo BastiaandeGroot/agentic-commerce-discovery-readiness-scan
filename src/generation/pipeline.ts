@@ -20,6 +20,7 @@ import {
   nextPhase,
   NO_USAGE,
   overlayCategories,
+  type CriticalTest,
   type DraftQuestion,
   type FacetEntry,
   type GroupingEntry,
@@ -126,6 +127,52 @@ function readQuestion(raw: unknown, fallbackId: string): DraftQuestion | null {
     answerable: answerable === 'false' || answerable === 'gedeeltelijk' ? answerable : 'true',
     mode: mode === 'alle' || mode === 'een' ? (mode as 'alle' | 'een') : undefined,
     note: asString(source.note) || undefined,
+    criticalTest: readCriticalTest(source.criticalTest),
+  };
+}
+
+/** De vier criteria, alleen als ze er alle vier staan. */
+function readCriticalTest(raw: unknown): CriticalTest | undefined {
+  const source = asObject(raw);
+  const test = {
+    decisive: asString(source.decisive),
+    irreversible: asString(source.irreversible),
+    product: asString(source.product),
+    catalogue: asString(source.catalogue),
+  };
+  return test.decisive && test.irreversible && test.product && test.catalogue ? test : undefined;
+}
+
+/**
+ * Haalt deze vraag het derde of vierde criterium niet? Over beleid, levering of
+ * voorraad in plaats van het product, of een berekening in plaats van een kenmerk.
+ */
+const notAboutProduct = (question: DraftQuestion) =>
+  question.intent === 'koopzekerheid' || question.answerType === 'proces' || question.answerable === 'false'
+  || question.answerType.startsWith('afgeleid') || question.answerType.startsWith('derived');
+
+/**
+ * De kritiek-toets afdwingen op wat het model aanleverde.
+ *
+ * Kritiek is de poort voor basisgeschikt en moet dus smal blijven. Het model
+ * noemt per kritieke vraag waarom elk van de drie criteria geldt; ontbreekt er
+ * één, of gaat de vraag niet over het product, dan wordt hij hoog. Bij twijfel
+ * niet kritiek — en dat staat als bevinding in de bank, zodat de beheerder het
+ * ziet en kan terugzetten.
+ */
+export function enforceCriticalTest(questions: DraftQuestion[], where: string): { questions: DraftQuestion[]; findings: string[] } {
+  const lowered: string[] = [];
+  const out = questions.map((question) => {
+    if (question.importance !== 'kritiek') return { ...question, criticalTest: undefined };
+    if (question.criticalTest && !notAboutProduct(question)) return question;
+    lowered.push(question.id);
+    return { ...question, importance: 'hoog' as const, criticalTest: undefined };
+  });
+  return {
+    questions: out,
+    findings: lowered.length === 0 ? [] : [
+      `${where}: ${lowered.length} vra${lowered.length === 1 ? 'ag' : 'gen'} kwam${lowered.length === 1 ? '' : 'en'} als kritiek terug zonder de volledige toets, ${lowered.length === 1 ? 'gaat' : 'gaan'} over beleid, levering of voorraad, of ${lowered.length === 1 ? 'is een berekening' : 'zijn berekeningen'}. Die staan op hoog: ${lowered.join(', ')}.`,
+    ],
   };
 }
 
@@ -464,7 +511,8 @@ export function applyReply(
     }
 
     case 'base': {
-      const questions = readQuestions(answer.questions, 'BAS', takenIds(state));
+      const tested = enforceCriticalTest(readQuestions(answer.questions, 'BAS', takenIds(state)), 'Basislaag');
+      const questions = tested.questions;
       if (questions.length === 0) {
         throw new EmptyPhase('De basislaag kwam terug zonder één vraag.', reply.usage);
       }
@@ -478,7 +526,7 @@ export function applyReply(
       updated = {
         ...state,
         base: { category: '', questions, reweight: [] },
-        findings: [...state.findings, ...findingsOf(answer)],
+        findings: [...state.findings, ...findingsOf(answer), ...tested.findings],
       };
       break;
     }
@@ -491,15 +539,29 @@ export function applyReply(
           const entry = asObject(one);
           return {
             id: asString(entry.id),
-            importance: asString(entry.importance),
+            importance: asString(entry.importance).toLowerCase(),
             reason: asString(entry.reason),
+            criticalTest: readCriticalTest(entry.criticalTest),
           };
         })
         .filter((entry) => entry.id !== '');
+      // Ook een herweging naar kritiek maakt een poort, dus dezelfde toets. De
+      // basisvraag zelf moet over het product gaan; zonder toets wordt het hoog.
+      const baseById = new Map((state.base?.questions ?? []).map((question) => [question.id, question]));
+      const loweredReweights: string[] = [];
+      for (const entry of reweight) {
+        if (entry.importance !== 'kritiek') { entry.criticalTest = undefined; continue; }
+        const question = baseById.get(entry.id);
+        if (entry.criticalTest && question && !notAboutProduct(question)) continue;
+        entry.importance = 'hoog';
+        entry.criticalTest = undefined;
+        loweredReweights.push(entry.id);
+      }
 
       // Een overlay bestaat omdat hij eigen vragen heeft; dat is de lat die hij
       // bij het panel haalde. Zonder één vraag is de stap mislukt.
-      const questions = readQuestions(answer.questions, prefix, takenIds(state));
+      const tested = enforceCriticalTest(readQuestions(answer.questions, prefix, takenIds(state)), category);
+      const questions = tested.questions;
       if (questions.length === 0) {
         throw new EmptyPhase(`De categorie ${category} kwam terug zonder één eigen vraag.`, reply.usage);
       }
@@ -523,7 +585,15 @@ export function applyReply(
             ? { category, questions, reweight: [], standalone: true }
             : { category, questions, reweight },
         ],
-        findings: [...state.findings, ...findingsOf(answer), ...(uncovered ? [uncovered] : [])],
+        findings: [
+          ...state.findings,
+          ...findingsOf(answer),
+          ...(uncovered ? [uncovered] : []),
+          ...tested.findings,
+          ...(loweredReweights.length > 0
+            ? [`${category}: de herweging naar kritiek van ${loweredReweights.join(', ')} kwam zonder volledige toets, of de vraag gaat niet over het product of is een berekening. Die staat op hoog.`]
+            : []),
+        ],
       };
       break;
     }
