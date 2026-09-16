@@ -25,6 +25,7 @@ export type QuestionIssue =
   | 'rule-without-source'
   | 'rule-not-computed'
   | 'critical-without-basis'
+  | 'critical-without-test'
   | 'structure-question'
   | 'process-question';
 
@@ -45,6 +46,7 @@ const OBJECTIONS: QuestionIssue[] = [
   'no-attributes',
   'rule-without-source',
   'critical-without-basis',
+  'critical-without-test',
 ];
 
 // `rule-not-computed` staat er bewust niet bij. Die zegt: er is een beslisregel
@@ -75,6 +77,9 @@ const WEIGHT: Record<QuestionIssue, number> = {
   'no-attributes': 50,
   'rule-without-source': 40,
   'critical-without-basis': 30,
+  // Kritiek is de poort voor basisgeschikt; een poort die niemand kan nalopen
+  // weegt zwaarder dan een regel die niet gerekend wordt.
+  'critical-without-test': 25,
   'rule-not-computed': 10,
   // Een structuurvraag is werk met waarde: het verband léggen is precies wat
   // deze scan hoort aan te wijzen. Een procesvraag is dat niet — daar kan geen
@@ -88,8 +93,16 @@ export interface ReviewedQuestion {
   label: Bilingual;
   /** De categorie waar hij bij hoort, of leeg bij een basisvraag. */
   category?: string;
-  layer: 'base' | 'overlay';
+  /**
+   * `reweight` is geen eigen vraag maar het gewicht van een basisvraag binnen één
+   * categorie; de id is dan `overlay-id/vraag-id`. Overslaan kan daar niet, het
+   * belang corrigeren wel — en daar zat bij de eerste bank de helft van de
+   * kritieke weging.
+   */
+  layer: 'base' | 'overlay' | 'reweight';
   importance: string;
+  /** Het belang zoals de bank het gaf, als een beheerder het corrigeerde. */
+  correctedFrom?: string;
   /** De kenmerken die de vraag nodig heeft, met of ze op een veld uitkomen. */
   attributes: { key: string; mapped: boolean }[];
   /** Op hoeveel panelsites dit onderwerp voorkomt; null = niet onderzocht. */
@@ -142,7 +155,11 @@ export function summariseBank(bank: QuestionBank): BankSummary {
   };
 }
 
-export function reviewBank(bank: QuestionBank): ReviewedQuestion[] {
+export function reviewBank(
+  bank: QuestionBank,
+  /** Het belang zoals de bank het gaf, per gecorrigeerde sleutel (zie `ImportanceCorrections`). */
+  corrected: Record<string, string> = {},
+): ReviewedQuestion[] {
   const rules = ruleIndex(bank);
   const out: ReviewedQuestion[] = [];
 
@@ -195,12 +212,19 @@ export function reviewBank(bank: QuestionBank): ReviewedQuestion[] {
         issues.push(question.answerType === 'process' ? 'process-question' : 'structure-question');
       }
 
+      // Kritiek zonder de toets erbij is niet na te lopen. Heeft een beheerder het
+      // belang zelf gezet, dan is dat zijn oordeel en de onderbouwing.
+      if (question.importance === 'critical' && !question.criticalTest && corrected[question.id] === undefined) {
+        issues.push('critical-without-test');
+      }
+
       out.push({
         id: question.id,
         label: question.label,
         category,
         layer,
         importance: question.importance,
+        correctedFrom: corrected[question.id],
         attributes: used,
         coverage: question.coverage ?? null,
         issues,
@@ -212,6 +236,33 @@ export function reviewBank(bank: QuestionBank): ReviewedQuestion[] {
   walk(bank.questions, 'base', undefined, attributeIndex(bank));
   for (const overlay of bank.overlays) {
     walk(overlay.questions ?? [], 'overlay', overlay.label.nl, attributeIndex(bank, overlay));
+  }
+
+  // Herwegingen naar kritiek, en elke herweging die een beheerder corrigeerde.
+  // Een basisvraag die in één categorie kritiek wordt, is daar net zo goed een
+  // poort als een eigen vraag.
+  const base = new Map(bank.questions.map((question) => [question.id, question]));
+  for (const overlay of bank.overlays) {
+    for (const [questionId, entry] of Object.entries(overlay.reweight ?? {})) {
+      const key = `${overlay.id}/${questionId}`;
+      const question = base.get(questionId);
+      if (!question || (entry.importance !== 'critical' && corrected[key] === undefined)) continue;
+      const issues: QuestionIssue[] = entry.importance === 'critical' && !entry.why && corrected[key] === undefined
+        ? ['critical-without-test']
+        : [];
+      out.push({
+        id: key,
+        label: question.label,
+        category: overlay.label.nl,
+        layer: 'reweight',
+        importance: entry.importance,
+        correctedFrom: corrected[key],
+        attributes: [],
+        coverage: question.coverage ?? null,
+        issues,
+        severity: issues.reduce((total, issue) => total + WEIGHT[issue], 0),
+      });
+    }
   }
 
   // Ergste bovenaan, en binnen dezelfde ernst op id zodat de volgorde vastligt.

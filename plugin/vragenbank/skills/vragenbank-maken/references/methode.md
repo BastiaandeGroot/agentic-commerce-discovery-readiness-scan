@@ -40,7 +40,22 @@ Bij vloeren of tegels: te weinig besteld en het verfbad is op.
 Bij verf: aangebroken blik, kleur zit al op de muur.
 Bij maatwerkmeubilair: gemaakt op maat, geen retour.
 
-Zoek de equivalent, en laat die je `kritiek`-weging bepalen in plaats van commercieel belang.
+Zoek de equivalent. Hij is het tweede criterium van de kritiek-toets hieronder, niet de hele toets.
+
+### De kritiek-toets
+
+De onomkeerbare fout alleen is geen maat. In een markt waar op maat geknipt of verwerkt wordt, is élke verkeerde keuze onomkeerbaar — en dan haalt bijna elke vraag de lat. Bij de eerste echte bank werden zo 31 van de 171 vragen kritiek, en na de herweging per categorie tot een derde per categorie. Kritiek is de poort voor basisgeschikt; een poort waar alles doorheen moet zegt niets.
+
+Een vraag is alleen `kritiek` als alle vier ja zijn:
+
+1. **Beslissend.** Maakt een fout antwoord het product ongeschikt voor wat de koper ermee wil? De verkeerde hoeveelheid, ongeschikt voor de toepassing, niet toegestaan of onveilig. Tegenvallen telt niet: sneller vuil, eerder verkleurd of minder mooi dan gehoopt is `hoog`.
+2. **Onherstelbaar.** Kan de koper het na levering niet terugdraaien, omdat het geknipt, verwerkt of aangebracht is, of omdat retour is uitgesloten? Dit is de onomkeerbare fout hierboven.
+3. **Over het product.** Gaat de vraag over een eigenschap van het product? Een vraag over beleid, levering of voorraad — retour, bijbestellen uit hetzelfde verfbad, een staal — is nooit kritiek, hoe belangrijk ook.
+4. **Uit de catalogus.** Staat het antwoord in een kenmerk van het product zelf? Een berekening die ook de maten of keuzes van de koper nodig heeft — "hoeveel meter heb ik nodig voor mijn raam", antwoordtype `afgeleid` — is nooit kritiek. Een catalogus die alles goed vastlegt, haalt zo'n vraag nog steeds niet, en als poort verbergt hij elke andere kritieke vraag. Bij de eerste echte bank zette "hoeveel meter heb ik nodig" als kritieke vraag basisgeschikt van 1.523 op 136 producten. De vraag blijft in de meting, als `hoog`.
+
+Een vraag die alleen informatie geeft waaruit een ander antwoord volgt, is zelf niet beslissend. "Waar is deze stof van gemaakt" voedt "is deze stof geschikt voor mijn bank"; alleen die tweede kan kritiek zijn.
+
+Leg per kritieke vraag in `kritiek_toets` vast waarom elk van de vier criteria geldt, in één zin per criterium. Een herweging naar kritiek in een overlay krijgt dezelfde toets. Bij twijfel: `hoog`.
 
 ---
 
@@ -171,6 +186,11 @@ Per vraag leg je vast:
   intentie: geschiktheid | hoeveelheid | onderhoud | verwachting |
             materiaal | verwerking | duurzaamheid | veiligheid | koopzekerheid
   belang: kritiek | hoog | middel | laag
+  kritiek_toets:                      # alleen bij kritiek: één zin per criterium
+    beslissend: "..."
+    onherstelbaar: "..."
+    product: "..."
+    uit_de_catalogus: "..."
   dekking: 6            # op hoeveel sites van het panel komt dit onderwerp voor
   dekking_bronnen: [site_a, site_b, ...]
   bron: [faq, categorietekst, review, vakkennis]
@@ -184,7 +204,7 @@ Vijf regels die de kwaliteit bepalen:
 
 **Formuleer als klantvraag, niet als attribuut.** "Is deze stof sterk genoeg voor mijn bank" en niet "Martindale-waarde". De attribuutnaam volgt uit de vraag, nooit andersom.
 
-**Laat `dekking` het gewicht sturen, maar niet bepalen.** Vuistregel: dekking boven 70% van het panel rechtvaardigt `hoog`, dekking van 100% samen met de onomkeerbare fout uit fase 0 rechtvaardigt `kritiek`. Maar een vraag met dekking 0 kan alsnog kritiek zijn als vakkennis zegt dat er een dure fout achter zit. Leg in dat geval expliciet uit waarom je afwijkt.
+**Laat `dekking` het gewicht sturen, maar niet bepalen.** Vuistregel: dekking boven 70% van het panel rechtvaardigt `hoog`. Dekking maakt een vraag nooit `kritiek` — dat doet de kritiek-toets uit fase 0, vier keer ja. Een vraag met dekking 0 kan kritiek zijn als de toets dat zegt; leg dan uit waarom je van de dekking afwijkt.
 
 **Eén vraag kan meerdere attributen plus een regel nodig hebben.** Dat is normaal en het is precies waar de waarde zit. "Hoeveel meter heb ik nodig" vraagt breedte plus rapport plus een berekening.
 

@@ -9,7 +9,8 @@ import { NextResponse } from 'next/server';
 import { isAdmin } from '../../../../src/server/admin';
 import { isRefusal, serviceClient } from '../../../../src/server/executor';
 import { importQuestionList } from '../../../../src/questions/list';
-import { applyOverlaySettings, type OverlaySettings } from '../../../../src/questions/bank';
+import { applyOverlaySettings, type Importance, type OverlaySettings } from '../../../../src/questions/bank';
+import { applyImportanceCorrections, type ImportanceCorrections } from '../../../../src/questions/critical';
 import type { Bilingual } from '../../../../src/domain/types';
 import { reviewBank, summariseBank } from '../../../../src/questions/review';
 
@@ -42,6 +43,15 @@ export async function GET(request: Request) {
       .select('id, vertical, version, status, findings, panel, grouping, csv, excluded, created_at, released_at')
       .order('created_at', { ascending: false }) as typeof banks;
   }
+
+  // Wat de beheerder aan het belang corrigeerde. Apart: zonder migratie 0013
+  // bestaat de kolom niet, en dan blijft beoordelen gewoon werken.
+  const correctionRows = await supabase.from('question_banks').select('id, importance_corrections');
+  const correctionsBy = new Map<string, ImportanceCorrections>(
+    correctionRows.error
+      ? []
+      : (correctionRows.data ?? []).map((row) => [row.id as string, (row.importance_corrections ?? {}) as ImportanceCorrections]),
+  );
 
   // Hoe ver de generatie is. Een aparte vraag en geen join: het is de enige
   // plek waar de stand van het werk vandaan komt, en een aanvraag zonder run —
@@ -84,10 +94,16 @@ export async function GET(request: Request) {
       // Beoordelen op de bank zoals de merchant hem krijgt: met losstaande
       // categorieën en gecorrigeerde labels erop.
       const settings = settingsOf(bank);
-      const applied = read.bank ? applyOverlaySettings(read.bank, settings) : undefined;
+      const corrections = correctionsBy.get(bank.id as string) ?? {};
+      const applied = read.bank
+        ? applyOverlaySettings(applyImportanceCorrections(read.bank, corrections), settings)
+        : undefined;
       return {
         ...rest,
-        questions: applied ? reviewBank(applied) : [],
+        questions: applied && read.bank ? reviewBank(applied, originalImportance(read.bank, corrections)) : [],
+        importance: corrections,
+        // Of correcties bewaard kunnen worden; zonder migratie 0013 niet.
+        canCorrect: !correctionRows.error,
         summary: applied ? summariseBank(applied) : undefined,
         overlays: (read.bank?.overlays ?? []).map((overlay) => ({
           id: overlay.id,
@@ -105,6 +121,27 @@ export async function GET(request: Request) {
     }),
   });
 }
+
+/** Het belang zoals de bank het gaf, voor elke sleutel die gecorrigeerd is. */
+function originalImportance(bank: QuestionBankShape, corrections: ImportanceCorrections): Record<string, string> {
+  const out: Record<string, string> = {};
+  const all = [...bank.questions, ...bank.overlays.flatMap((overlay) => overlay.questions ?? [])];
+  for (const key of Object.keys(corrections)) {
+    const [first, second] = key.split('/');
+    if (second) {
+      const overlay = bank.overlays.find((one) => one.id === first);
+      const base = bank.questions.find((one) => one.id === second);
+      out[key] = overlay?.reweight?.[second]?.importance ?? base?.importance ?? '';
+    } else {
+      out[key] = all.find((one) => one.id === first)?.importance ?? '';
+    }
+  }
+  return out;
+}
+
+type QuestionBankShape = NonNullable<ReturnType<typeof importQuestionList>['bank']>;
+
+const IMPORTANCES: Importance[] = ['critical', 'high', 'medium', 'low'];
 
 /** De instellingen per categorie, zoals ze naast de bank bewaard staan. */
 function settingsOf(bank: unknown): OverlaySettings {
@@ -129,9 +166,13 @@ export async function POST(request: Request) {
   let body: {
     bankId?: string;
     questionId?: string;
-    action?: 'release' | 'toggle' | 'standalone' | 'label';
+    action?: 'release' | 'toggle' | 'standalone' | 'label' | 'importance';
     overlayId?: string;
     label?: { nl?: string; en?: string };
+    /** Vraag-id, of `overlay-id/vraag-id` voor een herweging. */
+    key?: string;
+    /** Het nieuwe belang; leeg zet het terug op wat de bank zegt. */
+    importance?: string;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -179,6 +220,25 @@ export async function POST(request: Request) {
     const saved = await supabase.from('question_banks').update({ standalone: [...standalone].sort() }).eq('id', body.bankId);
     if (saved.error) return NextResponse.json({ error: 'Bewaren is niet gelukt.' }, { status: 502 });
     return NextResponse.json({ standalone: [...standalone].sort() });
+  }
+
+  // Het belang van een vraag of een herweging corrigeren. Naast de CSV, zodat de
+  // vraag-id's blijven staan: daar hangt het werk van elke merchant aan.
+  if (body.action === 'importance' && body.key) {
+    const current = await supabase.from('question_banks').select('importance_corrections').eq('id', body.bankId).maybeSingle();
+    if (current.error) {
+      return NextResponse.json({ error: 'Correcties zijn niet op te halen. Is migratie 0013 al gedraaid?' }, { status: 502 });
+    }
+    if (!current.data) return NextResponse.json({ error: 'Deze bank bestaat niet.' }, { status: 404 });
+    const corrections = { ...((current.data.importance_corrections as ImportanceCorrections | null) ?? {}) };
+    if (body.importance && IMPORTANCES.includes(body.importance as Importance)) {
+      corrections[body.key] = body.importance as Importance;
+    } else {
+      delete corrections[body.key];
+    }
+    const saved = await supabase.from('question_banks').update({ importance_corrections: corrections }).eq('id', body.bankId);
+    if (saved.error) return NextResponse.json({ error: 'Bewaren is niet gelukt.' }, { status: 502 });
+    return NextResponse.json({ importance: corrections });
   }
 
   // Een label corrigeren. Leeg in beide talen zet het terug op wat de bank zegt.

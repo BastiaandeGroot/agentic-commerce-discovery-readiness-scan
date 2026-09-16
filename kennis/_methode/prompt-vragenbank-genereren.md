@@ -128,6 +128,7 @@ Draai dit per site, of in groepjes van twee tot drie. Niet alle vijf tegelijk: d
 >     beslisregel: ...
 >     antwoordtype: ...
 >     beantwoordbaar_uit_attributen: true | gedeeltelijk | false
+>     kritiek_toets: {beslissend: ..., onherstelbaar: ..., product: ..., uit_de_catalogus: ...}   # alleen bij kritiek
 > uitgesloten_van_score: [...]
 > open_punten: [...]
 > ```
@@ -135,7 +136,8 @@ Draai dit per site, of in groepjes van twee tot drie. Niet alle vijf tegelijk: d
 > Regels:
 > - Formuleer als klantvraag, nooit als attribuutnaam. De attribuutnaam volgt uit de vraag.
 > - Gebruik eigen canonieke attribuutnamen. Neem geen veldnamen van een site over, maar noteer ze wel onder `benoemd_als`.
-> - Laat `dekking` het gewicht sturen maar niet bepalen: boven 70% van het panel rechtvaardigt `hoog`, volledige dekking samen met de onomkeerbare fout rechtvaardigt `kritiek`. Een vraag met `dekking: 0` kan alsnog kritiek zijn als er een dure fout achter zit; leg dan uit waarom je afwijkt.
+> - Laat `dekking` het gewicht sturen maar niet bepalen: boven 70% van het panel rechtvaardigt `hoog`. Dekking maakt een vraag nooit `kritiek`.
+> - `kritiek` alleen als alle vier ja zijn: (1) beslissend — een fout antwoord maakt het product ongeschikt voor wat de koper ermee wil, tegenvallen telt niet; (2) onherstelbaar — na levering niet terug te draaien; (3) over het product — niet over retour, levering, voorraad of een staal; (4) uit de catalogus — het antwoord staat in een kenmerk en is geen berekening met maten van de koper (antwoordtype `afgeleid` is nooit kritiek). Een vraag die alleen informatie geeft waaruit een ander antwoord volgt ("waar is het van gemaakt") is zelf niet beslissend. Vul `kritiek_toets` met één zin per criterium, ook bij een herweging naar kritiek. Bij twijfel: `hoog`.
 > - Eén vraag mag meerdere attributen plus een beslisregel nodig hebben.
 > - Markeer vragen die niet uit attributen te beantwoorden zijn (proces, structuur, levenscyclus) en zet ze in `uitgesloten_van_score`.
 > - Onderscheid gepubliceerde drempels (met bronsite) van beredeneerde drempels (naar `open_punten`).

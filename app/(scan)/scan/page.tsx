@@ -15,16 +15,17 @@ import type { Dataset, QuestionSetState, ScanReport } from '../../../src/domain/
 import { generateQuestionSets } from '../../../src/questions/generate';
 import { importQuestionList } from '../../../src/questions/list';
 import { applyAttributeShapes, applyOverlaySettings, excludeFromScore } from '../../../src/questions/bank';
+import { applyImportanceCorrections } from '../../../src/questions/critical';
 import type { Mapping } from '../../../src/questions/mapping';
 import { bankStore, LOCAL_ACCOUNT, type StoredBank } from '../../../src/storage/banks';
 import { LocalSettingsStore, SupabaseSettingsStore, type SettingsStore } from '../../../src/storage/settings';
-import { applyWork, extractWork, setKey, type QuestionWork } from '../../../src/questions/work';
+import { applyWork, mergeWork, setKey, type QuestionWork } from '../../../src/questions/work';
 import type { ScanClient } from '../../../src/worker/client';
 import { STRINGS } from '../../../src/i18n/strings';
 import { useLocale } from '../../../src/i18n/useLocale';
 import { UploadStep } from '../../../components/UploadStep';
 import { SegmentStep } from '../../../components/SegmentStep';
-import { normalizeName, pathKey, pathsFromProducts, type PathKind, type Verdicts } from '../../../src/intake/facets';
+import { applyVerdicts, classifyPaths, normalizeName, pathKey, pathsFromProducts, type PathKind, type Verdicts } from '../../../src/intake/facets';
 import { authHeader, supabase } from '../../../src/auth/client';
 import { NoVerdictStore, SupabaseVerdictStore, type VerdictStore } from '../../../src/storage/verdicts';
 // Het categoriepad kent de motor al; `facets` krijgt het als argument, zodat de
@@ -44,6 +45,21 @@ type Step = 'upload' | 'segments' | 'bank' | 'mapping' | 'questions' | 'report';
 export default function Home() {
   const [locale] = useLocale();
   const [step, setStep] = useState<Step>('upload');
+  /** De vraag waar het rapport naar verwees, zodat het vragensetscherm erop opent. */
+  const [focusQuestion, setFocusQuestion] = useState<{ setId: string; questionId: string; base: boolean }>();
+  /** Vanuit een bewaarde analyse: de vraag staat in het adres, want de catalogus moet eerst opnieuw in. */
+  const [fromSaved, setFromSaved] = useState(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const questionId = params.get('vraag');
+    const setId = params.get('set');
+    if (!questionId || !setId) return;
+    void (async () => {
+      await Promise.resolve();
+      setFocusQuestion({ questionId, setId, base: params.get('algemeen') === '1' });
+      setFromSaved(true);
+    })();
+  }, []);
   const [catalog, setCatalog] = useState<Dataset>();
   const [banks, setBanks] = useState<StoredBank[]>([]);
   const [questionState, setQuestionState] = useState<QuestionSetState>();
@@ -228,6 +244,12 @@ export default function Home() {
   /** Zijn eigen winkel; wordt één van de panelsites, nooit de enige. */
   const [shopUrl, setShopUrl] = useState<string>();
   const [report, setReport] = useState<ScanReport>();
+  /**
+   * De samenstelling waarop dit rapport rust, zonder het werk van de merchant.
+   * Gaat mee als de analyse bewaard wordt, zodat hij later zonder catalogus zijn
+   * vragen kan bijstellen.
+   */
+  const [reportPristine, setReportPristine] = useState<QuestionSetState>();
   // De client houdt de worker vast; de datasets blijven daar zodat ze niet voor
   // elke scan opnieuw door de structured clone hoeven.
   const [client, setClient] = useState<ScanClient>();
@@ -300,7 +322,7 @@ export default function Home() {
    */
   function handleQuestionState(next: QuestionSetState) {
     setQuestionState(next);
-    if (latest.current.pristine) latest.current.work = extractWork(next, latest.current.pristine);
+    if (latest.current.pristine) latest.current.work = mergeWork(latest.current.work, next, latest.current.pristine);
     setReconfirm((current) => ({
       categories: current.categories.filter((category) =>
         !next.sets.some((set) => setKey(set) === category && set.validated)),
@@ -388,6 +410,27 @@ export default function Home() {
   function handleReady(nextClient: ScanClient, nextCatalog: Dataset) {
     setClient(nextClient);
     setCatalog(nextCatalog);
+
+    // Vanuit een bewaarde analyse, op weg naar één vraag. Heeft de merchant over
+    // élk categoriepad al beslist, dan zegt het categoriescherm niets nieuws en
+    // gaan we meteen door. Anders niet: een pad zonder oordeel valt terug op een
+    // gok, en dan zouden de vragensets op een andere indeling rusten dan zijn
+    // vorige scan.
+    if (fromSaved && focusQuestion && banks.length > 0) {
+      const nextPaths = pathsFromProducts(nextCatalog.products, categoryPath);
+      const decided = nextPaths.length > 0 && nextPaths.every((path) => verdicts[pathKey(path.segments)] !== undefined);
+      if (decided) {
+        const rows = applyVerdicts(classifyPaths(nextPaths), verdicts);
+        const nextFacets = rows.filter((row) => row.kind === 'facet').map((row) => pathKey(row.segments)).sort();
+        const nextExcluded = rows.filter((row) => row.kind === 'excluded').map((row) => pathKey(row.segments)).sort();
+        setFacets(nextFacets);
+        setExcluded(nextExcluded);
+        compose(banks, nextCatalog, latest.current.mapping, latest.current.categories, nextFacets, nextExcluded);
+        setStep('questions');
+        return;
+      }
+    }
+
     compose(banks, nextCatalog);
     setStep('segments');
   }
@@ -447,7 +490,10 @@ export default function Home() {
       source: `${data.vertical} v${data.version}`,
       bank: applyAttributeShapes(
         applyOverlaySettings(
-          excludeFromScore(read.bank, Array.isArray(data.excluded) ? data.excluded : []),
+          excludeFromScore(
+            applyImportanceCorrections(read.bank, data.importance && typeof data.importance === 'object' ? data.importance : {}),
+            Array.isArray(data.excluded) ? data.excluded : [],
+          ),
           {
             standalone: Array.isArray(data.standalone) ? data.standalone : [],
             labels: data.labels && typeof data.labels === 'object' ? data.labels : {},
@@ -517,7 +563,9 @@ export default function Home() {
     setScanError(undefined);
     try {
       // De klok komt van hier: de motor heeft er zelf geen.
+      const pristineNow = latest.current.pristine;
       setReport(await client.scan(questionState, new Date().toISOString()));
+      setReportPristine(pristineNow);
       setStep('report');
     } catch (caught) {
       setScanError((caught as Error).message);
@@ -553,7 +601,7 @@ export default function Home() {
                 {done ? (
                   <button
                     type="button"
-                    onClick={() => setStep(entry.id as Step)}
+                    onClick={() => { setFocusQuestion(undefined); setStep(entry.id as Step); }}
                     className="text-ok underline-offset-2 hover:underline"
                   >
                     ✓ {entry.label}
@@ -573,6 +621,9 @@ export default function Home() {
       </header>
 
       <main>
+        {fromSaved && focusQuestion && step !== 'questions' && step !== 'report' ? (
+          <p className="mb-4 rounded-md bg-surface-2 px-3 py-2 text-sm leading-relaxed text-muted">{s.report.qReviewPending}</p>
+        ) : null}
         {step === 'upload' ? <UploadStep s={s} onReady={handleReady} /> : null}
 
         {step === 'segments' && catalog ? (
@@ -648,7 +699,8 @@ export default function Home() {
               onChange={handleQuestionState}
               reconfirm={reconfirm}
               saved={saveFailed ? 'failed' : settingsStore.where}
-              onContinue={() => setStep('mapping')}
+              focus={focusQuestion}
+              onContinue={() => { setFocusQuestion(undefined); setStep('mapping'); }}
             />
           </div>
         ) : null}
@@ -670,7 +722,14 @@ export default function Home() {
         ) : null}
 
         {step === 'report' && report ? (
-          <ReportView s={s} locale={locale} report={report} onRestart={restart} />
+          <ReportView
+            s={s}
+            locale={locale}
+            report={report}
+            onRestart={restart}
+            pristine={reportPristine}
+            onReviewQuestion={(question) => { setFocusQuestion(question); setStep('questions'); }}
+          />
         ) : null}
       </main>
     </div>

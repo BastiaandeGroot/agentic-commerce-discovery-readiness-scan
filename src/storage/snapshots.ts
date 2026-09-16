@@ -12,18 +12,40 @@
 // toevoegen betekent een migratie op data die er al staat.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ScanSnapshot } from '../engine/snapshot';
+import type { ScanSnapshot, SnapshotDetail } from '../engine/snapshot';
 
 export const LOCAL_ACCOUNT = 'lokaal';
 
 export interface SnapshotStore {
   list(accountId: string): Promise<ScanSnapshot[]>;
-  save(snapshot: ScanSnapshot): Promise<void>;
+  /**
+   * Bewaar een analyse. Het detail is los: mislukt alleen dat, dan staat de
+   * analyse er wel en gooit dit `DetailNotSaved`, zodat het scherm kan zeggen
+   * dat bijwerken zonder catalogus voor deze analyse niet kan.
+   */
+  save(snapshot: ScanSnapshot, detail?: SnapshotDetail): Promise<void>;
+  /** Het detail van één analyse, of `undefined` als het er niet is. */
+  loadDetail(accountId: string, id: string): Promise<SnapshotDetail | undefined>;
   remove(accountId: string, id: string): Promise<void>;
   clear(accountId: string): Promise<void>;
 }
 
 const KEY = (accountId: string) => `acdrs.snapshots.${accountId}`;
+const DETAIL_KEY = (accountId: string, id: string) => `acdrs.snapshot-detail.${accountId}.${id}`;
+
+/** De analyse is bewaard, het detail niet. */
+export class DetailNotSaved extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DetailNotSaved';
+  }
+}
+
+/**
+ * Van hoeveel analyses de browser het detail bewaart. Een detail is een paar
+ * honderd kilobyte en de browser geeft een paar megabyte; de nieuwste tellen.
+ */
+export const LOCAL_DETAIL_LIMIT = 3;
 
 /** Hoeveel scans we lokaal bewaren; daarboven valt de oudste af. */
 export const LOCAL_LIMIT = 25;
@@ -51,19 +73,40 @@ export class LocalSnapshotStore implements SnapshotStore {
     return this.read(accountId).sort((a, b) => b.savedAt.localeCompare(a.savedAt));
   }
 
-  async save(snapshot: ScanSnapshot): Promise<void> {
+  async save(snapshot: ScanSnapshot, detail?: SnapshotDetail): Promise<void> {
     const current = this.read(snapshot.accountId).filter((s) => s.id !== snapshot.id);
     const next = [snapshot, ...current]
       .sort((a, b) => b.savedAt.localeCompare(a.savedAt))
       .slice(0, LOCAL_LIMIT);
     this.write(snapshot.accountId, next);
+    // Alleen de nieuwste houden een detail; de rest valt terug op de snapshot.
+    for (const old of next.slice(LOCAL_DETAIL_LIMIT)) {
+      window.localStorage.removeItem(DETAIL_KEY(snapshot.accountId, old.id));
+    }
+    if (!detail) return;
+    try {
+      window.localStorage.setItem(DETAIL_KEY(snapshot.accountId, snapshot.id), JSON.stringify(detail));
+    } catch (caught) {
+      throw new DetailNotSaved((caught as Error).message);
+    }
+  }
+
+  async loadDetail(accountId: string, id: string): Promise<SnapshotDetail | undefined> {
+    try {
+      const raw = window.localStorage.getItem(DETAIL_KEY(accountId, id));
+      return raw ? (JSON.parse(raw) as SnapshotDetail) : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   async remove(accountId: string, id: string): Promise<void> {
     this.write(accountId, this.read(accountId).filter((s) => s.id !== id));
+    window.localStorage.removeItem(DETAIL_KEY(accountId, id));
   }
 
   async clear(accountId: string): Promise<void> {
+    for (const snapshot of this.read(accountId)) window.localStorage.removeItem(DETAIL_KEY(accountId, snapshot.id));
     window.localStorage.removeItem(KEY(accountId));
   }
 }
@@ -89,7 +132,7 @@ export class SupabaseSnapshotStore implements SnapshotStore {
     return (data ?? []).map((row) => ({ ...(row.snapshot as ScanSnapshot), accountId }));
   }
 
-  async save(snapshot: ScanSnapshot): Promise<void> {
+  async save(snapshot: ScanSnapshot, detail?: SnapshotDetail): Promise<void> {
     const { error } = await this.client.from('scan_snapshots').upsert(
       {
         account_id: snapshot.accountId,
@@ -107,6 +150,26 @@ export class SupabaseSnapshotStore implements SnapshotStore {
       { onConflict: 'account_id,snapshot_key' },
     );
     if (error) throw new Error(error.message);
+    if (!detail) return;
+    // Apart, zodat de analyse er staat ook als de kolom er nog niet is (migratie 0012).
+    const { error: detailError } = await this.client
+      .from('scan_snapshots')
+      .update({ detail })
+      .eq('account_id', snapshot.accountId)
+      .eq('snapshot_key', snapshot.id);
+    if (detailError) throw new DetailNotSaved(detailError.message);
+  }
+
+  async loadDetail(accountId: string, id: string): Promise<SnapshotDetail | undefined> {
+    const { data, error } = await this.client
+      .from('scan_snapshots')
+      .select('detail')
+      .eq('account_id', accountId)
+      .eq('snapshot_key', id)
+      .maybeSingle();
+    // Zonder kolom of zonder detail is dit een analyse van vóór het bijwerken: geen fout.
+    if (error || !data?.detail) return undefined;
+    return data.detail as SnapshotDetail;
   }
 
   async remove(accountId: string, id: string): Promise<void> {

@@ -8,7 +8,8 @@ export function Button({
 }: {
   children: ReactNode;
   onClick?: () => void;
-  variant?: 'primary' | 'secondary' | 'quiet';
+  /** `danger` alleen voor de bevestiging van iets wat niet terug te draaien is. */
+  variant?: 'primary' | 'secondary' | 'quiet' | 'danger';
   disabled?: boolean;
   /** Bezig: de knop blijft staan met zijn eigen tekst, zodat niet verschuift
    *  waar iemand net op klikte. */
@@ -19,6 +20,7 @@ export function Button({
     primary: 'bg-accent text-accent-ink hover:opacity-90 border-transparent',
     secondary: 'bg-surface text-ink border-line hover:bg-surface-2',
     quiet: 'bg-transparent text-muted border-transparent hover:text-ink hover:bg-surface-2',
+    danger: 'bg-danger-soft text-danger border-danger/30 hover:border-danger/60',
   }[variant];
   return (
     <button

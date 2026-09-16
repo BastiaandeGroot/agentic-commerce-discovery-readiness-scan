@@ -38,6 +38,7 @@ const HEADER = [
   'toelichting',
   'markt',
   'onomkeerbare_fout',
+  'kritiek_toets',
 ];
 
 /** Eén veld, met aanhalingstekens zodra het een scheidingsteken draagt. */
@@ -55,6 +56,13 @@ function escape(value: string): string {
  */
 function joinList(values: string[]): string {
   return values.map((value) => value.replace(/[;,]/g, ' ').trim()).filter(Boolean).join('; ');
+}
+
+/** De toets als één cel, leesbaar voor een mens. */
+function criticalTestText(test: DraftQuestion['criticalTest']): string {
+  return test
+    ? `beslissend: ${test.decisive} | onherstelbaar: ${test.irreversible} | product: ${test.product} | uit de catalogus: ${test.catalogue}`
+    : '';
 }
 
 function row(
@@ -86,6 +94,7 @@ function row(
     question.note ?? '',
     state.brief.vertical,
     state.shape?.irreversibleMistake ?? '',
+    criticalTestText(question.criticalTest),
   ];
   return cells.map((cell) => escape(String(cell ?? ''))).join(',');
 }
@@ -106,7 +115,9 @@ export function toCsv(state: RunState): string {
       .flatMap((overlay) =>
         overlay.reweight
           .filter((entry) => entry.id === question.id)
-          .map((entry) => `${overlay.category}: ${entry.importance}`),
+          // De toets van een herweging naar kritiek tussen haken erachter: de
+          // lezer neemt hem over als onderbouwing van die herweging.
+          .map((entry) => `${overlay.category}: ${entry.importance}${entry.criticalTest ? ` [${criticalTestText(entry.criticalTest).replace(/[[\]]/g, '')}]` : ''}`),
       );
     lines.push(row(question, 'basis', 'basis', state, joinList(reweights)));
   }

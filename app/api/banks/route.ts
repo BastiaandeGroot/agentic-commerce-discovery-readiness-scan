@@ -61,7 +61,16 @@ export async function GET(request: Request) {
   if (wanted) {
     const bank = rows.find((one) => one.id === wanted);
     if (!bank) return NextResponse.json({ error: 'Die vragenbank bestaat niet.' }, { status: 404 });
+    // Apart opgehaald: zonder migratie 0013 bestaat de kolom niet, en dan hoort de
+    // bank er gewoon zonder correcties te zijn in plaats van helemaal niet.
+    const corrections = await supabase
+      .from('question_banks')
+      .select('importance_corrections')
+      .eq('id', wanted)
+      .maybeSingle();
     return NextResponse.json({
+      // Het belang dat de beheerder corrigeerde, per vraag of per herweging.
+      importance: corrections.error ? {} : corrections.data?.importance_corrections ?? {},
       id: bank.id,
       vertical: bank.vertical,
       version: bank.version,

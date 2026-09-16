@@ -14,4 +14,8 @@
 // subrij van de tak erboven ("Meubelstoffen › Universele naaigarens").
 // 5.2.0 — een categorie krijgt alleen een eigen vragenset als minstens één eigen
 // vraag dekking > 0 heeft (in een bank die dekking draagt).
-export const SCAN_VERSION = '5.2.0';
+// 5.3.0 — een kritieke vraag die niet over het product gaat (koopzekerheid, een
+// procesvraag, of niet uit kenmerken te beantwoorden) of een berekening is
+// (antwoordtype afgeleid) telt als hoog, ook als een categorie haar herweegt; en
+// het belang dat een beheerder corrigeerde telt mee.
+export const SCAN_VERSION = '5.3.0';

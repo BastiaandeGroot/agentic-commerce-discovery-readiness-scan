@@ -19,6 +19,7 @@ import { authHeader } from '../../../../src/auth/client';
 import { hasObjection } from '../../../../src/questions/review';
 import { AttributeTypesPanel } from '../../../../components/AttributeTypesPanel';
 import { BankCategoriesPanel, type BankOverlayRow } from '../../../../components/BankCategoriesPanel';
+import { ImportanceCorrectionsPanel } from '../../../../components/ImportanceCorrectionsPanel';
 import type { StoredTyping } from '../../../../src/generation/attributes';
 
 interface GroupingEntry {
@@ -44,7 +45,9 @@ interface RequestRow {
 
 interface ReviewedQuestion {
   id: string; label: { nl: string; en: string }; category?: string;
-  layer: 'base' | 'overlay'; importance: string;
+  layer: 'base' | 'overlay' | 'reweight'; importance: string;
+  /** Het belang volgens de bank, als de beheerder het corrigeerde. */
+  correctedFrom?: string;
   attributes: { key: string; mapped: boolean }[];
   coverage: number | null;
   issues: string[]; severity: number;
@@ -63,6 +66,10 @@ interface BankRow {
   summary?: BankSummary;
   /** Vragen die de beheerder bij het vrijgeven overslaat. Terugdraaibaar. */
   excluded?: string[];
+  /** Gecorrigeerd belang per vraag of per herweging. */
+  importance?: Record<string, string>;
+  /** Of correcties bewaard kunnen worden (migratie 0013). */
+  canCorrect?: boolean;
   /** Welke waarde elk kenmerk verwacht; ontbreekt tot de bank getypeerd is. */
   attribute_types?: StoredTyping | null;
   /** De categorieën met een eigen vragenset, met wat de beheerder erover besliste. */
@@ -117,6 +124,25 @@ export default function Page() {
         method: 'POST',
         headers: { 'content-type': 'application/json', ...(await authHeader()) },
         body: JSON.stringify({ action: 'toggle', bankId, questionId }),
+      });
+      await load();
+    } finally {
+      setBusy(undefined);
+    }
+  }
+
+  /**
+   * Het belang van een vraag of herweging zetten. Dezelfde waarde kiezen als de
+   * bank bevestigt hem: dan is kritiek een oordeel van een mens en geen losse
+   * uitspraak van de generatie meer.
+   */
+  async function correct(bankId: string, key: string, importance: string) {
+    setBusy(`${bankId}:${key}:importance`);
+    try {
+      await fetch('/api/admin/queue', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(await authHeader()) },
+        body: JSON.stringify({ action: 'importance', bankId, key, importance }),
       });
       await load();
     } finally {
@@ -351,6 +377,9 @@ export default function Page() {
                     ? `${(bank.excluded ?? []).length} ${s.admin.skippedCount}. ${s.admin.skippedNote}`
                     : ''}
                 </p>
+                {bank.canCorrect === false ? (
+                  <p className="mt-1 text-sm text-warn">{s.admin.correctionsNeedMigration}</p>
+                ) : null}
 
                 {/* De volledige bank, vraag voor vraag, met het ergste bovenaan.
                     Een lijst tellingen — "26 beslisregels zonder bron" — is niet
@@ -432,9 +461,35 @@ export default function Page() {
                             </span>
                           </Td>
                           <Td>
-                            <Badge tone={q.importance === 'critical' ? 'danger' : 'neutral'}>
-                              {s.questions.importance[q.importance] ?? q.importance}
-                            </Badge>
+                            <span className="flex flex-col items-start gap-1">
+                              <Badge tone={q.importance === 'critical' ? 'danger' : 'neutral'}>
+                                {s.questions.importance[q.importance] ?? q.importance}
+                              </Badge>
+                              {/* Corrigeren naast de bank, zodat de vraag-id's blijven
+                                  staan. Een correctie toont wat de bank zei. */}
+                              {bank.canCorrect ? (
+                                <select
+                                  aria-label={s.admin.importanceLabel}
+                                  value={bank.importance?.[q.id] ?? ''}
+                                  disabled={busy === `${bank.id}:${q.id}:importance`}
+                                  onChange={(event) => void correct(bank.id, q.id, event.target.value)}
+                                  className="rounded-md border border-line bg-surface px-1.5 py-0.5 text-xs text-ink"
+                                >
+                                  <option value="">{s.admin.importanceBank}</option>
+                                  {(['critical', 'high', 'medium', 'low'] as const).map((level) => (
+                                    <option key={level} value={level}>{s.questions.importance[level]}</option>
+                                  ))}
+                                </select>
+                              ) : null}
+                              {q.correctedFrom ? (
+                                <span className="text-xs text-muted">
+                                  {s.admin.importanceWas} {s.questions.importance[q.correctedFrom] ?? q.correctedFrom}
+                                </span>
+                              ) : null}
+                              {q.layer === 'reweight' ? (
+                                <span className="text-xs text-muted">{s.admin.reweightRow}</span>
+                              ) : null}
+                            </span>
                           </Td>
                           <Td>
                             {q.issues.length === 0 ? (
@@ -479,6 +534,7 @@ export default function Page() {
                                 buiten de meting. Zichtbaar en terug te draaien:
                                 een keuze die je niet kunt terugzien is geen
                                 keuze maar een gok. */}
+                            {q.layer === 'reweight' ? null : (
                             <Button
                               variant={(bank.excluded ?? []).includes(q.id) ? 'secondary' : 'quiet'}
                               loading={busy === `${bank.id}:${q.id}`}
@@ -486,6 +542,7 @@ export default function Page() {
                             >
                               {(bank.excluded ?? []).includes(q.id) ? s.admin.include : s.admin.skip}
                             </Button>
+                            )}
                           </Td>
                         </tr>
                       ))}
@@ -515,6 +572,23 @@ export default function Page() {
             {typable.map((bank) => (
               <li key={bank.id} className="border-t border-line pt-4 first:border-t-0 first:pt-0">
                 <AttributeTypesPanel s={s} bank={bank} onChanged={load} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      {/* Het belang per vraag. Ook na het vrijgeven: de kritiek-toets kwam later
+          dan de eerste banken, en opnieuw genereren knipt het werk van merchants los. */}
+      <Card>
+        <CardTitle sub={s.admin.importanceBody}>{s.admin.importanceTitle}</CardTitle>
+        {typable.length === 0 ? (
+          <EmptyState title={s.admin.typingNoBanks} body={s.admin.importanceBody} />
+        ) : (
+          <ul className="flex flex-col gap-4">
+            {typable.map((bank) => (
+              <li key={bank.id} className="border-t border-line pt-4 first:border-t-0 first:pt-0">
+                <ImportanceCorrectionsPanel s={s} locale={locale} bank={bank} onChanged={load} />
               </li>
             ))}
           </ul>

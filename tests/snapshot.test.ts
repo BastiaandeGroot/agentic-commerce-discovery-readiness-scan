@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ScanReport } from '../src/domain/types';
 import { toSnapshot } from '../src/engine/snapshot';
+import { modelFromReport, modelFromSnapshot } from '../src/report/model';
 
 function rapport(): ScanReport {
   const vraag = (questionId: string, answered: number, applicable: number, scored = true) => ({
@@ -48,8 +49,32 @@ test('de werklijst gaat mee: alleen gescoorde vragen die open staan', () => {
   assert.deepEqual(snapshot.questions?.map((row) => row.questionId), ['A']);
   assert.deepEqual(snapshot.questions?.[0], {
     setId: 'meubel', questionId: 'A', label: { nl: 'Vraag A', en: 'Question A' }, importance: 'critical',
-    layer: 'category', answered: 3, applicable: 9, empty: 1, weak: 1, absent: 4,
+    layer: 'category', answered: 3, applicable: 9, empty: 1, weak: 1, unusable: 1, incomplete: 0, absent: 4,
+    evidence: undefined,
   });
+});
+
+test('een bewaarde analyse geeft hetzelfde rapportmodel als de scan waar hij uit kwam', () => {
+  const vers = modelFromReport(rapport(), 'nl', 'Alle');
+  const bewaard = modelFromSnapshot(bewaar(), 'nl', 'Alle');
+  assert.deepEqual(bewaard.funnel, vers.funnel);
+  assert.deepEqual(bewaard.scoreRows, vers.scoreRows);
+  assert.deepEqual(bewaard.blockers.top, vers.blockers.top);
+  assert.equal(bewaard.blockers.wouldBecome, vers.blockers.wouldBecome);
+  assert.deepEqual(bewaard.gaps, vers.gaps.map(({ field, label, cause, affected, questions }) => ({ field, label, cause, affected, questions })));
+  assert.deepEqual(bewaard.advisory, vers.advisory);
+  assert.equal(bewaard.hasCritical, vers.hasCritical);
+  assert.equal(bewaard.stamp.banks[0].label?.nl, 'Woontextiel');
+});
+
+test('een oudere bewaarde analyse laat weg wat hij niet weet, in plaats van het te raden', () => {
+  const oud = { ...bewaar(), questions: undefined, wouldBecome: undefined, hasSubcategories: undefined };
+  oud.categories = oud.categories.map(({ critical: _c, general: _g, all: _a, ...row }) => row);
+  const model = modelFromSnapshot(oud, 'nl', 'Alle');
+  assert.equal(model.questions, undefined);
+  assert.equal(model.blockers.wouldBecome, undefined);
+  assert.equal(model.scoreRows[0].critical, undefined);
+  assert.deepEqual(model.scoreRows[1].all, { answered: 5, total: 8 });
 });
 
 test('de gemiddelden per categorie en het advies gaan mee', () => {

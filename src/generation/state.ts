@@ -186,6 +186,23 @@ export interface DraftQuestion {
   answerable: 'true' | 'gedeeltelijk' | 'false';
   mode?: 'alle' | 'een';
   note?: string;
+  /**
+   * Bij een kritieke vraag: waarom elk van de vier criteria ja is (zie
+   * `src/questions/critical.ts`). Een kritieke vraag zonder alle vier wordt hoog.
+   */
+  criticalTest?: CriticalTest;
+}
+
+/** De kritiek-toets per vraag, in de woorden van het model. */
+export interface CriticalTest {
+  /** Een fout antwoord maakt het product ongeschikt voor wat de koper ermee wil. */
+  decisive: string;
+  /** Na levering niet terug te draaien. */
+  irreversible: string;
+  /** Het gaat over een eigenschap van het product, niet over beleid of voorraad. */
+  product: string;
+  /** Het antwoord staat in een kenmerk, en is geen berekening met maten van de koper. */
+  catalogue: string;
 }
 
 /** Een laag: de basis, of een overlay bij één categorie. */
@@ -194,7 +211,7 @@ export interface LayerDraft {
   category: string;
   questions: DraftQuestion[];
   /** Basisvragen die in deze categorie anders wegen. Herwegen mag, herschrijven niet. */
-  reweight: { id: string; importance: string; reason: string }[];
+  reweight: { id: string; importance: string; reason: string; criticalTest?: CriticalTest }[];
   /** Losstaand: deze categorie erft de basislaag niet. */
   standalone?: boolean;
 }

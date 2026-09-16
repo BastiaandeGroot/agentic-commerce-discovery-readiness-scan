@@ -29,3 +29,5 @@ import './report.test';
 import './standalone.test';
 import './snapshot.test';
 import './coveredoverlays.test';
+import './rescore.test';
+import './critical.test';

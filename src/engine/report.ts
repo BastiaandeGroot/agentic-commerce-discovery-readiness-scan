@@ -175,6 +175,23 @@ export function runScan(
   const products = catalog.products
     .filter((product) => !isExcludedProduct(product, excluded))
     .map((product) => evaluateProduct(product, questionState.sets, catalog, level, facets, excluded));
+  return aggregateScan(products, questionState, catalog, options.scannedAt);
+}
+
+/**
+ * Van uitkomsten per product naar het rapport.
+ *
+ * Los van `runScan`, zodat een bewaarde analyse dezelfde optelling gebruikt
+ * wanneer de merchant daarna een vraag uitzet: twee kopieën van deze optelling
+ * zouden uit elkaar lopen, en dan zegt het herberekende rapport iets anders dan
+ * een nieuwe scan op dezelfde vragen.
+ */
+export function aggregateScan(
+  products: ProductResult[],
+  questionState: QuestionSetState,
+  catalog: Dataset,
+  scannedAt: string,
+): ScanReport {
   const scored = products.filter((r) => !r.unmatched);
 
   // Per vraag: hoeveel producten die de set gebruiken, beantwoorden hem?
@@ -232,7 +249,7 @@ export function runScan(
       questionSetVersion: questionState.version,
       banks: questionState.banks,
       blindAttributes: questionState.blindAttributes,
-      scannedAt: options.scannedAt,
+      scannedAt,
     },
     sources: { catalog },
     productCount: products.length,

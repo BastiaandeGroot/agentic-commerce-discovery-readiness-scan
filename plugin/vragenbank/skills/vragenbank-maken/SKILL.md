@@ -111,9 +111,17 @@ mijn bank", niet "Martindale-waarde". De attribuutnaam volgt uit de vraag, nooit
 andersom.
 
 **Laat dekking het gewicht sturen, maar niet bepalen.** Dekking boven 70% van het
-panel rechtvaardigt `hoog`; dekking van 100% samen met de onomkeerbare fout
-rechtvaardigt `kritiek`. Maar een vraag met dekking 0 kan alsnog kritiek zijn als
-vakkennis zegt dat er een dure fout achter zit — leg dan uit waarom je afwijkt.
+panel rechtvaardigt `hoog`. Dekking maakt een vraag nooit `kritiek`.
+
+**Kritiek alleen bij vier keer ja.** (1) Beslissend: een fout antwoord maakt het
+product ongeschikt voor wat de koper ermee wil — tegenvallen telt niet. (2)
+Onherstelbaar: na levering niet terug te draaien. (3) Over het product: nooit een
+vraag over retour, levering, voorraad of een staal. (4) Uit de catalogus: het
+antwoord staat in een kenmerk; een berekening met maten van de koper (antwoordtype
+`afgeleid`, "hoeveel meter voor mijn raam") is nooit kritiek. "Waar is het van gemaakt" is
+niet beslissend; "is het geschikt voor mijn bank" wel. Zet per kritieke vraag één
+zin per criterium in `kritiek_toets`, ook bij een herweging. Bij twijfel: `hoog`.
+Zie `references/methode.md`, de kritiek-toets.
 
 **Een drempel hoort bij een toepassing, niet bij een segment.** "Sterk genoeg"
 heeft geen antwoord zonder te weten waarvoor. Zet de vraag één keer in de overlay

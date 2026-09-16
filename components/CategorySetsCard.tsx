@@ -118,8 +118,13 @@ export function CategorySetsCard({ s, locale, state, categories, onCategories, o
   useEffect(() => {
     if (startedSets.current) return;
     startedSets.current = true;
+    // Alleen wat nog open is. Een categorie waar de merchant al over besliste —
+    // ook "alleen de algemene vragen", die geen eigen set heeft — gaat niet
+    // opnieuw naar het model. Eerst ging dat wel: het voorstel overschreef zijn
+    // keuze niet, maar het scherm zei daarna "automatisch gekoppeld", en dan lijkt
+    // het alsof de app zijn keuze vergeten was.
     const openSets = state.sets.filter(
-      (set) => set.category !== undefined && set.overlayId === undefined,
+      (set) => set.category !== undefined && set.overlayId === undefined && !(set.category in categories),
     );
     void (async () => {
       // De render eerst laten aflopen; een fase omzetten in het lichaam van een
@@ -158,6 +163,8 @@ export function CategorySetsCard({ s, locale, state, categories, onCategories, o
           ) : null}
           {matchingSets ? (
             <p className="mt-1.5 text-xs text-muted">{s.mapping.setsMatching}</p>
+          ) : !setsBy && Object.keys(categories).length > 0 ? (
+            <p className="mt-1.5 text-xs text-muted">{s.mapping.setsRemembered}</p>
           ) : setsBy ? (
             <p className="mt-1.5 text-xs text-muted">
               {s.mapping.setsMatched}{' '}

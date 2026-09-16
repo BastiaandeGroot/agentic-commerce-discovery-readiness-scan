@@ -109,7 +109,15 @@ export function MappingStep({
   );
 
   const linked = rows.filter((row) => row.fields.length > 0).length;
-  const open = rows.filter((row) => row.fields.length === 0);
+  /**
+   * "Geen kolom" als bewuste keuze: een lege lijst in de koppeling. Die staat
+   * bewaard in het account, en hoort dus niet bij de volgende scan opnieuw naar
+   * het model — anders kwam er een voorstel overheen en was zijn keuze weg. Dat
+   * dit kenmerk niet in de catalogus staat ís dan de bevinding.
+   */
+  const noColumnChosen = (key: string, current: Mapping = mapping) =>
+    Array.isArray(current[key]) && current[key].length === 0;
+  const open = rows.filter((row) => row.fields.length === 0 && !noColumnChosen(row.key));
   const proposals = Object.keys(proposed).length;
 
   /**
@@ -175,7 +183,9 @@ export function MappingStep({
     setSource(from);
     onChange((current) => {
       const next = { ...current };
-      for (const [key, column] of Object.entries(marks)) next[key] = [column];
+      for (const [key, column] of Object.entries(marks)) {
+        if (!noColumnChosen(key, current)) next[key] = [column];
+      }
       return next;
     });
   }

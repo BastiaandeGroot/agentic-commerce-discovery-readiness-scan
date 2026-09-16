@@ -8,7 +8,7 @@
 // in de changelog en verhoogt de versie, want zonder dat is vergelijken over tijd
 // betekenisloos (S8).
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Dataset, Locale, Question, QuestionSetState } from '../src/domain/types';
 import { isScored } from '../src/questions/compose';
 import { FIELDS, requirementLabel } from '../src/spec/fields';
@@ -24,7 +24,12 @@ import { Badge, Button, Card, CardTitle } from './ui';
 interface Props {
   s: Strings;
   locale: Locale;
-  catalog: Dataset;
+  /**
+   * Zonder catalogus — een bewaarde analyse bijwerken — kan er geen vraag bij:
+   * een nieuwe vraag is nog nergens gemeten, en de kolommen om hem op te leggen
+   * zijn er niet.
+   */
+  catalog?: Dataset;
   state: QuestionSetState;
   onChange: (next: QuestionSetState) => void;
   /**
@@ -36,6 +41,20 @@ interface Props {
   reconfirm?: { categories: string[]; base: boolean };
   /** Waar het werk bewaard wordt, of dat bewaren mislukte. */
   saved?: 'account' | 'browser' | 'failed';
+  /**
+   * Vanuit het rapport: open de kaart van deze vraag en scrol ernaartoe. Een
+   * algemene vraag staat één keer, in de kaart met de algemene vragen.
+   */
+  focus?: { setId: string; questionId: string; base: boolean };
+  /** Wat de knop onderaan zegt; standaard door naar het koppelen. */
+  continueLabel?: string;
+  /** Pas door als alles bevestigd is. Uit bij een bewaarde analyse: daar is terug altijd goed. */
+  requireValidated?: boolean;
+}
+
+/** Het anker van een vraag op dit scherm; het rapport springt ernaartoe. */
+function anchorOf(setId: string, questionId: string, base: boolean): string {
+  return base ? `vraag-algemeen-${questionId}` : `vraag-${setId}-${questionId}`;
 }
 
 
@@ -53,7 +72,7 @@ const IMPORTANCE_TONE = {
 } as const;
 
 function QuestionRow({
-  s, locale, setId, question, onChange, state, shared, note,
+  s, locale, setId, question, onChange, state, shared, note, focused,
 }: {
   s: Strings; locale: Locale; setId: string; question: Question;
   state: QuestionSetState; onChange: (n: QuestionSetState) => void;
@@ -64,6 +83,8 @@ function QuestionRow({
   shared?: boolean;
   /** Waar deze vraag anders weegt; alleen bij de algemene vragen. */
   note?: string;
+  /** De vraag waar het rapport naartoe verwees. */
+  focused?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(question.label[locale]);
@@ -81,7 +102,10 @@ function QuestionRow({
   }
 
   return (
-    <li className={`flex flex-wrap items-start gap-3 border-t border-line py-2.5 ${question.disabled ? 'opacity-45' : ''}`}>
+    <li
+      id={anchorOf(setId, question.id, shared === true)}
+      className={`flex scroll-mt-24 flex-wrap items-start gap-3 border-t border-line py-2.5 ${question.disabled ? 'opacity-45' : ''} ${focused ? '-mx-2 rounded-md bg-surface-2 px-2' : ''}`}
+    >
       <div className="min-w-0 flex-1">
         {editing ? (
           <div className="flex flex-wrap gap-2">
@@ -233,24 +257,34 @@ function columnPattern(column: string): string {
 /** Sleutel voor de kaart met de algemene vragen; geen set-id, dus botst niet. */
 const BASE = '\u0000base';
 
-export function QuestionSetStep({ s, locale, catalog, state, onChange, onContinue, reconfirm, saved }: Props) {
-  const [openSet, setOpenSet] = useState<string | undefined>(BASE);
+export function QuestionSetStep({
+  s, locale, catalog, state, onChange, onContinue, reconfirm, saved, focus, continueLabel, requireValidated = true,
+}: Props) {
+  const [openSet, setOpenSet] = useState<string | undefined>(focus ? (focus.base ? BASE : focus.setId) : BASE);
+
+  // Naar de vraag waar het rapport vandaan kwam. Eén keer, bij binnenkomst: wie
+  // daarna verder scrolt of een andere kaart opent, wordt niet teruggetrokken.
+  useEffect(() => {
+    if (!focus) return;
+    document.getElementById(anchorOf(focus.setId, focus.questionId, focus.base))
+      ?.scrollIntoView({ block: 'center' });
+  }, [focus]);
   const [newLabel, setNewLabel] = useState('');
   const [newField, setNewField] = useState('');
 
   // Keuzelijst: de canonieke velden plus de eigen kolommen die we niet plaatsten.
   const fieldOptions = useMemo(() => {
     const canonical = FIELDS.map((f) => ({ value: f.key, label: f.label[locale] }));
-    const own = catalog.unmappedColumns.map((c) => ({ value: columnPattern(c), label: c }));
+    const own = (catalog?.unmappedColumns ?? []).map((c) => ({ value: columnPattern(c), label: c }));
     return [...canonical, ...own];
-  }, [catalog.unmappedColumns, locale]);
+  }, [catalog?.unmappedColumns, locale]);
 
   // Op dekking, hoog naar laag: wat de meeste webshops in de markt behandelen
   // staat bovenaan bij het nalopen.
   const base = useMemo(() => byCoverage(baseQuestions(state), (entry) => entry.question.coverage), [state]);
   const baseUncovered = base.filter((entry) => isUncovered(entry.question) && !entry.question.disabled).length;
   const baseUncoveredOff = base.filter((entry) => isUncovered(entry.question) && entry.question.disabled).length;
-  const ready = allValidated(state);
+  const ready = !requireValidated || allValidated(state);
 
   return (
     <div className="space-y-4">
@@ -388,6 +422,7 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onContinu
                   key={question.id}
                   s={s} locale={locale} setId={state.sets[0]?.id ?? ''} question={question}
                   state={state} onChange={onChange} shared
+                  focused={focus?.base === true && focus.questionId === question.id}
                   note={reweighted.length > 0
                     ? `${s.questions.reweighted}: ${reweighted
                       .map((r) => `${r.category} — ${s.questions.importance[r.importance]}`)
@@ -431,8 +466,14 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onContinu
               <div className="flex shrink-0 flex-wrap items-center gap-2">
                 {/* Een voorlopige bank hoort de merchant te zien, niet te raden:
                     zijn cijfer klopt met de gestelde vragen, maar of dít de
-                    vragen zijn is beredeneerd en niet onderzocht. */}
-                {set.bankStatus && set.bankStatus !== 'frozen' ? (
+                    vragen zijn is beredeneerd en niet onderzocht.
+                    "In review" valt weg zodra de merchant de set bevestigde:
+                    dan heeft hij hem nagelopen, en naast "Bevestigd" leest het
+                    als een tegenspraak. Een voorlopige bank blijft staan — die
+                    zegt iets over de bank, niet over zijn oordeel. */}
+                {set.bankStatus && set.bankStatus !== 'frozen'
+                  && !(set.bankStatus === 'in-review'
+                    && (hasOwnQuestions(set) ? set.validated : state.baseValidated)) ? (
                   <Badge tone="warn">{s.bank.status[set.bankStatus]}</Badge>
                 ) : null}
                 {/* Alleen de eigen vragen van deze categorie; de algemene vragen
@@ -485,11 +526,13 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onContinu
                         key={question.id}
                         s={s} locale={locale} setId={set.id} question={question}
                         state={state} onChange={onChange}
+                        focused={focus?.base === false && focus.setId === set.id && focus.questionId === question.id}
                       />
                     ))}
                   </ul>
                 )}
 
+                {catalog ? (
                 <div className="mt-4 flex flex-wrap items-end gap-2 rounded-lg bg-surface-2 p-3">
                   <label className="min-w-0 flex-1 text-xs text-muted">
                     {s.questions.newQuestionLabel}
@@ -522,6 +565,7 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onContinu
                     {s.questions.add}
                   </Button>
                 </div>
+                ) : null}
               </>
             ) : null}
           </Card>
@@ -538,8 +582,8 @@ export function QuestionSetStep({ s, locale, catalog, state, onChange, onContinu
           koppelscherm voor een scanknop die niet werkte en een bevestigknop die
           een scherm terug stond. */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={onContinue} disabled={!ready}>{s.questions.continueToMapping}</Button>
-        {ready ? (
+        <Button onClick={onContinue} disabled={!ready}>{continueLabel ?? s.questions.continueToMapping}</Button>
+        {ready && requireValidated ? (
           <span className="text-sm text-muted">{s.questions.continueNote}</span>
         ) : null}
       </div>

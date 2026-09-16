@@ -19,7 +19,8 @@ Scheidingsteken: puntkomma. Codering: UTF-8.
 |---|---|
 | `laag` | `base` voor vragen die voor elk product in de markt gelden, `overlay` voor vragen die alleen in één segment spelen, `standalone` voor een productgroep met een eigen leven (naaigaren naast stoffen). |
 | `categorie` | Het marktsegment waar een overlay bij hoort. Bij `base` mag hij leeg. |
-| `belang` | `kritiek`, `hoog`, `middel` of `laag`. `kritiek` betekent: deze vraag voorkomt de fout die de koper niet kan terugdraaien. Niet "commercieel belangrijk". |
+| `belang` | `kritiek`, `hoog`, `middel` of `laag`. `kritiek` alleen als alle vier gelden: een fout antwoord maakt het product ongeschikt, de koper kan het na levering niet terugdraaien, de vraag gaat over het product en niet over retour, levering of voorraad, en het antwoord staat in een kenmerk in plaats van in een berekening met maten van de koper. Niet "commercieel belangrijk". Een kritieke vraag over koopzekerheid, een procesvraag of een vraag met antwoordtype `afgeleid` leest de scan als `hoog`. |
+| `kritiek_toets` | Alleen bij `kritiek`: één zin per criterium, als `beslissend: … \| onherstelbaar: … \| product: … \| uit de catalogus: …`. Zonder deze kolom staat de vraag op het beoordeelscherm als "kritiek zonder toets". Bij een herweging naar kritiek komt de toets tussen haken achter het belang: `Gordijnstoffen: kritiek [beslissend: … \| onherstelbaar: … \| product: … \| uit de catalogus: …]`. |
 | `benodigde_attributen` | Komma-gescheiden kenmerknamen die nodig zijn om te antwoorden, bijvoorbeeld `rolbreedte_cm, rapport_hoogte_cm`. |
 | `modus` | `alle` als álle genoemde attributen nodig zijn (een som heeft al zijn termen), `een` als er één volstaat (bewijs stapelt). Laat je hem leeg, dan leidt de scan hem af uit de beslisregel. |
 | `dekking` | Op hoeveel panelsites dit onderwerp voorkomt. **Laat leeg als je het niet hebt onderzocht.** Nul betekent iets anders: niemand behandelt dit, en dat is een vondst. |

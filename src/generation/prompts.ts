@@ -18,7 +18,8 @@ import type { GroupingEntry, Phase, RunState, Topic } from './state';
 import { isStandaloneCategory, overlayCategories } from './state';
 
 /** Omhoog zodra een prompt de uitkomst op dezelfde markt kan verschuiven. */
-export const GENERATION_VERSION = '1.5.0';
+// 1.6.0 — kritiek volgt een toets van vier criteria, per vraag onderbouwd.
+export const GENERATION_VERSION = '1.6.0';
 
 /**
  * Wat een vraag moet bevatten, en in welke vorm.
@@ -32,8 +33,9 @@ export const GENERATION_VERSION = '1.5.0';
 const QUESTION_FIELDS = `- de vraag in het Nederlands én het Engels, allebei als klantvraag
 - intentie: geschiktheid, hoeveelheid, onderhoud, verwachting, materiaal,
   verwerking, duurzaamheid, veiligheid, koopzekerheid, comfort of functie
-- belang: kritiek, hoog, middel of laag — volgens de wegingsregel, met de
-  onomkeerbare fout hierboven als maat voor kritiek
+- belang: kritiek, hoog, middel of laag — volgens de wegingsregel. Kritiek
+  alleen als de kritiek-toets vier keer ja geeft, en dan vul je "criticalTest"
+  met per criterium één zin waarom. Bij twijfel: hoog.
 - dekking en dekking_bronnen, overgenomen uit het onderwerp waar hij op rust
 - bewijs: de canonieke attribuutnamen die nodig zijn om hem te beantwoorden.
   Eigen namen in snake_case (rolbreedte_cm, schuurweerstand_martindale), nooit
@@ -64,7 +66,8 @@ const questionShape = (id: string) => `{
     "rule": "naam_van_regel of weglaten", "ruleSource": "site of URL die de drempel publiceert, of weglaten",
     "answerType": "...",
     "answerable": "true|gedeeltelijk|false", "mode": "alle|een",
-    "note": "bron van de drempel, of waarom het belang afwijkt van de dekking"
+    "note": "bron van de drempel, of waarom het belang afwijkt van de dekking",
+    "criticalTest": {"decisive": "alleen bij kritiek: waarom een fout antwoord het product ongeschikt maakt", "irreversible": "waarom de koper het na levering niet kan terugdraaien", "product": "welke producteigenschap het is", "catalogue": "welk kenmerk het antwoord draagt, zonder maten van de koper"}
   }`;
 
 /**
@@ -103,11 +106,36 @@ Deze regels gelden altijd:
    wordt gebouwd vóórdat die catalogus opengaat, anders meet je alleen nog of
    er staat wat er staat.
 
-Weging: 'kritiek' betekent niet commercieel belangrijk maar: deze vraag voorkomt
-de fout die de koper niet kan terugdraaien. Dekking boven 70% van het panel
-rechtvaardigt 'hoog'. Volledige dekking samen met de onomkeerbare fout
-rechtvaardigt 'kritiek'. Een vraag met dekking 0 kan alsnog kritiek zijn als er
-een dure fout achter zit; leg dan uit waarom je afwijkt.
+Weging: 'kritiek' is de poort voor basisgeschikt en moet smal blijven. Het
+betekent niet commercieel belangrijk, en ook niet "het is vervelend als dit
+misgaat". In een markt waar op maat geknipt of verwerkt wordt is élke verkeerde
+keuze onomkeerbaar, dus die zin alleen onderscheidt niets. Een vraag is alleen
+kritiek als alle vier ja zijn:
+
+  1. Beslissend — maakt een fout antwoord het product ongeschikt voor wat de
+     koper ermee wil? Denk aan de verkeerde hoeveelheid, ongeschikt voor de
+     toepassing, niet toegestaan of onveilig. Tegenvallen telt niet: minder mooi,
+     sneller vuil, eerder verkleurd dan gehoopt is hoog.
+  2. Onherstelbaar — kan de koper het na levering niet meer terugdraaien, omdat
+     het geknipt, verwerkt of aangebracht is, of retour is uitgesloten?
+  3. Over het product — gaat de vraag over een eigenschap van het product? Een
+     vraag over beleid, levering of voorraad (retour, bijbestellen, een staal) is
+     nooit kritiek, hoe belangrijk ook.
+  4. Uit de catalogus — staat het antwoord in een kenmerk van het product zelf?
+     Een berekening die ook de maten of keuzes van de koper nodig heeft ("hoeveel
+     meter voor mijn raam", antwoordtype afgeleid) is nooit kritiek: een catalogus
+     die alles goed vastlegt, haalt hem nog steeds niet, en als poort verbergt hij
+     elke andere kritieke vraag. Zo'n vraag is hoog.
+
+Een vraag die alleen informatie geeft waaruit een ander antwoord volgt, is zelf
+niet beslissend: "waar is het van gemaakt" voedt "is het geschikt", en alleen die
+laatste kan kritiek zijn. Onderbouw elke kritieke vraag in "criticalTest" met
+één zin per criterium; zonder die vier zinnen wordt hij hoog. Bij twijfel: hoog.
+
+Dekking boven 70% van het panel rechtvaardigt 'hoog'. Dekking maakt een vraag
+nooit kritiek — de toets doet dat. Een vraag met dekking 0 kan kritiek zijn als
+de toets vier keer ja geeft; leg dan in "note" uit waarom je van de dekking
+afwijkt.
 
 Vragen die uit geen enkel attribuut te beantwoorden zijn — procesvragen ("kan ik
 een staal krijgen"), structuurvragen, levenscyclusvragen — horen in de bank omdat
@@ -375,7 +403,9 @@ Antwoord met dit JSON-object:
         maxTokens: 48000,
         prompt: `Markt: ${vertical}. Categorie: ${category}.
 
-Vorm van de markt — de onomkeerbare fout hierin is de maat voor "kritiek":
+Vorm van de markt. De onomkeerbare fout hieronder is het tweede criterium van de
+kritiek-toets, niet de hele toets: een vraag is alleen kritiek als hij ook
+beslissend is, over het product gaat en uit de catalogus te beantwoorden is.
 ${shapeBlock(state)}
 
 ${standalone
@@ -398,7 +428,8 @@ herhaal geen basisvragen.`}
 
 Twee dingen apart:
 - "reweight": basisvragen die in deze categorie ánders wegen, met de reden. Een
-  overlay mag herwegen maar nooit herschrijven — zou hij de tekst van een
+  herweging naar kritiek maakt daar een poort, dus dezelfde toets: vul
+  "criticalTest", anders wordt het hoog. Een overlay mag herwegen maar nooit herschrijven — zou hij de tekst van een
   basisvraag mogen veranderen, dan meten twee categorieën verschillende dingen
   onder hetzelfde id.
 - "questions": de vragen die alleen hier gelden. Ids in de vorm ${(category.slice(0, 3) || 'CAT').toUpperCase()}-01.
@@ -416,7 +447,7 @@ ${QUESTION_FIELDS}
 Antwoord met dit JSON-object:
 {
   "questions": [${questionShape(`${(category.slice(0, 3) || 'CAT').toUpperCase()}-01`)}],
-  "reweight": [{"id": "BAS-03", "importance": "kritiek", "reason": "..."}],
+  "reweight": [{"id": "BAS-03", "importance": "kritiek", "reason": "...", "criticalTest": {"decisive": "...", "irreversible": "...", "product": "...", "catalogue": "..."}}],
   "findings": ["..."]
 }`,
       };
