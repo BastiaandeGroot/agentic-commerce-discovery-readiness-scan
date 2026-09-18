@@ -400,7 +400,11 @@ merchant kenmerk noemde, wordt niet onderzocht.
    toepassingsprofiel: dezelfde vragen, andere drempels.
 
 Van de zestig knopen in de boom van De Groot — vijf op niveau 1, drieënvijftig
-op niveau 2, twee op niveau 3 — overleven er realistisch tien tot vijftien.
+op niveau 2, twee op niveau 3 — blijft na het scheiden van de kenmerken ongeveer
+de helft over: rond de vier hoofdcategorieën en vijfentwintig subcategorieën,
+dus een kleine dertig knopen. Bij vijf sites per knoop is dat ongeveer
+honderdvijftig onderzoeksbeurten. Dat is de orde van grootte waarop de rest van
+dit ontwerp gerekend is; ga er niet van uit dat het er tien zijn.
 
 ### Een panel per knoop
 
@@ -643,25 +647,24 @@ en niet via de plugin; stap 3 is daarmee vervangen door paragraaf 3a.
 ### De Cowork-route bouwen (paragraaf 3c)
 
 De app-route blijft staan; dit komt ernaast. Op volgorde, en elke stap is
-zelfstandig bruikbaar:
+zelfstandig bruikbaar. De knopenlijst zelf hoeft niet meer gebouwd te worden:
+`/dashboard/knopen` toont wat op `categorie` staat en kopieert het als één pad
+per regel.
 
 1. **Nagaan wat `importQuestionList` werkelijk tegenhoudt.** Haalt een handmatige
    upload dezelfde poorten als `/api/bank-result`? Zonder dat antwoord leunt de
    hele route op een aanname. Dit is een leestaak van een uur, geen bouwwerk.
-2. **De knopenlijst uit de app krijgen.** De merchant heeft zijn kenmerken al
-   gescheiden; die lijst — alleen categorieën, met aantallen — moet uit het
-   categoriescherm te kopiëren zijn. Eén knop.
-3. **De skill `vragenbank-maken` per knoop laten werken.** Nu werkt hij op
+2. **De skill `vragenbank-maken` per knoop laten werken.** Nu werkt hij op
    marktniveau met één panel van vijf. Erbij: panel per knoop, de basislaag als
    invoer bij elke knoopbeurt, en per knoop een tussenbestand zodat een
    afgebroken sessie niet opnieuw begint.
-4. **Eén markt end-to-end draaien** en de uitkomst naast woontextiel v2 leggen.
+3. **Eén markt end-to-end draaien** en de uitkomst naast woontextiel v2 leggen.
    Dat is de enige manier om te weten of onderzoek per knoop werkelijk betere
    categorievragen oplevert dan de `overlay`-fase uit een samenvatting.
-5. **Pas daarna de aanvulroute** uit 4c: matchen van nieuwe knopen tegen een
+4. **Pas daarna de aanvulroute** uit 4c: matchen van nieuwe knopen tegen een
    bestaande bank, en de mechanische toets aanvulling-of-herziening.
 
-Stap 4 is de beslissing. Valt hij tegen, dan is de app-route goedkoper én beter
+Stap 3 is de beslissing. Valt hij tegen, dan is de app-route goedkoper én beter
 en stopt dit hier.
 
 
