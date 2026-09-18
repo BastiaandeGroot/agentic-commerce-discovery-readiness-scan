@@ -703,6 +703,26 @@ Niet opnieuw voorstellen zonder dat er iets veranderd is.
 
 ## Open
 
+**De Cowork-route is vastgelegd, nog niet gebouwd** — 18 september. Het ontwerp
+staat in `ONTWERP-vragenbank-keten.md` 3c (onderzoek per categorieknoop, eigen
+panel per knoop), 4c (een tweede merchant in dezelfde markt vult de bestaande
+bank aan) en 5 (vastliggend: nooit een vragenset uit een kenmerkknoop). De
+opdracht is uit de app te halen: `/dashboard/knopen` toont per account de paden
+die op `categorie` staan en kopieert ze als één pad per regel. De boom van De
+Groot levert een kleine dertig knopen, dus rond de honderdvijftig
+onderzoeksbeurten.
+
+Volgende stap is stap 1 uit de bouwvolgorde in paragraaf 7: **nagaan of
+`importQuestionList` dezelfde poorten haalt als `/api/bank-result`** — de
+`kritiek_toets` en de overlay-regel. Een handmatige upload is de hele route;
+haalt hij die poorten niet, dan komt een bank binnen die de app van haar eigen
+pijplijn zou weigeren. Stap 3 (één markt end-to-end, naast woontextiel v2) is de
+beslissing: valt die tegen, dan is de app-route goedkoper én beter.
+
+Niet in een browser gezien: `/dashboard/knopen` en `/api/admin/category-nodes`
+staan in de routetabel en de build haalt het, maar de gevulde lijst vraagt een
+beheerderstoken en rijen in `category_verdicts`.
+
 **Woontextiel v4 gecorrigeerd; opnieuw scannen** — 16 september. Migratie 0013
 is gedraaid. v4 heeft 32 correcties in `importance_corrections`: de voorstellen
 naar hoog, plus de vragen die na de toets kritiek blijven expliciet bevestigd. De
