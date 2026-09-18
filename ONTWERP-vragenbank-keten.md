@@ -345,6 +345,99 @@ niet onder de overlay waar de bank hem bij zette. Open punt.
 
 ---
 
+## 3c. De route via Cowork: onderzoek per categorie
+
+Paragraaf 3a beschrijft de keten zoals hij sinds 9 september draait: de app zet
+één fase per beurt, en de bronoogst gaat **per panelsite** — vijf beurten die
+elk de hele markt moeten dekken. De categoriespecifieke vragen worden daarna
+geschreven in de `overlay`-fasen, uit de geconsolideerde oogst.
+
+Daar zit een zwakte in. Juist die categoriespecifieke vragen dragen de
+onomkeerbare fout — bij woontextiel vijf tot zeven kritieke vragen per categorie
+— en ze worden geschreven uit een samenvatting in plaats van uit bronnen. Eén
+oogstbeurt moet bovendien vijf takken tegelijk dekken binnen één antwoord.
+
+Het alternatief kantelt die matrix: **onderzoek per categorieknoop, elk met een
+eigen panel van vijf sites.** Wat hieronder staat is dat plan.
+
+### Waar het draait, en waarom dat uitmaakt
+
+In Cowork, met de plugin die er al staat (`plugin/vragenbank/`). Die levert één
+tweetalige CSV op, en `BankStep` leest die gewoon in — de dropzone accepteert
+`.csv,.tsv,.txt,.yaml,.yml,.json` en `importQuestionList` kiest op inhoud. Voor
+de handmatige weg hoeft er aan de app niets te veranderen.
+
+De reden is de prijs. Woontextiel v2 kostte rond de zeven dollar via de directe
+route. Onderzoek per knoop vermenigvuldigt het aantal web-beurten; op het
+abonnement kost dat niets extra's, op de API-rekening wel.
+
+### De harde regel: alleen categorieën
+
+**Van een kenmerkknoop wordt nooit een vragenset gemaakt.** Niet in de app, niet
+in Cowork, zonder uitzondering.
+
+Een categorieboom uit een webshop draagt drie soorten dingen door elkaar. Bij De
+Groot staat op niveau 2: `Eettafelbank` (een toepassing, eigen vragen),
+`Velours` (een materiaal) en `Vintage` (een collectie). De laatste twee zijn
+filters. Er onderzoek naar doen kost geld om te ontdekken dat het een kleur was,
+en er een vragenset van maken geeft het rapport een rij die een onderscheid
+suggereert dat er niet is.
+
+Wie dat onderscheid maakt is de merchant, in stap 'Categorieën'. Dat is het
+goedkoopste oordeel in de hele keten: één handeling van iemand die zijn eigen
+winkel kent, die tientallen onnodige onderzoeksbeurten voorkomt. De motor dwingt
+het al af — `deriveCategories` krijgt de kenmerkpaden mee en filtert ze eruit
+voordat er één vragenset bestaat. De Cowork-route krijgt dezelfde regel: wat de
+merchant kenmerk noemde, wordt niet onderzocht.
+
+### Twee poorten achter elkaar
+
+1. **De merchant levert de kandidaten.** Alleen zijn categorieknopen. Dat is
+   stap 'Categorieën'.
+2. **De markt bepaalt wie doorkomt.** Een kandidaat krijgt pas een eigen
+   vragenset als er minstens één eigen consumentenvraag op zijn panel voorkomt.
+   Die regel staat al in de methode. Haalt hij dat niet, dan wordt het een
+   toepassingsprofiel: dezelfde vragen, andere drempels.
+
+Van de zestig knopen in de boom van De Groot — vijf op niveau 1, drieënvijftig
+op niveau 2, twee op niveau 3 — overleven er realistisch tien tot vijftien.
+
+### Een panel per knoop
+
+Elke knoop die doorkomt krijgt **vijf sites die die subcategorie werkelijk
+voeren**. Niet het marktpanel opnieuw: een brede stoffenwinkel zonder
+lampenkappenafdeling levert voor lampenkapvragen een valse `0 van 5`.
+
+Dekking blijft daarmee leesbaar — binnen een knoop is de noemer vijf — op één
+voorwaarde: **het panel van die knoop staat in de bank, met datum en URL.**
+Anders is `dekking` niet reproduceerbaar, en dat is precies wat de methode
+verbiedt.
+
+Eén uitzondering: **de basislaag houdt het marktpanel.** Die vragen gelden over
+alle categorieën heen, dus hun noemer moet overal hetzelfde betekenen.
+
+### De basislaag gaat als invoer mee
+
+Elke knoopbeurt krijgt de basislaag mee met de opdracht: noem alleen wat híér
+bijkomt. Zonder dat vindt elke categorie zelfstandig "waar is het van gemaakt"
+opnieuw, onder een eigen id — en dan meten twee categorieën verschillende dingen
+onder dezelfde vraag. Dat is het verbod uit paragraaf 5, langs de achterdeur.
+
+### Wat deze route kost aan zekerheid
+
+De app vertrouwt de uitvoerder bewust niet op zijn woord: inlezen, poorten en
+degraderen gebeuren serverzijdig bij `/api/bank-result`. Een handmatige upload
+gaat door `importQuestionList`, en die controleert veel — maar of hij ook de
+nieuwere poorten haalt (`kritiek_toets`, de overlay-lat) is niet nagegaan. Dat
+moet uitgezocht zijn voordat deze route de echte weg wordt; anders glipt er
+handmatig iets binnen dat de pijplijn zou tegenhouden.
+
+Verder vervalt het hervatten per fase: valt een sessie om, dan is het aan de
+uitvoerder om te weten waar hij was. Dat is te ondervangen door per knoop een
+bestand weg te schrijven, maar het is geen eigenschap van de route zelf.
+
+---
+
 ## 4. Wat er aan de app bij moet
 
 ### Twee endpoints
@@ -430,6 +523,52 @@ bij het vergelijken dat de meetlat verschoven is. Die waarschuwing bestaat al.
 **Wie een herziening start:** wij, niet de merchant. Een merchant die zijn eigen
 bank mag herzien, herziet hem naar zijn eigen data toe.
 
+### Aanvullen is iets anders dan herzien
+
+Een bank groeit mee met elke merchant die in dezelfde markt binnenkomt. De
+tweede stoffenwinkel in woontextiel heeft categorieën die De Groot niet had —
+`Rolgordijnen` bijvoorbeeld — en die horen erbij te komen zonder dat er voor De
+Groot iets verandert.
+
+Dat kan, want **een overlay voor een categorie die een merchant niet heeft, is
+voor hem een lege wijziging.** Zijn producten hangen er niet onder, dus zijn
+vragen, zijn trechter en zijn rapport blijven identiek. De ceremonie hierboven —
+melding, vergelijkscherm, zelf beslissen — heeft dan niets te tonen.
+
+| | Wat er verandert | Wat de merchant merkt |
+|---|---|---|
+| **Aanvulling** | alleen nieuwe categoriesets erbij | niets; hij gaat stilzwijgend mee |
+| **Herziening** | basislaag, gewichten of drempels | de volle ceremonie hierboven |
+
+**De toets is mechanisch en per merchant.** "Aanvulling" mag niet op je woord:
+een nieuwe set verbreedt de match van de bank, en een pad dat eerst onder
+`Gordijnstoffen` viel kan ineens aan `Rolgordijnen` blijven hangen. Dan is het
+geen aanvulling meer. Dus: stel zijn sets opnieuw samen op de nieuwe versie en
+vergelijk de vraag-id's per set. Identiek → stilzwijgend mee. Eén verschil → de
+volle ceremonie. Dezelfde nieuwe versie kan voor de een een aanvulling zijn en
+voor de ander een herziening.
+
+### Hoe de tweede merchant binnenkomt
+
+1. Hij levert zijn catalogus en scheidt in stap 'Categorieën' zijn kenmerken van
+   zijn categorieën.
+2. De app legt zijn categorieknopen naast de sets die de bank al heeft. Die
+   machinerie bestaat: `/api/mapping` met `kind: 'categories'`.
+3. Wat matcht wordt hergebruikt — gratis en meteen.
+4. Wat niet matcht zijn de kandidaten voor een aanvullende run: per knoop een
+   eigen panel van vijf.
+5. Matcht er niets, dan zit hij waarschijnlijk niet in deze vertical en is het
+   een nieuwe bank.
+
+Drie nieuwe categorieën is vijftien onderzoeksbeurten in plaats van een
+volledige bouw.
+
+**De basislaag ligt vast na de eerste bouw.** Komt een merchant met een tak die
+de basisvragen niet dekken, dan wordt dat een categoriespecifieke vraag — ook
+als hij eigenlijk breder geldt. Een basisvraag erbij herscoort de hele markt, en
+dat hoort een bewuste herziening te zijn en niet iets wat er per merchant in
+sluipt.
+
 ## 5. Beslissingen die vastliggen
 
 **De bank hoort bij de markt, niet bij het account.** De aanvraag hoort bij een
@@ -446,6 +585,16 @@ meestuurt, krijgt hem gedegradeerd terug.
 
 **Er gaat geen productdata naar de uitvoerder.** Categorienamen met aantallen en
 een URL. Het type kan niet meer dragen en er staat een test op.
+
+**Een kenmerkknoop krijgt nooit een vragenset.** Alleen categorieën. Wie dat
+onderscheid maakt is de merchant, in stap 'Categorieën'; de motor dwingt het af
+in `deriveCategories`. Zou een kenmerk alsnog een set kunnen krijgen, dan is die
+stap betekenisloos en krijgt het rapport rijen die een onderscheid suggereren dat
+er niet is.
+
+**Een bank groeit aan, hij verandert niet.** Nieuwe categorieën erbij is een
+aanvulling en raakt niemand die ze niet heeft; de basislaag, gewichten en
+drempels aanpassen is een herziening met de ceremonie eromheen. Zie 4c.
 
 ---
 
@@ -490,6 +639,30 @@ een URL. Het type kan niet meer dragen en er staat een test op.
 
 Stap 1 tot en met 4 staan. De generatie loopt sinds 9 september in de app zelf
 en niet via de plugin; stap 3 is daarmee vervangen door paragraaf 3a.
+
+### De Cowork-route bouwen (paragraaf 3c)
+
+De app-route blijft staan; dit komt ernaast. Op volgorde, en elke stap is
+zelfstandig bruikbaar:
+
+1. **Nagaan wat `importQuestionList` werkelijk tegenhoudt.** Haalt een handmatige
+   upload dezelfde poorten als `/api/bank-result`? Zonder dat antwoord leunt de
+   hele route op een aanname. Dit is een leestaak van een uur, geen bouwwerk.
+2. **De knopenlijst uit de app krijgen.** De merchant heeft zijn kenmerken al
+   gescheiden; die lijst — alleen categorieën, met aantallen — moet uit het
+   categoriescherm te kopiëren zijn. Eén knop.
+3. **De skill `vragenbank-maken` per knoop laten werken.** Nu werkt hij op
+   marktniveau met één panel van vijf. Erbij: panel per knoop, de basislaag als
+   invoer bij elke knoopbeurt, en per knoop een tussenbestand zodat een
+   afgebroken sessie niet opnieuw begint.
+4. **Eén markt end-to-end draaien** en de uitkomst naast woontextiel v2 leggen.
+   Dat is de enige manier om te weten of onderzoek per knoop werkelijk betere
+   categorievragen oplevert dan de `overlay`-fase uit een samenvatting.
+5. **Pas daarna de aanvulroute** uit 4c: matchen van nieuwe knopen tegen een
+   bestaande bank, en de mechanische toets aanvulling-of-herziening.
+
+Stap 4 is de beslissing. Valt hij tegen, dan is de app-route goedkoper én beter
+en stopt dit hier.
 
 
 ---

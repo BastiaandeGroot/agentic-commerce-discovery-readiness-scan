@@ -8,7 +8,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { ChevronDown, History, Inbox, LayoutGrid, Library, ListChecks, Radar, Settings, ArrowLeft } from 'lucide-react';
+import { ChevronDown, History, Inbox, LayoutGrid, Library, ListChecks, Radar, Settings, ArrowLeft, ListTree } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { STRINGS } from '../../src/i18n/strings';
 import { authHeader } from '../../src/auth/client';
@@ -23,6 +23,7 @@ const LINKS = [
   // dit is navigatie en geen slot.
   { href: '/dashboard/aanvragen', key: 'requests', Icon: Inbox, admin: true },
   { href: '/dashboard/vragenbanken', key: 'banks', Icon: Library, admin: true },
+  { href: '/dashboard/knopen', key: 'nodes', Icon: ListTree, admin: true },
   { href: '/dashboard/winkelscan', key: 'shopScan', Icon: Radar, admin: true },
   { href: '/dashboard/instellingen', key: 'settings', Icon: Settings },
 ];

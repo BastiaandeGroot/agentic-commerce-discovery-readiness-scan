@@ -32,6 +32,7 @@ export const STRINGS = {
         requests: 'Aanvragen',
         shopScan: 'Winkel doormeten',
         banks: 'Vragenbanken',
+        nodes: 'Categorieknopen',
         settings: 'Instellingen',
       } as Record<string, string>,
       account: 'Account',
@@ -744,6 +745,21 @@ export const STRINGS = {
       allRecords: 'Alle',
     },
 
+    nodes: {
+      heading: 'Categorieknopen voor de vragenbank',
+      intro:
+        'Wat elke merchant op zijn categoriescherm als categorie heeft aangemerkt. Dit is de opdracht voor het onderzoek: per knoop wordt er een panel van vijf sites langsgegaan die díé subcategorie werkelijk voeren.',
+      rule:
+        'Alleen categorieën staan hier. Een pad dat de merchant een kenmerk noemde — een materiaal, een collectie, een kleur — krijgt nooit een vragenset en wordt dus ook niet onderzocht. Dat scheelt het meeste werk: van een boom van zestig knopen blijft ongeveer de helft over.',
+      nodeCount: 'categorieknopen',
+      copy: 'Kopieer de lijst',
+      copied: 'Gekopieerd',
+      emptyTitle: 'Nog geen categorieknopen',
+      emptyBody:
+        'Zodra een merchant zijn catalogus aanlevert en op het categoriescherm zijn kenmerken van zijn categorieën scheidt, staat zijn lijst hier.',
+      failedNext: 'Draait de migratie voor `category_verdicts` al? Zonder die tabel is er niets te tonen.',
+      retry: 'Opnieuw proberen',
+    },
     shopScan: {
       heading: 'Winkel doormeten',
       intro: 'Meet wat een AI-assistent van een webshop kan zien, zonder dat de eigenaar iets aanlevert. We halen een steekproef productpagina\u2019s op en leggen daar de vragen van zijn markt naast.',
@@ -1177,6 +1193,7 @@ export const STRINGS = {
         requests: 'Requests',
         shopScan: 'Measure a shop',
         banks: 'Question banks',
+        nodes: 'Category nodes',
         settings: 'Settings',
       } as Record<string, string>,
       account: 'Account',
@@ -1884,6 +1901,21 @@ export const STRINGS = {
       closeDetail: 'Hide details',
     },
 
+    nodes: {
+      heading: 'Category nodes for the question bank',
+      intro:
+        'What each merchant marked as a category on their category screen. This is the research brief: per node a panel of five sites that actually carry that subcategory.',
+      rule:
+        'Only categories appear here. A path the merchant called a characteristic — a material, a collection, a colour — never gets a question set and is therefore never researched. That saves most of the work: of a sixty-node tree, roughly half remains.',
+      nodeCount: 'category nodes',
+      copy: 'Copy the list',
+      copied: 'Copied',
+      emptyTitle: 'No category nodes yet',
+      emptyBody:
+        'As soon as a merchant supplies a catalogue and separates characteristics from categories on the category screen, their list appears here.',
+      failedNext: 'Has the migration for `category_verdicts` run? Without that table there is nothing to show.',
+      retry: 'Try again',
+    },
     shopScan: {
       heading: 'Measure a shop',
       intro: 'Measure what an AI assistant can see of a web shop, without the owner supplying anything. We fetch a sample of product pages and lay the questions of their market alongside.',
