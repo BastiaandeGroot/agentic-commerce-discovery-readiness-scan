@@ -69,7 +69,13 @@ function antwoord(phase: string): unknown {
   }
   if (phase.startsWith('harvest')) {
     return {
-      questions: [{ question: 'Is dit sterk genoeg voor mijn bank?', source: 'faq', url: 'https://een.nl/faq' }],
+      segments: [
+        { name: 'Meubelstoffen', url: 'https://een.nl/meubelstoffen' },
+        { name: 'Velours', parent: 'Meubelstoffen' },
+        { name: 'meubelstoffen' },
+        { name: '' },
+      ],
+      questions: [{ question: 'Is dit sterk genoeg voor mijn bank?', source: 'faq', url: 'https://een.nl/faq', segment: 'Meubelstoffen' }],
       attributes: [{ namedAs: 'slijtvastheid', meaning: 'schuurweerstand' }],
       rules: [{ name: 'martindale_bank', rule: '>= 30000 voor bankstof', url: 'https://een.nl/faq' }],
       notes: [],
@@ -165,6 +171,11 @@ test('de reeks loopt van panel tot tabel en stuurt zichzelf', async () => {
   assert.ok(state.csv, 'de reeks levert een tabel op');
   assert.equal(state.panel.length, 5);
   assert.equal(state.harvest.length, 5);
+  // De indeling van elke site gaat mee, ontdubbeld en zonder lege namen, en elke
+  // vraag weet onder welke categorie hij stond.
+  assert.deepEqual(state.harvest[0].segments.map((segment) => segment.name), ['Meubelstoffen', 'Velours']);
+  assert.equal(state.harvest[0].segments[1].parent, 'Meubelstoffen');
+  assert.equal(state.harvest[0].questions[0].segment, 'Meubelstoffen');
 });
 
 test('de tabel gaat door dezelfde lezer als de vragenlijst van een merchant', async () => {

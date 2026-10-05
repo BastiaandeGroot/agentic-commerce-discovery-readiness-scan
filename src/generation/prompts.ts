@@ -19,7 +19,9 @@ import { isStandaloneCategory, overlayCategories } from './state';
 
 /** Omhoog zodra een prompt de uitkomst op dezelfde markt kan verschuiven. */
 // 1.6.0 — kritiek volgt een toets van vier criteria, per vraag onderbouwd.
-export const GENERATION_VERSION = '1.6.0';
+// 1.7.0 — de oogst legt per site vast hoe zij de markt indeelt. Nog niets
+//         gebruikt het; de indeling uit het panel volgt in 2.0.0 (ontwerp 3d).
+export const GENERATION_VERSION = '1.7.0';
 
 /**
  * Wat een vraag moet bevatten, en in welke vorm.
@@ -194,6 +196,19 @@ const topicBlock = (topics: Topic[]) =>
     })
     .join('\n');
 
+/**
+ * De oogst zonder de indeling per site. De samenvoegstap weegt onderwerpen, en de
+ * menu's van vijf winkels zijn daar ruis; de fase die de indeling wél weegt
+ * krijgt ze apart.
+ */
+const withoutSegments = (site: RunState['harvest'][number]) => ({
+  site: site.site,
+  questions: site.questions,
+  attributes: site.attributes,
+  rules: site.rules,
+  notes: site.notes,
+});
+
 const groupingBlock = (grouping: GroupingEntry[]) =>
   grouping.map((entry) => `- ${entry.category} (${entry.count}): ${entry.kind}`).join('\n');
 
@@ -318,9 +333,20 @@ reproduceerbaar. Laadt de site niet of vind je een bron niet, zet dat dan in
 "notes" — een site die zwijgt is een bevinding en geen reden om iets aan te
 nemen.
 
+Leg daarnaast vast HOE DEZE SITE DE MARKT INDEELT: de categorieën en
+subcategorieën uit haar menu binnen deze markt, onder de naam die zij zelf
+gebruikt. Neem die namen letterlijk over, vertaal of verbeter ze niet: uit de
+indeling van alle panelsites samen volgt straks welke vragensets er bestaan en
+hoe ze heten. Alleen wat een productsoort of toepassing is; een filter op kleur,
+materiaal, merk of prijs is geen categorie. Zet bij elke vraag onder welke van
+die categorieën je hem vond, of laat "segment" leeg als hij voor de hele winkel
+geldt. Kun je het menu niet lezen, zet dat in "notes" en laat "segments" leeg —
+raad geen indeling.
+
 Antwoord met dit JSON-object:
 {
-  "questions": [{"question": "zoals een klant hem stelt", "source": "faq|categorietekst|blog|productpagina|review", "url": "https://..."}],
+  "segments": [{"name": "letterlijk zoals de site hem noemt", "parent": "de categorie erboven, als die er is", "url": "https://..."}],
+  "questions": [{"question": "zoals een klant hem stelt", "source": "faq|categorietekst|blog|productpagina|review", "url": "https://...", "segment": "onder welke categorie van deze site, of leeg"}],
   "attributes": [{"namedAs": "de naam op deze site", "meaning": "welk kenmerk dit is"}],
   "rules": [{"name": "korte naam", "rule": "de regel inclusief getallen", "url": "https://..."}],
   "notes": ["wat er niet lukte of opviel"]
@@ -337,7 +363,7 @@ Antwoord met dit JSON-object:
 
 Dit is de ruwe oogst per site:
 
-${JSON.stringify(state.harvest, null, 1)}
+${JSON.stringify(state.harvest.map(withoutSegments), null, 1)}
 
 Voeg samen tot één lijst onderwerpen.
 

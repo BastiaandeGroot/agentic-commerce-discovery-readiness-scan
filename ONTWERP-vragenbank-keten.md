@@ -482,6 +482,112 @@ bestand weg te schrijven, maar het is geen eigenschap van de route zelf.
 
 ---
 
+## 3d. De indeling komt uit het panel
+
+Besloten op 5 oktober 2026. Tot nu toe kwamen de vrágen van het panel en de
+indeling van de aanvrager: de panelfase kreeg de categorieën van de merchant en
+besloot per naam of het een overlay, een profiel, een facet of losstaand was.
+Woontextiel v4 heet daardoor tot op de spelfout "Onderhoudsprodukten" zoals de
+boom van De Groot. Dat is de regel "een bank hoort bij een vertical, niet bij een
+merchant" voor de helft: een tweede winkel die "Tafelzeil" zegt, landt nergens.
+
+Vanaf hier bepaalt het panel ook het skelet: **welke vragensets er bestaan en hoe
+ze heten volgt uit hoe de vijf sites de markt indelen.** De boom van de aanvrager
+is één van die vijf, en wordt daarna op het skelet gelegd — op precies dezelfde
+manier als de boom van elke winkel die later komt.
+
+### Wat er per fase verandert
+
+| Fase | Nu | Straks |
+|---|---|---|
+| `panel` | panel, vorm van de markt, én de categorieën van de merchant indelen | panel en vorm van de markt. De categorieën gaan nog mee als afbakening van de markt, niet om in te delen |
+| `harvest` (per site) | vragen, kenmerknamen, beslisregels | daarbij: hoe déze site de markt indeelt (haar categorieën, zoals zij ze noemt), en bij elke vraag onder welke categorie hij gevonden is |
+| `consolidate` | onderwerpen met dekking | ongewijzigd |
+| **`structure`** (nieuw) | — | de marktsegmenten: uit vijf indelingen één skelet, met per segment de namen die de sites gebruiken, op hoeveel sites het voorkomt, en het oordeel overlay / profiel / facet / losstaand |
+| `base` | ongewijzigd | ongewijzigd |
+| `overlay` (per categorie) | per categorie van de merchant | per marktsegment |
+| `facets` | herindeling van de categorieën van de merchant | de eigenschappen die sites als categorie voeren |
+| `assemble` | `categorie` is de naam van de merchant | `categorie` is de marktnaam; `geldt_voor` draagt de namen die de sites gebruikten |
+
+`geldt_voor` bestaat al in de lezer (`appliesTo` in `src/questions/list.ts`) en
+bouwt het patroon waarmee een vragenset op een categorie landt. De aliassen
+hoeven dus niet verzonnen te worden: het zijn de namen die het panel werkelijk
+gebruikt, met de site erbij. Herkomst staat bij elk getal, en nu ook bij elke naam.
+
+### Wanneer een segment bestaat
+
+Twee poorten, allebei na te rekenen:
+
+1. **Het segment staat op minstens twee panelsites als categorie.** Eén site is
+   de menukeuze van één winkel; twee is een indeling van de markt. Het getal
+   staat in de bank, net als dekking.
+2. **Er is minstens één eigen consumentenvraag die een panelsite behandelt.** Dat
+   is de bestaande lat voor een overlay en die blijft. Haalt een segment de
+   eerste poort en niet de tweede, dan is het een toepassingsprofiel.
+
+Een segment dat alleen de aanvrager voert, haalt de eerste poort niet. Het wordt
+een bevinding op het beoordeelscherm, en zijn categorie valt onder haar
+bovenliggende segment of houdt de algemene vragen. Dat kost hem een rij, en het is
+de bedoeling: anders meet de bank weer de boom van één winkel. De beheerder kan
+het op het beoordeelscherm terugzetten, zoals hij nu de indeling vaststelt.
+
+De naam van een segment is **de naam die de meeste panelsites gebruiken**; bij
+gelijke stand de kortste. Geen eigen vinding van het model.
+
+### Wat er met de boom van de merchant gebeurt
+
+Die wordt op het skelet gelegd, in de volgorde die er al is: op naam of alias
+(deterministisch), dan een voorstel van het model (`CategorySetsCard`, alleen voor
+sets die nog nergens geland zijn), dan de keuze van de merchant. Of een pad een
+categorie of een kenmerk is, blijft zijn oordeel in stap 'Categorieën'.
+
+`grouping` in de bank gaat daarmee over marktsegmenten en niet meer over de
+categorieën van de aanvrager. Het beoordeelscherm toont dan per segment de namen
+per site en het aantal sites, in plaats van de lijst van één winkel.
+
+### Wat het kost en raakt
+
+- **Een nieuwe bankversie met nieuwe vraag-id's.** Wie op de oude versie werkte,
+  bevestigt opnieuw. Nu is dat één merchant; dit is het goedkoopste moment.
+- **Eén fase erbij en een iets grotere oogst**: naar schatting een dollar bovenop
+  de zeven die een markt kost.
+- **`GENERATION_VERSION` naar 2.0.0.** De vorm van een run verandert.
+- **De privacybelofte wordt smaller, niet breder**: de categorieën van de
+  merchant gaan nog mee, maar bepalen niets meer.
+- **De Cowork-route (3c) schuift mee**: "onderzoek per categorieknoop van de
+  merchant" wordt "onderzoek per marktsegment". Het panel per knoop blijft.
+- **4c wordt eenvoudiger**: een tweede merchant landt meestal op naam of alias.
+  Brengt hij een segment mee dat het panel niet kende, dan blijft dat een
+  herziening.
+
+### Wat ik niet weet
+
+- **Leest een oogstbeurt de indeling van een site betrouwbaar?** Menu's zitten
+  vaak achter script. `src/collect/` haalt al adressen uit sitemaps zonder model;
+  dat is de terugval als de oogst het niet haalt. Eerst meten.
+- **Delen vijf sites genoeg indeling?** Als elke site de markt anders knipt,
+  haalt weinig de eerste poort en wordt de bank één grote basislaag. Dat is dan
+  de bevinding, maar het zou het rapport armer maken dan v4.
+
+Daarom is stap 4 hieronder de beslissing, zoals bij de Cowork-route.
+
+### Volgorde van bouwen
+
+1. **De oogst legt de indeling van elke site vast**, en bij elke vraag de
+   categorie waaronder hij stond. Voegt alleen toe; er verandert niets aan wat
+   eruit komt.
+2. **De fase `structure`**, en de overlayfasen lopen over marktsegmenten. De
+   panelfase deelt niet meer in. Met vaste antwoorden na te spelen in een test.
+3. **De tabel**: marktnaam in `categorie`, de namen van de sites in `geldt_voor`,
+   het aantal sites per segment erbij. Headless nagaan dat de boom van De Groot
+   erop landt.
+4. **Woontextiel opnieuw genereren en naast v4 leggen.** Landen de categorieën van
+   De Groot? Zijn de categorievragen beter of slechter? Valt het tegen, dan stopt
+   dit hier en is de kolom met synoniemen per vragenset de kleinere uitweg.
+5. **Het beoordeelscherm** toont segmenten met hun sites.
+
+---
+
 ## 4. Wat er aan de app bij moet
 
 ### Twee endpoints

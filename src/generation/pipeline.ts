@@ -301,14 +301,32 @@ function completeGrouping(grouping: GroupingEntry[], state: RunState): { groupin
 
 function readHarvest(raw: unknown, site: string): SiteHarvest {
   const source = asObject(raw);
+  // Ontdubbeld op naam: een site die een categorie in twee menu's zet, voert er
+  // nog steeds één.
+  const seen = new Set<string>();
+  const segments = asArray(source.segments).map((one) => {
+    const entry = asObject(one);
+    return {
+      name: asString(entry.name),
+      parent: asString(entry.parent) || undefined,
+      url: asString(entry.url) || undefined,
+    };
+  }).filter((one) => {
+    const key = one.name.toLowerCase();
+    if (one.name === '' || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   return {
     site,
+    segments,
     questions: asArray(source.questions).map((one) => {
       const entry = asObject(one);
       return {
         question: asString(entry.question),
         source: asString(entry.source),
         url: asString(entry.url) || undefined,
+        segment: asString(entry.segment) || undefined,
       };
     }).filter((one) => one.question !== ''),
     attributes: asArray(source.attributes).map((one) => {

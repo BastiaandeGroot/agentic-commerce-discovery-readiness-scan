@@ -139,10 +139,27 @@ export interface GroupingEntry {
   distinct?: string[];
 }
 
+/** Eén categorie zoals een panelsite haar voert. */
+export interface SiteSegment {
+  /** Letterlijk zoals de site hem noemt; dit wordt een alias van de vragenset. */
+  name: string;
+  /** De categorie erboven op deze site, als die er is. */
+  parent?: string;
+  url?: string;
+}
+
 /** De ruwe oogst van één site. Fase 2 van de methode. */
 export interface SiteHarvest {
   site: string;
-  questions: { question: string; source: string; url?: string }[];
+  /**
+   * Hoe deze site de markt indeelt: haar categorieën, onder de naam die zij
+   * gebruikt. Hieruit volgt welke vragensets er bestaan en hoe ze heten; zie
+   * paragraaf 3d van het ontwerp. Leeg bij een oogst van vóór versie 2.0.0, of
+   * als de site haar indeling niet prijsgaf — dat laatste staat dan in `notes`.
+   */
+  segments: SiteSegment[];
+  /** `segment`: onder welke categorie van deze site de vraag gevonden is. */
+  questions: { question: string; source: string; url?: string; segment?: string }[];
   attributes: { namedAs: string; meaning: string }[];
   rules: { name: string; rule: string; url?: string }[];
   /** Wat er niet lukte — een site die niet laadt is een bevinding, geen stilte. */

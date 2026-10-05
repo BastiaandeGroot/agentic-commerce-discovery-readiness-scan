@@ -988,6 +988,16 @@ bij een vertical, niet bij een merchant": dat geldt nu voor de vragen, niet voor
 het skelet. Zie ook "Subcategorieën landen alleen op de volle naam" hieronder en
 paragraaf 4c van het ontwerp (een tweede merchant vult de bank aan).
 
+**Besloten: de indeling komt uit het panel** — 5 oktober. Het ontwerp staat in
+`ONTWERP-vragenbank-keten.md` 3d, met de bouwvolgorde. Twee aannames daarin zijn
+nog niet door Bastiaan bevestigd en bepalen stap 2: een segment bestaat pas als
+minstens **twee** panelsites het als categorie voeren, en een segment dat alleen
+de aanvrager voert wordt een bevinding en geen vragenset. Stap 1 staat: de oogst
+legt per site haar indeling vast (`SiteHarvest.segments`) en bij elke vraag de
+categorie waaronder hij stond (`GENERATION_VERSION` 1.7.0). Nog niets gebruikt
+het. Volgende: de fase `structure`. De methode in `kennis/_methode/` en de kopie in
+de plugin gaan mee zodra de reeks werkelijk verandert, in stap 2.
+
 **Eén kolom, meerdere kenmerken, en andersom** — een koppeling wijst nu naar
 één kolom. `washing_label` draagt zowel maximale wastemperatuur als bleekbaar, en
 de drie Oekotex-kenmerken van v4 zijn in een catalogus meestal één kolom.
