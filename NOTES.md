@@ -989,14 +989,42 @@ het skelet. Zie ook "Subcategorieën landen alleen op de volle naam" hieronder e
 paragraaf 4c van het ontwerp (een tweede merchant vult de bank aan).
 
 **Besloten: de indeling komt uit het panel** — 5 oktober. Het ontwerp staat in
-`ONTWERP-vragenbank-keten.md` 3d, met de bouwvolgorde. Twee aannames daarin zijn
-nog niet door Bastiaan bevestigd en bepalen stap 2: een segment bestaat pas als
-minstens **twee** panelsites het als categorie voeren, en een segment dat alleen
-de aanvrager voert wordt een bevinding en geen vragenset. Stap 1 staat: de oogst
-legt per site haar indeling vast (`SiteHarvest.segments`) en bij elke vraag de
-categorie waaronder hij stond (`GENERATION_VERSION` 1.7.0). Nog niets gebruikt
-het. Volgende: de fase `structure`. De methode in `kennis/_methode/` en de kopie in
-de plugin gaan mee zodra de reeks werkelijk verandert, in stap 2.
+`ONTWERP-vragenbank-keten.md` 3d. Bastiaan bevestigde de twee regels: een segment
+bestaat pas als minstens twee panelsites het als categorie voeren
+(`SEGMENT_SITES`), en wat alleen één site voert — ook de aanvrager — wordt een
+bevinding en geen vragenset.
+
+Stap 1 tot en met 3 staan (`GENERATION_VERSION` 2.0.0):
+
+- de oogst legt per site haar indeling vast (`SiteHarvest.segments`) en bij elke
+  vraag de categorie waaronder hij stond;
+- de panelfase deelt de categorieën van de aanvrager niet meer in; ze gaan nog
+  mee als afbakening van de markt;
+- de nieuwe fase `structure` legt de vijf indelingen op elkaar. Het model beslist
+  wat bij elkaar hoort; de app telt zelf op hoeveel sites een segment staat (een
+  alias telt alleen als die site die categorie werkelijk voert), kiest de naam die
+  de meeste sites gebruiken, en zet een segment van één site terug naar profiel;
+- de categoriefasen lopen over marktsegmenten en krijgen de vragen die panelsites
+  ónder dat segment behandelen letterlijk mee — tot nu toe schreven ze uit de
+  samenvatting van de hele markt, de zwakte uit ontwerp 3c;
+- de tabel draagt `geldt_voor` met de namen van de sites; de lezer kende die
+  kolom al en maakt er het patroon van waarmee een vragenset landt.
+
+Met vaste antwoorden nagespeeld in `tests/generation.test.ts`. **Niet op een
+echte markt gedraaid**: of een oogstbeurt een menu betrouwbaar leest en of vijf
+sites genoeg indeling delen, weet niemand tot stap 4.
+
+`scripts/generate-local.ts` stuurt dezelfde reeks met de hand aan: één stap
+vragen, één antwoord uit een bestand geven, toestand na elke stap op schijf. Zo
+kan een Claude-sessie op een abonnement het werk van het model doen zonder
+API-kosten, met dezelfde opdrachten en dezelfde poorten als de app. De uitkomst is
+een CSV plus bijlagen; in de database komt hij pas via `/api/bank-result`.
+
+Nog te doen: stap 4 (woontextiel opnieuw genereren en naast v4 leggen — het
+beslismoment), stap 5 (het beoordeelscherm toont nog `count` per categorie en
+weet niets van sites en aliassen), en de promptreeks voor Cowork in
+`kennis/_methode/prompt-vragenbank-genereren.md` plus haar kopie in de plugin: die
+beschrijft nog de oude indeling. De methode zelf is bijgewerkt.
 
 **Eén kolom, meerdere kenmerken, en andersom** — een koppeling wijst nu naar
 één kolom. `washing_label` draagt zowel maximale wastemperatuur als bleekbaar, en

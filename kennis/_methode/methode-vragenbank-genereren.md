@@ -148,6 +148,18 @@ Vuistregel: bij stoffen was een derde van de vragen categorieoverstijgend. Verwa
 
 Een overlay mag een basisvraag **herwegen** of uitschakelen, maar niet herschrijven. Anders lopen dezelfde vragen uit de pas.
 
+### De indeling komt uit het panel, niet van één winkel
+
+Welke vragensets er bestaan en hoe ze heten, volgt uit hoe de panelsites de markt indelen. Niet uit de categorieboom van de winkel die de bank aanvroeg: dan draagt de bank zijn menu, tot op zijn spelfouten, en landt een tweede winkel in dezelfde markt nergens.
+
+Leg daarom bij de bronoogst per site vast hoe zij de markt indeelt — haar categorieën, onder haar eigen namen — en bij elke vraag onder welke categorie hij stond. Leg daarna de vijf indelingen op elkaar tot marktsegmenten. Drie regels, alle drie na te rekenen:
+
+- **Een segment bestaat pas als minstens twee panelsites het als categorie voeren.** Eén site is de menukeuze van één winkel. Het aantal sites staat bij het segment, zoals dekking bij een vraag. Wat maar één site voert, krijgt geen eigen vragenset; het is een bevinding voor de review.
+- **Het segment heet zoals de meeste sites het noemen.** Geen eigen vinding. De andere namen reizen mee als alias (`geldt_voor`), met de site erbij, zodat de vragenset ook landt bij een winkel die het anders noemt.
+- **Tellen doet de methode, niet de schrijver.** Een naam telt alleen als die site die categorie werkelijk voert.
+
+De boom van een merchant wordt daarna op dit skelet gelegd: op naam of alias, dan op voorstel, dan door zijn eigen keuze. Dat gaat voor de aanvrager precies zo als voor elke winkel die later komt.
+
 ### Een eigen vragenset vraagt een vraag die de markt stelt
 
 Een categorie krijgt alleen een eigen vragenset als minstens één eigen consumentenvraag op een panelsite voorkomt: dekking groter dan nul. Kun je die niet vinden, dan stelt de markt in deze categorie geen andere vragen dan elders, en is het een toepassingsprofiel. Een subcategorie die de toets niet haalt, wordt onder haar categorie gemeten; een hoofdcategorie houdt alleen de basislaag.
@@ -162,7 +174,7 @@ Markeer zo'n categorie als **losstaand**: een eigen vragenset, zonder de basisla
 
 In de vragenlijst is dat `laag: standalone`. Voor een bank die er al ligt kan de beheerder een categorie op het beoordeelscherm losstaand maken, zonder opnieuw te genereren.
 
-Neem categorienamen over zoals de markt ze schrijft en niet zoals één winkel ze spelt: een bank hoort bij de markt. Een label is op het beoordeelscherm te corrigeren; de categorie van de merchant blijft er dan gewoon op aansluiten.
+Een label is op het beoordeelscherm te corrigeren; de categorie van de merchant blijft er dan gewoon op aansluiten.
 
 ### Subcategorieën worden profielen, geen eigen bank
 

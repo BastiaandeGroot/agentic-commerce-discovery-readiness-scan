@@ -244,20 +244,6 @@ function readGrouping(raw: unknown, state: RunState): GroupingEntry[] {
 }
 
 /**
- * De indeling zoals het model hem gaf, zonder eis op het aantal genoemde vragen.
- *
- * Tot 15 september moest een categorie hier drie vragen noemen die nergens
- * anders gesteld worden, anders werd ze een profiel. Die eis is vervangen door
- * een die na te rekenen is: een categorie krijgt een eigen vragenset als
- * minstens één eigen vraag op een panelsite voorkomt (dekking > 0). Dat is pas
- * te zien als de vragen geschreven zijn, dus de controle staat bij de
- * categoriefase (`uncoveredFinding`) en in de app (`withCoveredOverlays`).
- */
-function applyOverlayBar(grouping: GroupingEntry[]): { grouping: GroupingEntry[]; findings: string[] } {
-  return { grouping, findings: [] };
-}
-
-/**
  * Een bevinding als geen enkele eigen vraag van deze categorie op een panelsite
  * voorkomt. De vragen blijven in de bank staan; de app geeft zo'n categorie geen
  * eigen vragenset, en dat hoort de beheerder te weten vóór het vrijgeven.
@@ -268,33 +254,139 @@ function uncoveredFinding(category: string, questions: { coverage: number | null
     + 'daardoor geen eigen vragenset: een subcategorie wordt onder haar categorie gemeten, een hoofdcategorie krijgt alleen de algemene vragen.';
 }
 
+/** Vanaf hoeveel panelsites een segment van de markt is, en niet van één winkel. */
+export const SEGMENT_SITES = 2;
+
 /**
- * Categorieën die de groepering niet noemt.
+ * De naam van een segment: die de meeste panelsites gebruiken.
  *
- * Stilzwijgend weglaten zou de ergste fout van de hele keten zijn: een categorie
- * die nergens landt, verdwijnt uit het rapport zonder dat iemand het ziet. Ze
- * worden daarom facet — het onschuldigste vak, want een facet krijgt geen eigen
- * vragenset — en het staat als bevinding op het scherm waar de beheerder hem
- * kan terugzetten.
+ * Geen vinding van het model. Bij gelijke stand de kortste, en daarna op alfabet,
+ * zodat dezelfde oogst altijd dezelfde naam geeft.
  */
-function completeGrouping(grouping: GroupingEntry[], state: RunState): { grouping: GroupingEntry[]; findings: string[] } {
-  const named = new Set(grouping.map((entry) => entry.category));
-  const missing = state.brief.segments.filter((segment) => !named.has(segment.name));
-  if (missing.length === 0) return { grouping, findings: [] };
+function segmentName(aliases: { name: string }[]): string | undefined {
+  const tally = new Map<string, { name: string; count: number }>();
+  for (const alias of aliases) {
+    const key = alias.name.toLowerCase();
+    const seen = tally.get(key);
+    if (seen) seen.count += 1;
+    else tally.set(key, { name: alias.name, count: 1 });
+  }
+  return [...tally.values()]
+    .sort((a, b) => b.count - a.count || a.name.length - b.name.length || a.name.localeCompare(b.name))[0]?.name;
+}
+
+/**
+ * De marktsegmenten zoals het model ze uit de vijf indelingen haalde, door de
+ * poorten van de app.
+ *
+ * Het model legt categorieën van verschillende sites op elkaar; dat is een
+ * oordeel en dat mag het hebben. Wat het níet mag is tellen. Een alias telt
+ * alleen als die site die categorie werkelijk voert — het staat in haar oogst —
+ * en elke categorie van een site hoort bij hoogstens één segment. Het aantal
+ * sites volgt daaruit, en daarmee de poort: een segment dat minder dan
+ * `SEGMENT_SITES` sites voeren is de menukeuze van één winkel en krijgt geen
+ * eigen vragenset.
+ */
+function readStructure(raw: unknown, state: RunState): { grouping: GroupingEntry[]; findings: string[] } {
+  const carried = new Map<string, { site: string; names: Map<string, string> }>();
+  for (const harvest of state.harvest) {
+    carried.set(harvest.site.toLowerCase(), {
+      site: harvest.site,
+      names: new Map((harvest.segments ?? []).map((segment) => [segment.name.toLowerCase(), segment.name])),
+    });
+  }
+
+  const claimed = new Set<string>();
+  const invented: string[] = [];
+  const read = asArray(raw)
+    .map((one) => {
+      const source = asObject(one);
+      const working = asString(source.category);
+      const kind = asString(source.kind).toLowerCase();
+      if (working === '' || !KINDS.has(kind)) return null;
+      const aliases: { site: string; name: string }[] = [];
+      for (const item of asArray(source.aliases)) {
+        const alias = asObject(item);
+        const site = carried.get(asString(alias.site).toLowerCase());
+        const name = site?.names.get(asString(alias.name).toLowerCase());
+        const key = `${site?.site.toLowerCase()}|${name?.toLowerCase()}`;
+        if (!site || !name || claimed.has(key)) continue;
+        claimed.add(key);
+        aliases.push({ site: site.site, name });
+      }
+      return {
+        working,
+        kind: kind as GroupingEntry['kind'],
+        parent: asString(source.parent) || undefined,
+        reason: asString(source.reason),
+        distinct: asStrings(source.distinct).slice(0, 5),
+        aliases,
+      };
+    })
+    .filter((one): one is NonNullable<typeof one> => one !== null)
+    // Een segment dat op geen enkele site terug te vinden is, komt niet uit het
+    // panel. Het wordt genoemd en niet meegenomen.
+    .filter((one) => {
+      if (one.aliases.length > 0) return true;
+      invented.push(one.working);
+      return false;
+    });
+
+  // De namen: wat de meeste sites zeggen, en elke naam maar één keer.
+  const taken = new Set<string>();
+  const named = read.map((one) => {
+    const preferred = segmentName(one.aliases) ?? one.working;
+    const name = taken.has(preferred.toLowerCase()) ? one.working : preferred;
+    taken.add(name.toLowerCase());
+    return { ...one, name };
+  });
+  const finalName = new Map(named.map((one) => [one.working.toLowerCase(), one.name]));
+
+  const single: string[] = [];
+  const grouping = named.map((one): GroupingEntry => {
+    const sites = [...new Set(one.aliases.map((alias) => alias.site))];
+    const ownSet = one.kind === 'overlay' || one.kind === 'losstaand';
+    const tooFew = ownSet && sites.length < SEGMENT_SITES;
+    if (tooFew) single.push(`${one.name} (${sites.join(', ')})`);
+    const kind = tooFew ? 'profiel' : one.kind;
+    return {
+      category: one.name,
+      count: 0,
+      kind,
+      parent: kind === 'profiel' && one.parent ? finalName.get(one.parent.toLowerCase()) : undefined,
+      reason: tooFew
+        ? `${one.reason} Alleen ${sites.join(', ')} voert dit als categorie; daarom geen eigen vragenset.`.trim()
+        : one.reason,
+      distinct: kind === 'overlay' ? one.distinct : undefined,
+      aliases: one.aliases,
+      sites,
+    };
+  });
+
+  const unplaced = [...carried.values()].flatMap((site) =>
+    [...site.names.entries()]
+      .filter(([key]) => !claimed.has(`${site.site.toLowerCase()}|${key}`))
+      .map(([, name]) => `${name} (${site.site})`));
+  const silent = state.harvest.filter((harvest) => (harvest.segments ?? []).length === 0).map((harvest) => harvest.site);
 
   return {
-    grouping: [
-      ...grouping,
-      ...missing.map((segment) => ({
-        category: segment.name,
-        count: segment.count,
-        kind: 'facet' as const,
-        reason: 'De generatie noemde deze categorie niet; hij staat als facet tot iemand hem indeelt.',
-      })),
-    ],
+    grouping,
     findings: [
-      `${missing.length} categorie${missing.length === 1 ? '' : 'ën'} kwam${missing.length === 1 ? '' : 'en'} niet terug in de groepering `
-      + `(${missing.slice(0, 5).map((segment) => segment.name).join(', ')}). Ze staan nu als facet.`,
+      ...(single.length > 0
+        ? [`${single.length} segment${single.length === 1 ? ' wordt' : 'en worden'} maar door één panelsite als categorie gevoerd en ${single.length === 1 ? 'krijgt' : 'krijgen'} daarom geen eigen vragenset: ${single.slice(0, 12).join('; ')}. Dat is de menukeuze van één winkel; zet het hier terug als het wél een segment van de markt is.`]
+        : []),
+      ...(invented.length > 0
+        ? [`${invented.length} segment${invented.length === 1 ? '' : 'en'} uit het antwoord ${invented.length === 1 ? 'is' : 'zijn'} op geen enkele panelsite terug te vinden en ${invented.length === 1 ? 'is' : 'zijn'} niet meegenomen: ${invented.slice(0, 8).join(', ')}.`]
+        : []),
+      ...(unplaced.length > 0
+        ? [`${unplaced.length} categorie${unplaced.length === 1 ? '' : 'ën'} van panelsites ${unplaced.length === 1 ? 'is' : 'zijn'} in geen segment ondergebracht: ${unplaced.slice(0, 12).join('; ')}${unplaced.length > 12 ? ' en meer' : ''}.`]
+        : []),
+      ...(silent.length > 0
+        ? [`${silent.join(', ')} gaf${silent.length === 1 ? '' : 'en'} geen indeling prijs. De noemer voor "op hoeveel sites" is daardoor ${state.harvest.length - silent.length} en geen ${state.harvest.length}.`]
+        : []),
+      ...(grouping.some((entry) => entry.kind === 'overlay' || entry.kind === 'losstaand')
+        ? []
+        : ['Geen enkel segment krijgt een eigen vragenset: de panelsites delen te weinig indeling. De bank bestaat dan alleen uit de algemene vragen.']),
     ],
   };
 }
@@ -473,14 +565,11 @@ export function applyReply(
         .filter((one): one is NonNullable<typeof one> => one !== null)
         .slice(0, 8);
 
-      const read = readGrouping(answer.grouping, state);
-      const barred = applyOverlayBar(read);
-      const completed = completeGrouping(barred.grouping, state);
-
       updated = {
         ...state,
         panel,
-        grouping: completed.grouping,
+        // De indeling volgt later, uit het panel als geheel; zie `structure`.
+        grouping: [],
         shape: {
           unit: asString(shape.unit),
           irreversibleMistake: asString(shape.irreversibleMistake),
@@ -490,8 +579,6 @@ export function applyReply(
         findings: [
           ...state.findings,
           ...findingsOf(answer),
-          ...barred.findings,
-          ...completed.findings,
           ...(panel.length < 5
             ? [`Het panel telt ${panel.length} sites in plaats van vijf. De dekking per vraag is daarmee grover dan de methode aanneemt.`]
             : []),
@@ -524,6 +611,16 @@ export function applyReply(
             ? []
             : ['Geen enkel onderwerp heeft dekking 0. De stap voor vragen die niemand beantwoordt heeft niets opgeleverd, en dan meet de bank het marktgemiddelde.']),
         ],
+      };
+      break;
+    }
+
+    case 'structure': {
+      const structure = readStructure(answer.segments, state);
+      updated = {
+        ...state,
+        grouping: structure.grouping,
+        findings: [...state.findings, ...findingsOf(answer), ...structure.findings],
       };
       break;
     }

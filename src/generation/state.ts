@@ -32,6 +32,7 @@ export type Phase =
   | { kind: 'panel' }
   | { kind: 'harvest'; index: number }
   | { kind: 'consolidate' }
+  | { kind: 'structure' }
   | { kind: 'base' }
   | { kind: 'overlay'; index: number }
   | { kind: 'facets' }
@@ -59,6 +60,7 @@ export function decodePhase(raw: string): Phase {
     case 'harvest': return { kind: 'harvest', index: Number.isFinite(at) ? at : 0 };
     case 'overlay': return { kind: 'overlay', index: Number.isFinite(at) ? at : 0 };
     case 'consolidate': return { kind: 'consolidate' };
+    case 'structure': return { kind: 'structure' };
     case 'base': return { kind: 'base' };
     case 'facets': return { kind: 'facets' };
     case 'assemble': return { kind: 'assemble' };
@@ -108,7 +110,11 @@ export interface VerticalShape {
 }
 
 /**
- * Wat de merchant een categorie noemt, en wat het volgens de methode is.
+ * Een segment van de markt, en wat het volgens de methode is.
+ *
+ * Tot versie 2.0.0 was dit een categorie van de aanvrager. Nu volgt het segment
+ * uit hoe de panelsites de markt indelen (ontwerp 3d): `category` is de naam die
+ * de meeste sites gebruiken, `aliases` de namen per site.
  *
  * Dit is het enige echte oordeel in de hele keten. Een `overlay` krijgt een
  * eigen vragenset en dus een eigen rij in het rapport; een `profiel` is dezelfde
@@ -118,7 +124,16 @@ export interface VerticalShape {
  */
 export interface GroupingEntry {
   category: string;
+  /** Producten bij de aanvrager, in runs van vóór 2.0.0. Daarna altijd 0. */
   count: number;
+  /**
+   * Onder welke naam welke panelsite dit segment voert. Alleen wat werkelijk in
+   * de oogst van die site staat: de app telt zelf en gelooft het model niet op
+   * zijn woord. Deze namen worden de aliassen van de vragenset.
+   */
+  aliases?: { site: string; name: string }[];
+  /** De panelsites die het segment als categorie voeren; de noemer is het panel. */
+  sites?: string[];
   /**
    * `losstaand`: de producten zijn niet het kernproduct van de markt — garen,
    * onderhoudsmiddelen, gereedschap, onderdelen. Ze krijgen een eigen vragenset
@@ -300,6 +315,8 @@ export function nextPhase(phase: Phase, state: RunState): Phase {
         ? { kind: 'harvest', index: phase.index + 1 }
         : { kind: 'consolidate' };
     case 'consolidate':
+      return { kind: 'structure' };
+    case 'structure':
       return { kind: 'base' };
     case 'base':
       return overlayCategories(state).length > 0 ? { kind: 'overlay', index: 0 } : { kind: 'facets' };
@@ -316,8 +333,8 @@ export function nextPhase(phase: Phase, state: RunState): Phase {
 
 /** Hoeveel stappen deze run in totaal telt, zodat een scherm voortgang kan tonen. */
 export function totalPhases(state: RunState): number {
-  // panel + oogst per site + consolidatie + basis + overlay per categorie + facetten + samenstellen
-  return 1 + Math.max(state.panel.length, 1) + 1 + 1 + overlayCategories(state).length + 1 + 1;
+  // panel + oogst per site + consolidatie + indeling + basis + overlay per segment + facetten + samenstellen
+  return 1 + Math.max(state.panel.length, 1) + 1 + 1 + 1 + overlayCategories(state).length + 1 + 1;
 }
 
 /** De hoeveelste stap dit is. Alleen voor de voortgang; de reeks stuurt zichzelf. */
@@ -328,10 +345,11 @@ export function phaseNumber(phase: Phase, state: RunState): number {
     case 'panel': return 1;
     case 'harvest': return 2 + phase.index;
     case 'consolidate': return 2 + sites;
-    case 'base': return 3 + sites;
-    case 'overlay': return 4 + sites + phase.index;
-    case 'facets': return 4 + sites + overlays;
-    case 'assemble': return 5 + sites + overlays;
+    case 'structure': return 3 + sites;
+    case 'base': return 4 + sites;
+    case 'overlay': return 5 + sites + phase.index;
+    case 'facets': return 5 + sites + overlays;
+    case 'assemble': return 6 + sites + overlays;
     default: return totalPhases(state);
   }
 }

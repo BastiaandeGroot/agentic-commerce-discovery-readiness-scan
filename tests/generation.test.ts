@@ -52,28 +52,21 @@ function antwoord(phase: string): unknown {
         standards: ['EN ISO 12947'],
         legal: [],
       },
-      grouping: [
-        {
-          category: 'Meubelstoffen', kind: 'overlay', reason: 'eigen slijtvragen',
-          distinct: ['Hoeveel slijtage kan het hebben?', 'Kan het tegen huisdieren?', 'Hoe stevig is de naad?'],
-        },
-        {
-          category: 'Gordijnstoffen', kind: 'overlay', reason: 'eigen lichtvragen',
-          distinct: ['Hoeveel licht laat het door?', 'Hoe valt de plooi?', 'Krimpt het na wassen?'],
-        },
-        { category: 'Eetkamerstoelen', kind: 'profiel', parent: 'Meubelstoffen', reason: 'zelfde vragen, andere drempel' },
-        { category: 'Vlekwerend', kind: 'facet', reason: 'is een eigenschap' },
-      ],
       findings: ['Het panel leunt op twee Nederlandse leiders.'],
     };
   }
   if (phase.startsWith('harvest')) {
+    // Elke site deelt de markt net anders in: de Duitse noemt gordijnstof anders,
+    // en alleen de laatste voert tassenstoffen.
+    const site = Number(phase.split(':')[1]);
     return {
       segments: [
         { name: 'Meubelstoffen', url: 'https://een.nl/meubelstoffen' },
         { name: 'Velours', parent: 'Meubelstoffen' },
         { name: 'meubelstoffen' },
         { name: '' },
+        { name: site === 3 ? 'Vorhangstoffe' : 'Gordijnstoffen' },
+        ...(site === 4 ? [{ name: 'Tassenstoffen' }] : []),
       ],
       questions: [{ question: 'Is dit sterk genoeg voor mijn bank?', source: 'faq', url: 'https://een.nl/faq', segment: 'Meubelstoffen' }],
       attributes: [{ namedAs: 'slijtvastheid', meaning: 'schuurweerstand' }],
@@ -86,6 +79,31 @@ function antwoord(phase: string): unknown {
       topics: [
         { topic: 'slijtage', question: 'Is dit sterk genoeg voor mijn bank?', coverage: 5, coverageSites: ['Een', 'Twee', 'Drie', 'Vier', 'Vijf'], sources: ['faq'] },
         { topic: 'krimp', question: 'Krimpt dit na wassen?', coverage: 0, coverageSites: [], sources: ['vakkennis'] },
+      ],
+      findings: [],
+    };
+  }
+  if (phase === 'structure') {
+    return {
+      segments: [
+        {
+          category: 'Bekleding', kind: 'overlay', reason: 'eigen slijtvragen',
+          aliases: [{ site: 'Een', name: 'Meubelstoffen' }, { site: 'Twee', name: 'meubelstoffen' }, { site: 'Drie', name: 'Meubelstoffen' }],
+          distinct: ['Hoeveel slijtage kan het hebben?'],
+        },
+        {
+          category: 'Raamstof', kind: 'overlay', reason: 'eigen lichtvragen',
+          aliases: [
+            { site: 'Een', name: 'Gordijnstoffen' }, { site: 'Twee', name: 'Gordijnstoffen' },
+            { site: 'Vier', name: 'Vorhangstoffe' },
+            // Een site die deze categorie niet voert, en een naam die niemand voert: tellen niet.
+            { site: 'Vier', name: 'Gordijnstoffen' }, { site: 'Zes', name: 'Gordijnstoffen' },
+          ],
+          distinct: ['Hoeveel licht laat het door?'],
+        },
+        { category: 'Tassenstoffen', kind: 'overlay', reason: 'eigen vragen over draagkracht', aliases: [{ site: 'Vijf', name: 'Tassenstoffen' }] },
+        { category: 'Eetkamerstoelen', kind: 'profiel', parent: 'Bekleding', reason: 'zelfde vragen, andere drempel', aliases: [{ site: 'Een', name: 'Velours' }] },
+        { category: 'Verzonnen', kind: 'overlay', reason: 'staat nergens', aliases: [{ site: 'Een', name: 'Bestaat niet' }] },
       ],
       findings: [],
     };
@@ -163,6 +181,7 @@ test('de reeks loopt van panel tot tabel en stuurt zichzelf', async () => {
     'panel',
     'harvest:0', 'harvest:1', 'harvest:2', 'harvest:3', 'harvest:4',
     'consolidate',
+    'structure',
     'base',
     'overlay:0', 'overlay:1',
     'facets',
@@ -173,7 +192,7 @@ test('de reeks loopt van panel tot tabel en stuurt zichzelf', async () => {
   assert.equal(state.harvest.length, 5);
   // De indeling van elke site gaat mee, ontdubbeld en zonder lege namen, en elke
   // vraag weet onder welke categorie hij stond.
-  assert.deepEqual(state.harvest[0].segments.map((segment) => segment.name), ['Meubelstoffen', 'Velours']);
+  assert.deepEqual(state.harvest[0].segments.map((segment) => segment.name), ['Meubelstoffen', 'Velours', 'Gordijnstoffen']);
   assert.equal(state.harvest[0].segments[1].parent, 'Meubelstoffen');
   assert.equal(state.harvest[0].questions[0].segment, 'Meubelstoffen');
 });
@@ -197,16 +216,62 @@ test('de tabel gaat door dezelfde lezer als de vragenlijst van een merchant', as
   assert.equal(meterage?.mode, 'all');
 });
 
-test('een categorie die de groepering vergeet valt niet stilzwijgend weg', async () => {
+test('de indeling komt uit het panel: de naam die de meeste sites gebruiken', async () => {
   const { state } = await draai();
-  const vergeten = state.grouping.find((entry) => entry.category === 'Vergeten categorie');
-
-  assert.ok(vergeten, 'hij staat er alsnog in');
-  assert.equal(vergeten?.kind, 'facet', 'als facet, want dat is het onschuldigste vak');
-  assert.ok(
-    state.findings.some((finding) => finding.includes('Vergeten categorie')),
-    'en het staat als bevinding op het scherm',
+  // Het model noemde het "Bekleding" en "Raamstof"; de app neemt wat de sites zeggen.
+  assert.deepEqual(
+    state.grouping.filter((entry) => entry.kind === 'overlay').map((entry) => entry.category),
+    ['Meubelstoffen', 'Gordijnstoffen'],
   );
+  assert.equal(state.grouping.some((entry) => entry.category === 'Bekleding' || entry.category === 'Raamstof'), false);
+});
+
+test('de app telt zelf op hoeveel sites een segment staat', async () => {
+  const { state } = await draai();
+  const gordijn = state.grouping.find((entry) => entry.category === 'Gordijnstoffen');
+  // Vier voert "Vorhangstoffe" en niet "Gordijnstoffen"; Zes zit niet in het panel.
+  assert.deepEqual(gordijn?.sites, ['Een', 'Twee', 'Vier']);
+  assert.deepEqual(gordijn?.aliases?.map((alias) => alias.name), ['Gordijnstoffen', 'Gordijnstoffen', 'Vorhangstoffe']);
+});
+
+test('een segment dat maar één panelsite voert krijgt geen eigen vragenset', async () => {
+  const { state } = await draai();
+  const tassen = state.grouping.find((entry) => entry.category === 'Tassenstoffen');
+  assert.equal(tassen?.kind, 'profiel');
+  assert.deepEqual(tassen?.sites, ['Vijf']);
+  assert.ok(
+    state.findings.some((finding) => finding.includes('Tassenstoffen') && finding.includes('één panelsite')),
+    'en het staat als bevinding op het scherm, waar de beheerder het kan terugzetten',
+  );
+});
+
+test('een segment dat op geen enkele site terug te vinden is, komt niet in de bank', async () => {
+  const { state } = await draai();
+  assert.equal(state.grouping.some((entry) => entry.category === 'Verzonnen'), false);
+  assert.ok(state.findings.some((finding) => finding.includes('Verzonnen')));
+});
+
+test('een profiel hangt onder de naam die zijn overlay kreeg', async () => {
+  const { state } = await draai();
+  assert.equal(state.grouping.find((entry) => entry.category === 'Velours')?.parent, 'Meubelstoffen');
+});
+
+test('de namen van de sites reizen mee als alias, en de vragenset landt erop', async () => {
+  const { state } = await draai();
+  const read = importQuestionList([{ name: 'woontextiel.csv', text: state.csv ?? '' }]);
+  const gordijn = read.bank?.overlays.find((overlay) => overlay.id === 'gordijnstoffen');
+  assert.ok(gordijn, 'de vragenset heet zoals de markt hem noemt');
+  assert.match('Vorhangstoffe', new RegExp(`^(?:${gordijn?.match})$`, 'i'), 'en landt ook op de Duitse naam');
+  assert.deepEqual(read.warnings.filter((warning) => warning.includes('niet herkend')), []);
+});
+
+test('de panelfase deelt de categorieën van de aanvrager niet meer in', async () => {
+  const result = await advance(
+    emptyState(BRIEF), FIRST_PHASE,
+    async (task) => ({ json: { ...(antwoord(task.phase) as object), grouping: [{ category: 'Meubelstoffen', kind: 'overlay' }] }, usage: { input: 0, output: 0, cached: 0 } }),
+    '2026-10-05',
+  );
+  assert.deepEqual(result.state.grouping, []);
 });
 
 test('de facetanalyse haalt geen overlay meer weg waar al vragen voor geschreven zijn', async () => {
@@ -256,27 +321,26 @@ test('het JSON-object komt ook uit een antwoord met een zin ervoor', () => {
   assert.throws(() => extractJson('{"a": 1'), /niet afgesloten/);
 });
 
-test('een categorie zonder genoemde eigen vragen blijft zoals het model hem indeelde', async () => {
-  // Tot 15 september werd zo'n categorie een profiel omdat ze geen drie vragen
-  // noemde. Die eis is vervangen door dekking > 0, en die is pas na de
-  // categoriefase te zien.
+test('een segment zonder genoemde eigen vragen blijft zoals het model het indeelde', async () => {
+  // Of een segment werkelijk een eigen vraag met dekking heeft, is pas na de
+  // categoriefase te zien; de indelingsfase eist het niet.
   const ask: Ask = async (task) => {
-    if (task.phase !== 'panel') return { json: antwoord(task.phase), usage: { input: 0, output: 0, cached: 0 } };
-    const panel = antwoord('panel') as { grouping: { category: string; distinct?: string[] }[] };
+    const json = antwoord(task.phase) as { segments?: { category: string; distinct?: string[] }[] };
+    if (task.phase !== 'structure') return { json, usage: { input: 0, output: 0, cached: 0 } };
     return {
-      json: {
-        ...panel,
-        grouping: panel.grouping.map((entry) => (
-          entry.category === 'Gordijnstoffen' ? { ...entry, distinct: [] } : entry
-        )),
-      },
+      json: { ...json, segments: json.segments?.map((entry) => (entry.category === 'Raamstof' ? { ...entry, distinct: [] } : entry)) },
       usage: { input: 0, output: 0, cached: 0 },
     };
   };
 
-  const result = await advance(emptyState(BRIEF), FIRST_PHASE, ask, '2026-09-15');
-  const gordijn = result.state.grouping.find((entry) => entry.category === 'Gordijnstoffen');
-  assert.equal(gordijn?.kind, 'overlay');
+  let state = emptyState(BRIEF);
+  let phase: Phase = FIRST_PHASE;
+  for (let stap = 0; stap < 40 && phase.kind !== 'base'; stap++) {
+    const result = await advance(state, phase, ask, '2026-10-05');
+    state = result.state;
+    phase = result.next;
+  }
+  assert.equal(state.grouping.find((entry) => entry.category === 'Gordijnstoffen')?.kind, 'overlay');
 });
 
 test('een categorie zonder eigen vraag met dekking krijgt een bevinding', async () => {
@@ -314,7 +378,7 @@ test('een stap die het antwoord van een andere stap krijgt, loopt niet stil door
 
   let state = emptyState(BRIEF);
   let phase: Phase = FIRST_PHASE;
-  while (phase.kind !== 'base') {
+  for (let stap = 0; stap < 40 && phase.kind !== 'base'; stap++) {
     const result = await advance(state, phase, verkeerd, '2026-09-09');
     state = result.state;
     phase = result.next;
@@ -332,7 +396,7 @@ test('een categorie krijgt de vorm van een vraag voluit te zien, niet "zelfde al
   let state = emptyState(BRIEF);
   let phase: Phase = FIRST_PHASE;
   const ask: Ask = async (task) => ({ json: antwoord(task.phase), usage: { input: 1, output: 1, cached: 0 } });
-  while (phase.kind !== 'overlay') {
+  for (let stap = 0; stap < 40 && phase.kind !== 'overlay'; stap++) {
     const result = await advance(state, phase, ask, '2026-09-09');
     state = result.state;
     phase = result.next;
@@ -361,7 +425,7 @@ test('een categorie met zinnen in plaats van kenmerknamen is een mislukte stap',
 
   let state = emptyState(BRIEF);
   let phase: Phase = FIRST_PHASE;
-  while (phase.kind !== 'overlay') {
+  for (let stap = 0; stap < 40 && phase.kind !== 'overlay'; stap++) {
     const result = await advance(state, phase, zinnen, '2026-09-09');
     state = result.state;
     phase = result.next;
@@ -378,13 +442,23 @@ test('een losstaande categorie krijgt een eigen fase en komt zonder basislaag in
   const ask: Ask = async (task) => {
     prompts.set(task.phase, task.prompt);
     const json = antwoord(task.phase) as Record<string, unknown>;
-    if (task.phase === 'panel') {
+    // Twee sites voeren garen als categorie; daarmee is het een segment van de markt.
+    if (task.phase === 'harvest:0' || task.phase === 'harvest:1') {
+      return {
+        json: { ...json, segments: [...(json.segments as unknown[]), { name: 'Naaigarens' }] },
+        usage: { input: 1, output: 1, cached: 0 },
+      };
+    }
+    if (task.phase === 'structure') {
       return {
         json: {
           ...json,
-          grouping: [
-            ...(json.grouping as unknown[]),
-            { category: 'Naaigarens', kind: 'losstaand', reason: 'de algemene vragen over stof slaan niet op garen' },
+          segments: [
+            ...(json.segments as unknown[]),
+            {
+              category: 'Garen', kind: 'losstaand', reason: 'de algemene vragen over stof slaan niet op garen',
+              aliases: [{ site: 'Een', name: 'Naaigarens' }, { site: 'Twee', name: 'Naaigarens' }],
+            },
           ],
         },
         usage: { input: 1, output: 1, cached: 0 },

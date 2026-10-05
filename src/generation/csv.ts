@@ -22,6 +22,7 @@ const HEADER = [
   'vraag_en',
   'laag',
   'categorie',
+  'geldt_voor',
   'intentie',
   'belang',
   'dekking',
@@ -58,6 +59,27 @@ function joinList(values: string[]): string {
   return values.map((value) => value.replace(/[;,]/g, ' ').trim()).filter(Boolean).join('; ');
 }
 
+/**
+ * De namen waaronder panelsites dit segment voeren, zonder de naam die het al
+ * heeft.
+ *
+ * De lezer maakt er het patroon van waarmee een vragenset op een categorie
+ * landt (`geldt_voor`). Zo landt de set ook bij een winkel die het segment
+ * anders noemt dan de bank — met namen die het panel werkelijk gebruikt.
+ */
+function aliasesOf(state: RunState, category: string): string[] {
+  const entry = state.grouping.find((one) => one.category === category);
+  const seen = new Set([category.toLowerCase()]);
+  const out: string[] = [];
+  for (const alias of entry?.aliases ?? []) {
+    const key = alias.name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(alias.name);
+  }
+  return out;
+}
+
 /** De toets als één cel, leesbaar voor een mens. */
 function criticalTestText(test: DraftQuestion['criticalTest']): string {
   return test
@@ -78,6 +100,7 @@ function row(
     question.questionEn,
     layer,
     category,
+    layer === 'basis' ? '' : joinList(aliasesOf(state, category)),
     question.intent,
     question.importance,
     question.coverage === null || question.coverage === undefined ? '' : String(question.coverage),
