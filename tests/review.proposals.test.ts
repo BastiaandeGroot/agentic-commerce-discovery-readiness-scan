@@ -6,7 +6,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyReview, liveProposals } from '../src/questions/mapping';
+import { applyReview, liveProposals, overlaysToPropose } from '../src/questions/mapping';
 
 test('een voorstel blijft voorstel tot de merchant de koppeling wijzigt', () => {
   const proposed = { droogvoorschrift: 'description', breedte: 'fabric_width', coating: 'coated' };
@@ -83,4 +83,22 @@ test('de invoer blijft ongemoeid', () => {
   const start = { mapping: { a: ['x'] }, proposed: { a: 'x' } };
   applyReview(start, ['a'], []);
   assert.deepEqual(start, { mapping: { a: ['x'] }, proposed: { a: 'x' } });
+});
+
+// --- Welke vragenset een model nog mag voorstellen -------------------------
+
+test('een vragenset die al bij een eigen categorie hoort, wordt niet nog eens voorgesteld', () => {
+  const label = (nl: string) => ({ nl, en: nl });
+  const overlays = [
+    { id: 'meubelstoffen', label: label('Meubelstoffen') },
+    { id: 'tafelkleedstoffen', label: label('Tafelkleedstoffen') },
+    { id: 'lampenkapstoffen', label: label('Lampenkapstoffen') },
+  ];
+  // Decoratiestoffen heeft geen eigen set; haar subcategorie Tafelkleedstoffen wel.
+  const sets = [
+    { overlayId: 'meubelstoffen' },
+    { overlayId: undefined },
+    { overlayId: 'tafelkleedstoffen' },
+  ] as Parameters<typeof overlaysToPropose>[0]['sets'];
+  assert.deepEqual(overlaysToPropose({ overlays, sets }).map((overlay) => overlay.id), ['lampenkapstoffen']);
 });

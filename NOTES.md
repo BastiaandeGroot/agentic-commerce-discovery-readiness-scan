@@ -966,10 +966,27 @@ kenmerken, 5 blokken op Sonnet), nalopen en bevestigen. 0010 maakt
 0010 werkt de scan, maar valt bewaren in het account stil terug (het scherm meldt
 dat) en mislukt het bewaren van een uitgesloten categorie.
 
-**Een categorie die de bank als facet kent, krijgt een verkeerde overlay** — 14
-september. In v4 is Decoratiestoffen een facet; op het koppelscherm koos Haiku er
-Tafelkleedstoffen voor, en Outdoorstoffen kreeg Schaduwdoek. Zo'n categorie hoort
-standaard op "alleen de algemene vragen" te staan.
+**Een categorie zonder eigen set kreeg de set van haar subcategorie** — gemeld 14
+september, opgelost 5 oktober. In v4 heeft Decoratiestoffen geen eigen vragen; het
+model zocht de dichtstbijzijnde set en koos Tafelkleedstoffen, en Outdoorstoffen
+kreeg Schaduwdoek. Daarmee kreeg elke decoratiestof de tafelkleedvragen én verdween
+de regel van Tafelkleedstoffen zelf, want die mat nu hetzelfde als haar
+bovenliggende categorie. Het model krijgt nu alleen de sets voorgelegd die nog
+nergens op naam geland zijn (`overlaysToPropose`); blijft er geen over, dan gaat er
+niets de deur uit en houdt de categorie de algemene vragen. De merchant kan in de
+keuzelijst nog elke set kiezen. Een fout voorstel dat al bewaard stond, blijft
+staan tot hij het zelf omzet.
+
+**De categorieën van een bank zijn die van de aanvrager** — vastgesteld 5 oktober.
+De vragen komen van het panel, de indeling niet: de aanvraag draagt de
+categorienamen van de merchant, en de generatie schrijft per naam een vragenset.
+Woontextiel v4 heet daardoor tot op de spelfout "Onderhoudsprodukten" zoals de
+boom van De Groot. Voor de aanvrager klopt elke naam; een tweede winkel in dezelfde
+markt die "Tafelzeil" of "Verduisterende gordijnen" zegt, landt nergens op naam en
+is aangewezen op een voorstel of op de keuzelijst. Dit schuurt met "een bank hoort
+bij een vertical, niet bij een merchant": dat geldt nu voor de vragen, niet voor
+het skelet. Zie ook "Subcategorieën landen alleen op de volle naam" hieronder en
+paragraaf 4c van het ontwerp (een tweede merchant vult de bank aan).
 
 **Eén kolom, meerdere kenmerken, en andersom** — een koppeling wijst nu naar
 één kolom. `washing_label` draagt zowel maximale wastemperatuur als bleekbaar, en

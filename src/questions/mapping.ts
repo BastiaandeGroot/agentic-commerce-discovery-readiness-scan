@@ -104,6 +104,26 @@ export function applyReview(
   return { mapping, proposed, replaced, dropped };
 }
 
+/**
+ * De vragensets die een model nog mag voorstellen voor een categorie zonder set.
+ *
+ * Alleen wat nog nergens geland is. Een vragenset die op naam al bij een eigen
+ * categorie hoort, is vergeven: hem ook voorstellen voor een ándere categorie
+ * ging mis op de eerste echte catalogus. "Decoratiestoffen" heeft in de bank geen
+ * eigen vragen, het model zocht de dichtstbijzijnde en koos "Tafelkleedstoffen" —
+ * de set van haar eigen subcategorie. Daarmee kreeg elke decoratiestof de
+ * tafelkleedvragen, en verdween de regel van Tafelkleedstoffen zelf, want die mat
+ * nu hetzelfde als haar bovenliggende categorie.
+ *
+ * Een categorie waar geen set voor overblijft, houdt alleen de algemene vragen.
+ * Dat is een geldig antwoord; de merchant kan in de keuzelijst nog elke set
+ * kiezen, ook een vergeven.
+ */
+export function overlaysToPropose(state: Pick<QuestionSetState, 'overlays' | 'sets'>): QuestionSetState['overlays'] {
+  const landed = new Set(state.sets.map((set) => set.overlayId).filter((id): id is string => id !== undefined));
+  return state.overlays.filter((overlay) => !landed.has(overlay.id));
+}
+
 export function toMapping(pairs: MappingPair[]): Mapping {
   const out: Mapping = {};
   for (const pair of pairs) out[pair.key] = pair.columns;
