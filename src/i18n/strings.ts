@@ -394,6 +394,15 @@ export const STRINGS = {
       misfit: 'Dit kenmerk verwacht {verwacht}; deze kolom bevat {gevonden}. Weet je zeker dat het antwoord hierin staat, laat hem dan staan.',
       misfitDropped: 'Voorstel {kenmerk} → {kolom} vervallen: het kenmerk verwacht {verwacht}, de kolom bevat {gevonden}.',
       unfitSkipped: 'Niet voorgesteld als bron: {kolommen}. Daar staat lopende tekst, een bestand of een tijdstip in en geen kenmerk. Weet je dat het antwoord er toch in staat, kies de kolom dan zelf.',
+      unfitColumn: {
+        prose: 'In deze kolom staat lopende tekst. De scan beantwoordt vragen uit kenmerken, niet uit een omschrijving: staat het antwoord ook in een eigen kolom, kies die dan, en anders "geen kolom".',
+        file: 'In deze kolom staat een bestand of een adres, geen kenmerk. Kies een andere kolom, of "geen kolom".',
+        timestamp: 'In deze kolom staat een tijdstip dat je systeem zelf schreef, geen kenmerk. Kies een andere kolom, of "geen kolom".',
+      } as Record<string, string>,
+      reviewAll: 'Alles opnieuw laten voorstellen',
+      reviewAllNote: 'Legt elke koppeling op dit scherm opnieuw voor aan het model, ook wat je eerder zelf koos. Wat het anders ziet wordt vervangen, wat het niet meer aanwijst komt weer open te staan; elke wijziging staat daarna hierboven. "Geen kolom" blijft staan.',
+      reviewReplaced: '{kenmerk}: {oud} is vervangen door {nieuw}.',
+      reviewDropped: '{kenmerk}: de koppeling met {oud} is vervallen, het model wijst die kolom niet meer aan. Het kenmerk staat weer open.',
       openSummary:
         'Onbeantwoordbaar met deze koppeling: {vragen} vragen, door {kenmerken} ongekoppelde kenmerken. Staat een kenmerk echt niet in je catalogus, laat dan "geen kolom" staan — dat is de bevinding. Welke vragen het zijn, zie je in het rapport.',
       moreQuestions: 'meer vragen',
@@ -1553,6 +1562,15 @@ export const STRINGS = {
       misfit: 'This characteristic expects {verwacht}; this column holds {gevonden}. If you are sure the answer is in here, keep it.',
       misfitDropped: 'Proposal {kenmerk} → {kolom} dropped: the characteristic expects {verwacht}, the column holds {gevonden}.',
       unfitSkipped: 'Not proposed as a source: {kolommen}. These hold running text, a file or a timestamp rather than a characteristic. If you know the answer is in there, pick the column yourself.',
+      unfitColumn: {
+        prose: 'This column holds running text. The scan answers questions from characteristics, not from a description: if the answer also sits in a column of its own, pick that one, otherwise "no column".',
+        file: 'This column holds a file or an address, not a characteristic. Pick another column, or "no column".',
+        timestamp: 'This column holds a timestamp your system wrote itself, not a characteristic. Pick another column, or "no column".',
+      } as Record<string, string>,
+      reviewAll: 'Have everything proposed again',
+      reviewAllNote: 'Puts every link on this screen before the model again, including what you chose yourself earlier. What it sees differently is replaced, what it no longer points to is open again; every change is listed above afterwards. "No column" stays.',
+      reviewReplaced: '{kenmerk}: {oud} was replaced by {nieuw}.',
+      reviewDropped: '{kenmerk}: the link to {oud} was dropped, the model no longer points to that column. The characteristic is open again.',
       openSummary:
         'Unanswerable with this mapping: {vragen} questions, because of {kenmerken} unlinked characteristics. If a characteristic really is not in your catalogue, leave "no column" — that is the finding. The report shows which questions they are.',
       moreQuestions: 'more questions',

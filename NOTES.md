@@ -779,10 +779,41 @@ stelde ooit een beheerkolom voor, dus ook dat oordeel won niets. En B tegen A is
 `kleurnaam → color` — binnen de ruis van één run. De opdracht is dus gebleven
 zoals hij was. Het experiment staat op de branch `proef-kolomduiding`.
 
-Wat er nog niet in zit: een koppeling die eerder al bewaard is, blijft staan. Het
-model stelt alleen voor wat open staat, dus foute koppelingen van vóór deze
-wijziging haalt de merchant zelf weg. Het browsermodel (zonder sleutel) werkt nog
-zoals het werkte en is de zwakste van de drie.
+**Een voorstel onthoudt dat het een voorstel is (5 oktober 2026).** De regel was
+altijd "een voorstel is nooit een koppeling", maar alleen het scherm wist welke
+koppelingen een voorstel waren. Ze werden meteen als gewone koppeling bewaard, en
+na herladen was niet meer te zien dat de merchant er nooit naar had gekeken. Het
+model stelt alleen voor wat open staat, dus een koppeling van een zwakker model
+bleef voorgoed staan — `droogvoorschrift` op `description` is er zo een.
+
+- De herkomst staat nu naast de koppeling: `Proposed` (kenmerk → voorgestelde
+  kolom) in `src/questions/mapping.ts`, bewaard in `merchant_bank_settings`
+  (migratie 0014) en bij de bank in de browser. Kiest de merchant zelf, dan is het
+  zijn koppeling en vervalt het merk.
+- `PROPOSAL_VERSION` in `src/semantic/prompt.ts` gaat omhoog als het model, de
+  opdracht of de zeef verandert. Voorstellen van een oudere versie worden bij het
+  openen van het koppelscherm **één keer** opnieuw voorgelegd. Niet bij elk
+  bezoek: twee beurten geven niet precies dezelfde lijst (zo'n tien procent
+  verschil tussen runs), en een scan hoort niet te verschuiven omdat iemand het
+  scherm opnieuw opende.
+- `applyReview` verwerkt het oordeel: een andere kolom vervangt de oude, een
+  kenmerk dat het model niet meer aanwijst staat weer open, en beide staan als
+  melding op het scherm. "Geen kolom" blijft altijd staan, en wat de merchant
+  tijdens de ronde zelf koos ook. Een onleesbaar antwoord is een storing en geen
+  lege lijst (`ReadProposals.unreadable`) — anders gooit een storing koppelingen weg.
+- Voor koppelingen van vóór deze wijziging is niet meer te zeggen wat een voorstel
+  was. Daarvoor is de knop **Alles opnieuw laten voorstellen**: uitdrukkelijk, want
+  hij gaat ook over wat de merchant eerder zelf koos.
+- Een gekozen kolom met lopende tekst, een bestand of een tijdstip krijgt een
+  waarschuwing op zijn regel, zoals een vorm die niet past.
+
+Het browsermodel vult alleen aan en oordeelt niet opnieuw over wat er staat.
+
+**Nog te doen:** migratie 0014 draaien. Zonder blijft alles werken, maar gaat de
+herkomst in het account niet mee en wordt een voorstel na herladen weer een gewone
+koppeling. Niet in een browser gezien: de knop, de meldingen en de waarschuwing per
+regel zijn gebouwd en getypecheckt, de logica staat onder test, maar het scherm is
+niet doorlopen met een catalogus erin.
 
 ## Bewust afgevallen
 

@@ -4,6 +4,18 @@
 // dezelfde opdracht als de app, en meet een verbetering niet iets anders dan
 // wat er straks live staat.
 
+/**
+ * De versie van alles wat een voorstel bepaalt: het model, de opdracht hieronder
+ * en de zeef op kolommen en vormen.
+ *
+ * Gaat omhoog als één van die drie verandert. Voorstellen die een merchant nog
+ * niet aanraakte en die onder een oudere versie gedaan zijn, worden dan één keer
+ * opnieuw beoordeeld. Niet bij elk bezoek: twee beurten van hetzelfde model
+ * geven niet precies dezelfde lijst, en een scan hoort niet te verschuiven omdat
+ * iemand het scherm opnieuw opende.
+ */
+export const PROPOSAL_VERSION = '2026-10-05';
+
 export interface Payload {
   attributes: { key: string; text: string }[];
   columns: { key: string; text: string }[];
@@ -115,6 +127,12 @@ export interface ReadProposals {
   proposals: Proposal[];
   /** Wat afviel, in woorden voor het scherm. */
   rejected: string[];
+  /**
+   * Het antwoord was niet te lezen. Dat is iets anders dan "geen voorstellen":
+   * wie een bestaande koppeling opnieuw laat beoordelen en dit voor een leeg
+   * antwoord aanziet, gooit koppelingen weg op een storing.
+   */
+  unreadable?: true;
 }
 
 /** De waarden in een kolombeschrijving: alles na de naam en de vorm. */
@@ -148,10 +166,10 @@ export function readProposals(
   try {
     parsed = JSON.parse(text);
   } catch {
-    return { proposals, rejected: ['Het antwoord van het model was geen leesbare lijst.'] };
+    return { proposals, rejected: ['Het antwoord van het model was geen leesbare lijst.'], unreadable: true };
   }
   const list = (parsed as { koppelingen?: unknown }).koppelingen;
-  if (!Array.isArray(list)) return { proposals, rejected: ['Het antwoord van het model bevatte geen koppelingen.'] };
+  if (!Array.isArray(list)) return { proposals, rejected: ['Het antwoord van het model bevatte geen koppelingen.'], unreadable: true };
 
   const seen = new Set<string>();
   for (const item of list) {

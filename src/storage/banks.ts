@@ -42,6 +42,9 @@ export interface StoredBank {
    * Alleen namen — kenmerksleutel en kolomnaam. Geen waarde, geen product.
    */
   mapping?: Record<string, string[]>;
+  /** Welke van die koppelingen nog een voorstel zijn, en onder welke versie gedaan. */
+  proposed?: Record<string, string>;
+  proposalVersion?: string;
   /**
    * Welke vragenset uit de lijst bij welke eigen categorie hoort.
    *

@@ -192,8 +192,12 @@ model.
   gebruikt (breedte/width, gewicht/weight). Vaktaal hoort bij de markt en dus bij
   de vragenlijst, in een kolom `synoniemen`. Zet nooit een vakwoordenlijst per
   vertical in de motor.
-- **Een voorstel van het model is nooit een koppeling.** Het staat gemarkeerd in
-  de lijst tot de merchant het laat staan of wijzigt. Twee regels houden het
+- **Een voorstel van het model is nooit een koppeling.** De herkomst wordt naast
+  de koppeling bewaard (`Proposed` in `src/questions/mapping.ts`) tot de merchant
+  zelf kiest. Verandert het model, de opdracht of de zeef, dan gaat
+  `PROPOSAL_VERSION` omhoog en worden onaangeraakte voorstellen één keer opnieuw
+  beoordeeld — niet bij elk bezoek, want een scan mag niet verschuiven doordat
+  iemand het scherm opende. Twee regels houden het
   bruikbaar, allebei gemeten en beide onmisbaar: vectoren worden **gecentreerd**
   (anders lijken alle namen in één catalogus op elkaar) en een voorstel vraagt
   een **wederzijds beste match** (anders krijgt élk kenmerk er een, ook de

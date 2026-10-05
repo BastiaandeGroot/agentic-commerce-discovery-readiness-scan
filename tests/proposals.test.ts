@@ -65,3 +65,9 @@ test('een onleesbaar antwoord geeft geen voorstellen maar een melding', () => {
   assert.equal(proposals.length, 0);
   assert.equal(rejected.length, 1);
 });
+
+test('een onleesbaar antwoord is als storing te herkennen, een leeg antwoord niet', () => {
+  assert.equal(readProposals('geen json', [{ key: 'a' }], []).unreadable, true);
+  assert.equal(readProposals('{"iets":1}', [{ key: 'a' }], []).unreadable, true);
+  assert.equal(readProposals('{"koppelingen":[]}', [{ key: 'a' }], []).unreadable, undefined);
+});
