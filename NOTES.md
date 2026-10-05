@@ -702,23 +702,32 @@ op `composition_info`. Kanttekening: één run per instelling, en de vorige meti
 gaf tussen runs al 31–33; de verschillen van een paar voorstellen zijn ruis, het
 verschil 7 tegen 2 is dat niet.
 
-Wat alle drie de uitdraaien laten zien is één soort fout, en die zit in de opdracht
-en niet in het model. De toets is "beantwoordt een waarde uit de kolom de vráág", en een
-vraag leunt op meer kenmerken tegelijk. Dus krijgt één ja/nee-kolom ze allemaal:
-`flame_retardant` (Yes/No) is voorgesteld voor `brandvertragend_ja_nee` — terecht
-— maar ook voor `brandklasse`, `brandgedrag_classificatie` en
-`fr_wasbestendig_boolean`. Zelfde patroon bij `waterdichtheid_klasse → water_proof`,
-`testnorm_lichtechtheid → lightfatness` en `weefdichtheid → curtain_density`. Dat is
-de fout die niet mag: de vraag naar het brandbewijs lijkt beantwoord door een
-vinkje, en het gat verdwijnt. Te bouwen: de toets per kenmerk stellen in plaats van
-per vraag ("is deze waarde zélf een klasse, een norm, een percentage?"). Het
-bestaande vormoordeel (`shapeMisfit`) ving er in deze meting geen één: de
-opstelling leest de CSV zonder de bevestigde kenmerktypen uit de database, dus
-nagaan of het met die typen wél aanslaat op een klasse tegenover een ja/nee-kolom.
-Pas wijzigen mét meting.
+**Die vergelijking draaide zonder de kenmerktypen, en dat vertekende haar.** De
+meetopstelling las de CSV zonder de bevestigde typering uit de database; de app
+geeft die wél mee, en dan staat er `brandklasse [vaste lijst: B1, M1, schwer
+entflammbar]` in plaats van alleen een naam met een vraag. Opnieuw gemeten met
+`--types` (430 open kenmerken, 109 kolommen na het schiften):
 
-**Kolommen schiften vóór het koppelen (5 oktober 2026).** Stap 1 van drie; de
-andere twee staan hieronder. Aanleiding: `droogvoorschrift` stond op het live
+| | voorstellen | per honderd kenmerken | van de negen gevaarlijke |
+|---|---|---|---|
+| Opus 5.5 medium, mét typen | 97 | ~$0,12 | 1 |
+| Opus 5.5 low, mét typen | 88 | ~$0,08 | 2 |
+
+Met typen verdwijnt de fout "een vinkje voor een klasse" bijna vanzelf. Wat
+overblijft is `waterdichtheid_klasse → water_proof`, een tweedeling op een
+ja/nee-kolom en dus verdedigbaar; low doet daarnaast `fr_wasbestendig_boolean →
+flame_retardant`. `weefdichtheid → curtain_density` stond eerder op de lijst van
+gevaarlijke, ten onrechte: de bank typeert dat kenmerk zelf als transparant,
+lichtfilterend of verduisterend. De keuze voor medium blijft staan — low mist ook
+mét typen gewone koppelingen als `vezelsamenstelling → composition_info`.
+
+**De les: meet nooit zonder `--types`.** En de keerzijde: een bank zónder
+bevestigde typering — een handmatige upload, of een bank die nog op review staat
+— krijgt de slechte getallen van de eerste tabel. De typering is de grootste
+hefboom op de kwaliteit van het koppelen, groter dan het model of de opdracht.
+
+**Kolommen schiften vóór het koppelen (5 oktober 2026).** De eerste van de
+bedachte stappen, en de enige die bleef. Aanleiding: `droogvoorschrift` stond op het live
 scherm op `description`. De app kende maar één soort vrije tekst, dus een
 omschrijving van 503 woorden was even goed kandidaat als een samenstelling van 5,
 en de regel "proza is geen antwoordbron" stond alleen in deze notities.
@@ -747,15 +756,28 @@ vervallen voorstel staat als melding op het scherm. Voor de gekozen instelling
 voorstellen die dat model overhoudt zijn geen vormfout. Stap 1 is een vloer onder
 élk model, geen verbetering van dit ene getal.
 
-Wat stap 1 niet vangt, en waar stap 2 en 3 voor zijn: `fr_wasbestendig_boolean`
-op `flame_retardant` (ja/nee op ja/nee, maar een ander ja), `waterdichtheid_klasse`
-op `water_proof`, `testnorm_lichtechtheid` op `lightfatness`, `weefdichtheid` op
-`curtain_density` en `leverbaarheid_status` op `internal_comment`. Dat is
-betekenis en geen vorm. Het plan: (2) het model stelt per kolom één keer vast wat
-hij meet — 119 kolommen in plaats van 430 kenmerken, één keer per catalogus, als
-tabel die de merchant ziet — en (3) de kenmerken worden tegen die vaste betekenis
-gelegd, met als toets "ís deze kolom dit kenmerk" in plaats van "raakt een waarde
-de vraag". De naam mag een kolom voordragen, de waarden beslissen.
+**Stap 2 gebouwd, gemeten en afgevallen (5 oktober 2026).** Het idee: het model
+stelt eerst per kolom vast wat hij vastlegt (`flame_retardant`: "ja/nee, of de
+stof brandvertragend is; niet volgens welke norm of klasse") en legt de kenmerken
+daarna tegen die vaste betekenis, met een strengere toets: "legt de kolom dít
+kenmerk vast" in plaats van "raakt een waarde de vraag". Headless gebouwd en
+gemeten, alles mét typen op Opus 5.5 medium:
+
+| | voorstellen | kosten | van de negen gevaarlijke |
+|---|---|---|---|
+| A — de opdracht die er staat | 97 | $0,58 | 1 |
+| B — de strengere opdracht | 88 | $0,55 | 0 |
+| C — strenger, mét kolomduiding | 82 | $0,75 | 0 |
+
+De kolomduiding zelf was goed: 105 van de 109 kolommen kregen een leesbare zin,
+en 32 werden terecht als beheer aangemerkt (`url_key`, SEO-velden,
+winkelinstellingen). Maar het koppelen werd er niet beter van. C deed niets wat B
+niet deed, verloor koppelingen die klopten (`geschikt_voor_buiten → outdoor_usage`,
+`wasbaar_ja_nee → machine_washable`) en kostte een derde meer. Geen enkele run
+stelde ooit een beheerkolom voor, dus ook dat oordeel won niets. En B tegen A is
+één verdedigbaar voorstel minder tegen negen voorstellen minder, waaronder
+`kleurnaam → color` — binnen de ruis van één run. De opdracht is dus gebleven
+zoals hij was. Het experiment staat op de branch `proef-kolomduiding`.
 
 Wat er nog niet in zit: een koppeling die eerder al bewaard is, blijft staan. Het
 model stelt alleen voor wat open staat, dus foute koppelingen van vóór deze
@@ -777,6 +799,7 @@ Niet opnieuw voorstellen zonder dat er iets veranderd is.
 | Titel gebruiken om andere vragen te beantwoorden | Titel is retrieval, geen filtering. En de grens naar "dan de omschrijving ook" is niet te verdedigen. |
 | De generatie als agent, in een cloud-routine of in Cowork | Een agent die elk kwartier wakker wordt om te concluderen dat de wachtrij leeg is, kost ~96 sessies per dag aan niets. En een agentische generatie kan niet hervatten: valt hij om bij site vier, dan begint hij bij nul. De methode ís een vaste reeks, dus hem als reeks draaien geeft hervatten, een prijs per stap en een model per fase. Pollen hoort goedkoop te zijn en werken duur; die twee in één ding stoppen was de fout. |
 | Een eigen agentlus op Render die de bank zelf schrijft | Dat is dezelfde pijplijn plus onderhoud: een gereedschapslus, herhalingen, en hetzelfde hervattingsprobleem opnieuw oplossen. De fasenreeks doet het met minder code en met de tussenstand in de database. |
+| Het model eerst per kolom laten vaststellen wat hij vastlegt, en daar de kenmerken tegen leggen | Gebouwd en gemeten op 5 oktober 2026: geen gevaarlijk voorstel minder dan de bestaande opdracht, wel minder goede voorstellen en een derde meer kosten, plus een extra tabel voor de merchant. De hefboom bleek de kenmerktypering van de bank te zijn, niet de volgorde. Branch `proef-kolomduiding`. Wél opnieuw overwegen als het doel verandert: de duiding per kolom is leesbaar en zou het koppelscherm voor de merchant kunnen verduidelijken. |
 
 ---
 

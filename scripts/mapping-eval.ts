@@ -6,24 +6,36 @@
 // kolomwaarden eronder, zodat een mens kan zien of het klopt. Geen productiecode.
 //
 //   npx esbuild scripts/mapping-eval.ts --bundle --platform=node --format=esm --outfile=<tmp>/mapping-eval.mjs
-//   node --env-file=.env.local <tmp>/mapping-eval.mjs <catalogus> <vragenlijst> [model]
+//   node --env-file=.env.local <tmp>/mapping-eval.mjs <catalogus> <vragenlijst> [model] [effort] [--types=<json>]
+//
+// `--types` is de bevestigde typering van de bank (kenmerk -> vorm), zoals de app
+// die bij een vrijgegeven bank uit de database krijgt. **Meet nooit zonder**: dan
+// ziet het model alleen namen en vragen, en lijkt het veel slechter dan wat er
+// live staat. Op 5 oktober 2026 gaf dat negen gevaarlijke voorstellen die met
+// typen op één na verdwenen.
 
 import { readFileSync } from 'node:fs';
 import Anthropic from '@anthropic-ai/sdk';
 import { ingest } from '../src/intake/index';
 import { generateQuestionSets } from '../src/questions/generate';
+import { applyAttributeShapes } from '../src/questions/bank';
 import { importQuestionList } from '../src/questions/list';
 import { attributeInventory } from '../src/questions/mapping';
 import { carriesCharacteristic, profileCatalog, shapeMisfit } from '../src/engine/profile';
 import { describeAttribute, describeColumn } from '../src/semantic/describe';
 import { PROPOSALS_SCHEMA, SYSTEM, prompt, readProposals } from '../src/semantic/prompt';
 
-const [catalogPath, bankPath, model = 'claude-haiku-4-5', effort] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const [catalogPath, bankPath, model = 'claude-haiku-4-5', effort] = args.filter((arg) => !arg.startsWith('--'));
+const typesPath = args.find((arg) => arg.startsWith('--types='))?.slice('--types='.length);
 
 const catalog = ingest(catalogPath, readFileSync(catalogPath, 'utf8'));
 const imported = importQuestionList([{ name: bankPath, text: readFileSync(bankPath, 'utf8') }]);
 if (!imported.bank) throw new Error(imported.errors.join('\n'));
-const state = generateQuestionSets(catalog, [imported.bank]);
+const bank = typesPath
+  ? applyAttributeShapes(imported.bank, JSON.parse(readFileSync(typesPath, 'utf8')))
+  : imported.bank;
+const state = generateQuestionSets(catalog, [bank]);
 
 const rows = attributeInventory(state);
 const open = rows.filter((row) => row.fields.length === 0);
@@ -39,7 +51,7 @@ const attributes = open.map((row) => ({
 }));
 const columns = free.map((column) => ({ key: column, text: describeColumn(column, catalog, profiles[column]) }));
 
-console.log(`MODEL ${model} — ${attributes.length} open kenmerken, ${columns.length} kolommen`);
+console.log(`MODEL ${model} — ${attributes.length} open kenmerken (${open.filter((row) => row.shape).length} met een type), ${columns.length} kolommen`);
 
 const client = new Anthropic();
 const pairs: { key: string; columns: string[]; evidence: string; reason: string }[] = [];
@@ -71,8 +83,9 @@ for (const pair of pairs) {
   const row = byKey.get(pair.key)!;
   const column = pair.columns[0];
   const profile = profiles[column];
-  const misfit = row.shape && profile && shapeMisfit(row.shape, profile) ? '  [VORM PAST NIET]' : '';
-  console.log(`\n${pair.key} -> ${column}${misfit}`);
+  // Het scherm laat zo'n voorstel vervallen (`keepFitting`); hier staat het apart.
+  const misfit = row.shape && profile && shapeMisfit(row.shape, profile);
+  console.log(`\n${pair.key} ${misfit ? '-x' : '->'} ${column}${misfit ? '  [VERVALT: VORM PAST NIET]' : ''}`);
   console.log(`  vraag:  ${row.questions[0]?.nl ?? ''}`);
   console.log(`  kolom:  ${describeColumn(column, catalog, profile).slice(0, 160)}`);
   console.log(`  bewijs: ${pair.evidence} — ${pair.reason}`);

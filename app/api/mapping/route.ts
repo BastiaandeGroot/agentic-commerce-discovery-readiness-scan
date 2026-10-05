@@ -38,20 +38,19 @@ const MODEL = 'claude-haiku-4-5';
  * waardenrij; Opus 5 wees bij elk voorstel één waarde aan die klopte en vond
  * `machine_washable` en `sustainable`, die Haiku miste.
  *
- * Sinds 5 oktober 2026 Opus 5.5 op effort medium. Drie instellingen gemeten op
- * De Groot met woontextiel v4 (430 open kenmerken, 119 kolommen), één run elk:
+ * Sinds 5 oktober 2026 Opus 5.5 op effort medium. Gemeten op De Groot met
+ * woontextiel v4 en zijn bevestigde kenmerktypen (430 open kenmerken, 109
+ * kolommen), één run elk:
  *
- *   Opus 5 medium     130 voorstellen   ~$0,18 en ~47 s per honderd kenmerken
- *   Opus 5.5 low      108               ~$0,09 en ~14 s
- *   Opus 5.5 medium   112               ~$0,13 en ~33 s
+ *   Opus 5.5 medium   97 voorstellen   ~$0,12 per honderd kenmerken
+ *   Opus 5.5 low      88               ~$0,08
  *
- * Het aantal is niet de maat; de verkeerde koppeling is dat. Van negen nagelopen
- * voorstellen van het gevaarlijke soort — een ja/nee-kolom voor een kenmerk dat
- * een klasse of norm vraagt (`brandklasse` op `flame_retardant`), of lopende
- * tekst als bron (`soepelheid` op `short_description`) — deed Opus 5 er vijf,
- * 5.5 op low zeven en 5.5 op medium twee. Low is dus goedkoper en sneller, maar
- * slechter op de enige fout die telt, en het miste ook gewone koppelingen als
- * `vezelsamenstelling` op `composition_info`. Zie NOTES.md.
+ * Low is goedkoper maar mist gewone koppelingen (`vezelsamenstelling` op
+ * `composition_info`, `gewicht_gm2` op `weight_per_m2`) en doet er meer waarbij
+ * een gat ten onrechte verdwijnt (`fr_wasbestendig_boolean` op een ja/nee-kolom
+ * voor brandvertragend). Een eerdere vergelijking mét Opus 5 draaide zonder de
+ * kenmerktypen en is daardoor niet met deze getallen te vergelijken; de volgorde
+ * was dezelfde. Zie NOTES.md.
  */
 const ATTRIBUTE_MODEL = 'claude-opus-5-5';
 
