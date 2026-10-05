@@ -20,7 +20,7 @@ import type { AttributeShape, Dataset, Locale, QuestionSetState } from '../src/d
 import { attributeInventory, mappingSummary, type Mapping } from '../src/questions/mapping';
 import { allValidated, stillToConfirm } from '../src/questions/mutate';
 import { describeAttribute, describeColumn } from '../src/semantic/describe';
-import { filledIn, profileCatalog, shapeMisfit, type ColumnProfile } from '../src/engine/profile';
+import { carriesCharacteristic, filledIn, profileCatalog, shapeMisfit, type ColumnProfile } from '../src/engine/profile';
 import { suggestMappings } from '../src/semantic/suggest';
 import { embed, ModelUnavailable, type LoadProgress } from '../src/semantic/model';
 import { MappingNotConfigured, requestMapping } from '../src/semantic/remote';
@@ -241,7 +241,16 @@ export function MappingStep({
     // Alleen wat nog open staat, en alleen de kolommen die nog vrij zijn: wat al
     // gekoppeld is hoeft niet opnieuw en mag niet weggekaapt worden.
     const taken = rows.flatMap((row) => mapping[row.key] ?? []);
-    const free = columns.filter((column) => !taken.includes(column));
+    const untaken = columns.filter((column) => !taken.includes(column));
+    // Lopende tekst, bestanden en tijdstippen worden niet voorgesteld: de scan
+    // beantwoordt vragen uit kenmerken, niet uit een omschrijving. Lege kolommen
+    // evenmin: daar valt niets in te herkennen. Wat om de eerste reden afvalt
+    // staat erbij, want de merchant kan zo'n kolom nog wel zelf kiezen.
+    const free = untaken.filter((column) => carriesCharacteristic(profiles[column]));
+    const skipped = untaken.filter((column) => profiles[column]?.unfit !== undefined);
+    const skippedNote = skipped.length > 0
+      ? [s.mapping.unfitSkipped.replace('{kolommen}', skipped.join(', '))]
+      : [];
     const described = open.map((row) => ({
       key: row.key,
       text: describeAttribute({
@@ -259,15 +268,12 @@ export function MappingStep({
     try {
       // In blokken: de route neemt hoogstens 200 kenmerken en 300 kolommen per
       // aanvraag, en een bank als woontextiel v4 vraagt er ruim 700. Eén grote
-      // aanvraag gaf een 400 en dus stil geen enkel voorstel. Lege kolommen gaan
-      // niet mee: daar valt niets in te herkennen, en ze drukken de kolommen die
-      // wél iets zeggen onder de grens.
+      // aanvraag gaf een 400 en dus stil geen enkel voorstel.
       const describedColumns = free
-        .filter((column) => (profiles[column]?.filled ?? 0) > 0)
         .slice(0, MAX_COLUMNS)
         .map((column) => ({ key: column, text: describeColumn(column, catalog, profiles[column]) }));
       const pairs: { key: string; columns: string[] }[] = [];
-      const seenNotes: string[] = [];
+      const seenNotes: string[] = [...skippedNote];
       const blocks: (typeof described)[] = [];
       for (let start = 0; start < described.length; start += ATTRIBUTE_BATCH) {
         blocks.push(described.slice(start, start + ATTRIBUTE_BATCH));
@@ -314,7 +320,7 @@ export function MappingStep({
         free.map((column, i) => ({ key: column, vector: vectors[described.length + i] })),
       );
       const fitting = keepFitting(found.map((f) => ({ key: f.key, columns: [f.column] })));
-      setNotes(fitting.dropped);
+      setNotes([...skippedNote, ...fitting.dropped]);
       accept(fitting.kept, 'browser');
     } catch (caught) {
       setFailed(caught instanceof ModelUnavailable);

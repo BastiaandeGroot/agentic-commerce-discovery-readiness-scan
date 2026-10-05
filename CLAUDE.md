@@ -28,7 +28,7 @@ mens ziet en bevestigt — geen oordeel dat stilzwijgend doorwerkt.
 
 1. Het **koppelscherm** (`components/MappingStep.tsx`, met `src/semantic/` en
    `app/api/mapping/`). Daar bepaalt een model welk kenmerk in welke kolom staat:
-   Claude Opus 5 via de serverroute, en anders een embeddingmodel in de
+   Claude Opus 5.5 via de serverroute, en anders een embeddingmodel in de
    browser. Een voorstel van Claude telt alleen als het een waarde uit die kolom
    aanwijst die de vraag beantwoordt (`readProposals` in `src/semantic/prompt.ts`). Er gaan kenmerknamen, vraagteksten en kolomnamen de deur uit, geen
    productrij en geen veldwaarde.

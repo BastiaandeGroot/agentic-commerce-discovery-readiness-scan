@@ -393,6 +393,7 @@ export const STRINGS = {
       expects: 'verwacht',
       misfit: 'Dit kenmerk verwacht {verwacht}; deze kolom bevat {gevonden}. Weet je zeker dat het antwoord hierin staat, laat hem dan staan.',
       misfitDropped: 'Voorstel {kenmerk} → {kolom} vervallen: het kenmerk verwacht {verwacht}, de kolom bevat {gevonden}.',
+      unfitSkipped: 'Niet voorgesteld als bron: {kolommen}. Daar staat lopende tekst, een bestand of een tijdstip in en geen kenmerk. Weet je dat het antwoord er toch in staat, kies de kolom dan zelf.',
       openSummary:
         'Onbeantwoordbaar met deze koppeling: {vragen} vragen, door {kenmerken} ongekoppelde kenmerken. Staat een kenmerk echt niet in je catalogus, laat dan "geen kolom" staan — dat is de bevinding. Welke vragen het zijn, zie je in het rapport.',
       moreQuestions: 'meer vragen',
@@ -1551,6 +1552,7 @@ export const STRINGS = {
       expects: 'expects',
       misfit: 'This characteristic expects {verwacht}; this column holds {gevonden}. If you are sure the answer is in here, keep it.',
       misfitDropped: 'Proposal {kenmerk} → {kolom} dropped: the characteristic expects {verwacht}, the column holds {gevonden}.',
+      unfitSkipped: 'Not proposed as a source: {kolommen}. These hold running text, a file or a timestamp rather than a characteristic. If you know the answer is in there, pick the column yourself.',
       openSummary:
         'Unanswerable with this mapping: {vragen} questions, because of {kenmerken} unlinked characteristics. If a characteristic really is not in your catalogue, leave "no column" — that is the finding. The report shows which questions they are.',
       moreQuestions: 'more questions',

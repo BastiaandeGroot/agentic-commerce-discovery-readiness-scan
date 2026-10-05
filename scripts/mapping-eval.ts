@@ -14,7 +14,7 @@ import { ingest } from '../src/intake/index';
 import { generateQuestionSets } from '../src/questions/generate';
 import { importQuestionList } from '../src/questions/list';
 import { attributeInventory } from '../src/questions/mapping';
-import { profileCatalog, shapeMisfit } from '../src/engine/profile';
+import { carriesCharacteristic, profileCatalog, shapeMisfit } from '../src/engine/profile';
 import { describeAttribute, describeColumn } from '../src/semantic/describe';
 import { PROPOSALS_SCHEMA, SYSTEM, prompt, readProposals } from '../src/semantic/prompt';
 
@@ -30,7 +30,7 @@ const open = rows.filter((row) => row.fields.length === 0);
 const profiles = profileCatalog(catalog, 0, new Set(), new Set());
 const free = [...catalog.columns].sort((a, b) => a.localeCompare(b))
   .filter((column) => !rows.some((row) => row.fields.includes(column)))
-  .filter((column) => (profiles[column]?.filled ?? 0) > 0)
+  .filter((column) => carriesCharacteristic(profiles[column]))
   .slice(0, 300);
 
 const attributes = open.map((row) => ({

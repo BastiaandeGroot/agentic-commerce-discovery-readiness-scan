@@ -1,7 +1,7 @@
 # Werknotities
 
 Sessiestand: wat er staat, wat er besloten is, wat er open is.
-Laatst bijgewerkt: 2026-09-16.
+Laatst bijgewerkt: 2026-09-23.
 
 Structurele regels die altijd gelden staan **niet** hier maar in `CLAUDE.md`.
 
@@ -678,6 +678,85 @@ vond `machine_washable` en `sustainable` die de anderen misten; twijfelgevallen
 `merk → supplier` en `meubeltype_advies → categories`. ~$0,20 en ~80 seconden per
 blok van honderd kenmerken; vier blokken lopen tegelijk.
 
+**Sinds 5 oktober 2026: Opus 5.5 op effort medium.** Gevraagd was low; de meting
+wees medium aan. Drie instellingen met dezelfde opstelling op De Groot en
+woontextiel v4 (430 open kenmerken, 119 kolommen, vijf blokken), één run elk:
+
+| | voorstellen | uitvoertokens | per honderd kenmerken | gevaarlijk (van 9) |
+|---|---|---|---|---|
+| Opus 5 medium (was live) | 130 | 22.475 | ~$0,18, ~47 s | 5 |
+| Opus 5.5 low | 108 | 8.047 | ~$0,09, ~14 s | 7 |
+| Opus 5.5 medium | 112 | 17.685 | ~$0,13, ~33 s | 2 |
+
+"Gevaarlijk" zijn negen nagelopen voorstellen waarbij een gat ten onrechte
+verdwijnt: `brandklasse`, `brandgedrag_classificatie` en `fr_wasbestendig_boolean`
+op `flame_retardant` (ja/nee), `waterdichtheid_klasse` op `water_proof`,
+`testnorm_lichtechtheid` op `lightfatness`, `weefdichtheid` op `curtain_density`,
+`leverbaarheid_status` op `internal_comment` (de opdracht verbiedt die letterlijk),
+en `soepelheid` en `valgedrag_omschrijving` op `short_description` (lopende tekst
+als bron, een afgevallen richting). 5.5 medium houdt er twee over
+(`waterdichtheid_klasse`, `weefdichtheid`) en maakt één nieuwe van hetzelfde soort
+(`testnorm_slijtvastheid` op `martindale`). Low miste daarnaast gewone koppelingen
+die de andere twee vonden, zoals `vezelsamenstelling` en `materiaalsamenstelling`
+op `composition_info`. Kanttekening: één run per instelling, en de vorige meting
+gaf tussen runs al 31–33; de verschillen van een paar voorstellen zijn ruis, het
+verschil 7 tegen 2 is dat niet.
+
+Wat alle drie de uitdraaien laten zien is één soort fout, en die zit in de opdracht
+en niet in het model. De toets is "beantwoordt een waarde uit de kolom de vráág", en een
+vraag leunt op meer kenmerken tegelijk. Dus krijgt één ja/nee-kolom ze allemaal:
+`flame_retardant` (Yes/No) is voorgesteld voor `brandvertragend_ja_nee` — terecht
+— maar ook voor `brandklasse`, `brandgedrag_classificatie` en
+`fr_wasbestendig_boolean`. Zelfde patroon bij `waterdichtheid_klasse → water_proof`,
+`testnorm_lichtechtheid → lightfatness` en `weefdichtheid → curtain_density`. Dat is
+de fout die niet mag: de vraag naar het brandbewijs lijkt beantwoord door een
+vinkje, en het gat verdwijnt. Te bouwen: de toets per kenmerk stellen in plaats van
+per vraag ("is deze waarde zélf een klasse, een norm, een percentage?"). Het
+bestaande vormoordeel (`shapeMisfit`) ving er in deze meting geen één: de
+opstelling leest de CSV zonder de bevestigde kenmerktypen uit de database, dus
+nagaan of het met die typen wél aanslaat op een klasse tegenover een ja/nee-kolom.
+Pas wijzigen mét meting.
+
+**Kolommen schiften vóór het koppelen (5 oktober 2026).** Stap 1 van drie; de
+andere twee staan hieronder. Aanleiding: `droogvoorschrift` stond op het live
+scherm op `description`. De app kende maar één soort vrije tekst, dus een
+omschrijving van 503 woorden was even goed kandidaat als een samenstelling van 5,
+en de regel "proza is geen antwoordbron" stond alleen in deze notities.
+
+- `ColumnProfile.unfit` in `src/engine/profile.ts`: `prose` (vrije tekst, geen
+  meervoudige keuze, gemiddeld acht woorden of meer per cel), `file` (pad of
+  url) en `timestamp` (datum mét tijd). Op de waarden, niet op de naam. Op De
+  Groot vallen er tien van de 120 gevulde kolommen af: `description`,
+  `short_description`, `meta_description`, `meta_title`, drie afbeeldingspaden
+  en drie tijdstippen. `url_key` en de afbeeldingslabels blijven: een slug is
+  niet met zekerheid van een code te onderscheiden zonder naar de naam te kijken.
+- Zo'n kolom wordt niet meer vóórgesteld, door Claude noch door het
+  browsermodel (`carriesCharacteristic`). De merchant kan hem nog zelf kiezen, en
+  het scherm zegt welke kolommen zijn overgeslagen.
+- `shapeMisfit` kende alleen getallen. Erbij: een klasse van drie of meer
+  waarden, of een code, op een ja/nee-kolom.
+
+Nagerekend op de drie metingen hierboven, zonder nieuwe modelaanroep: van de
+negen gevaarlijke voorstellen vallen er vier af (`brandklasse` en
+`brandgedrag_classificatie` op de vorm, `soepelheid` en `valgedrag_omschrijving`
+op de lopende tekst). Eén voorstel valt af dat verdedigbaar was:
+`binnen_of_buitengebruik` (binnen, buiten, beide) op de ja/nee-kolom
+`outdoor_usage`. Dat is de prijs van de klasse-regel en een bewuste keuze — het
+vervallen voorstel staat als melding op het scherm. Voor de gekozen instelling
+(5.5 medium) verandert stap 1 in deze meting verder niets: de twee gevaarlijke
+voorstellen die dat model overhoudt zijn geen vormfout. Stap 1 is een vloer onder
+élk model, geen verbetering van dit ene getal.
+
+Wat stap 1 niet vangt, en waar stap 2 en 3 voor zijn: `fr_wasbestendig_boolean`
+op `flame_retardant` (ja/nee op ja/nee, maar een ander ja), `waterdichtheid_klasse`
+op `water_proof`, `testnorm_lichtechtheid` op `lightfatness`, `weefdichtheid` op
+`curtain_density` en `leverbaarheid_status` op `internal_comment`. Dat is
+betekenis en geen vorm. Het plan: (2) het model stelt per kolom één keer vast wat
+hij meet — 119 kolommen in plaats van 430 kenmerken, één keer per catalogus, als
+tabel die de merchant ziet — en (3) de kenmerken worden tegen die vaste betekenis
+gelegd, met als toets "ís deze kolom dit kenmerk" in plaats van "raakt een waarde
+de vraag". De naam mag een kolom voordragen, de waarden beslissen.
+
 Wat er nog niet in zit: een koppeling die eerder al bewaard is, blijft staan. Het
 model stelt alleen voor wat open staat, dus foute koppelingen van vóór deze
 wijziging haalt de merchant zelf weg. Het browsermodel (zonder sleutel) werkt nog
@@ -712,12 +791,87 @@ die op `categorie` staan en kopieert ze als één pad per regel. De boom van De
 Groot levert een kleine dertig knopen, dus rond de honderdvijftig
 onderzoeksbeurten.
 
-Volgende stap is stap 1 uit de bouwvolgorde in paragraaf 7: **nagaan of
-`importQuestionList` dezelfde poorten haalt als `/api/bank-result`** — de
-`kritiek_toets` en de overlay-regel. Een handmatige upload is de hele route;
-haalt hij die poorten niet, dan komt een bank binnen die de app van haar eigen
-pijplijn zou weigeren. Stap 3 (één markt end-to-end, naast woontextiel v2) is de
-beslissing: valt die tegen, dan is de app-route goedkoper én beter.
+Stap 1 uit de bouwvolgorde is gedaan — 18 september. De vraag was of een
+handmatige upload dezelfde poorten haalt als `/api/bank-result`; het antwoord is
+dat **die deur er zelf geen heeft**. `deliverBank` roept dezelfde
+`importQuestionList` aan die de merchant gebruikt en voegt niets toe behalve de
+status `review` bij bevindingen — en die bevindingen levert de maker zelf aan.
+De poorten waar het om ging staan in de generatiefasen, vóór de CSV bestaat, en
+een aangeleverde bank passeert ze dus hoe hij ook binnenkomt.
+
+Op een proeflijst nagemeten. Wat de lezer wél doet: criterium 3 en 4 van de
+kritiek-toets toepassen, met waarschuwing (`enforceCriticalCriteria`), een dubbel
+vraag-id blokkeren, en een vraag zonder kenmerken melden. Wat hij niet doet, en
+de pijplijn wel:
+
+- **Kritiek zonder `kritiek_toets` blijft kritiek**, zonder één waarschuwing. De
+  pijplijn zet die op hoog (`enforceCriticalTest`), net als een herweging naar
+  kritiek zonder toets. Dit is de ergste: kritiek is de poort voor
+  basisgeschikt, en een lijst waarin alles kritiek heet komt schoon binnen.
+- **Geen `unmeasurable`-lat.** Een bank waarin geen enkele vraag een kenmerknaam
+  draagt — precies waarop woontextiel v3 sneuvelde — leest foutloos in en meet
+  dan overal nul. De pijplijn laat zo'n fase mislukken.
+- **De overlay-lat werkt wél, maar stil.** Een overlay zonder eigen vraag met
+  dekking > 0 haalt `withCoveredOverlays` bij het scannen weg, inclusief zijn
+  herwegingen. Dat is de juiste uitkomst; alleen zegt niemand het.
+
+Het beoordeelscherm vangt het eerste punt (`critical-without-test` in
+`review.ts`), maar daar komt een bank die de merchant zelf inleest nooit langs.
+
+Die reparatie leek eerst "de toets uit `enforceCriticalTest` in
+`importQuestionList` zetten". **Dat gaat niet door** — 21 september. Woontextiel
+v4 heeft geen kolom `kritiek_toets`; de bank is van vóór die kolom. Die regel zou
+alle vijftien kritieke vragen van de enige vrijgegeven bank naar hoog zetten en
+basisgeschikt leeg maken. Wat er wel komt is een **waarschuwing** als een lijst
+kritieke vragen draagt zonder enige onderbouwing: die verlaagt niets, breekt v4
+niet, en zet een aangeleverde bank op `review`.
+
+Stap 3 (één markt end-to-end, naast woontextiel v2) blijft de beslissing: valt
+die tegen, dan is de app-route goedkoper én beter.
+
+---
+
+**De definitie van kritiek gaat naar twee criteria** — 23 september, besloten.
+
+In plaats van vier:
+
+1. De vraag zegt zelf of het product **geschikt** is voor wat de koper ermee gaat
+   doen — geen getal waaruit dat pas volgt, en geen tegenvaller.
+2. Het antwoord komt **uit de catalogus**, zonder de maten of keuzes van de koper.
+
+*Onherstelbaar* en *over het product* vervallen als aparte eis. Niet omdat ze
+onwaar zijn, maar omdat ze niets wegfilterden: in een markt waar alles op maat
+geknipt wordt is alles onherstelbaar, en dat liet 31 van de 171 vragen door.
+Onherstelbaar blijft wél de reden dát we dit meten; het hoort in de uitleg aan de
+merchant, niet in de zeef.
+
+Wat de meting hierachter opleverde, op v4 (171 vragen, 15 kritiek na de 32
+correcties):
+
+- Op v4 verandert de nieuwe definitie bijna niets: 13 blijven, 2 vervallen
+  (BUI-03 lichtechtheid is verloop en geen geschiktheid; OND-02 is een risico met
+  een gebruiksadvies). GOR-01 blijft, maar is als informatie geformuleerd
+  ("hoeveel licht laat hij door") terwijl het een geschiktheidsvraag is — tekst
+  meenemen naar een volgende versie.
+- De winst zit elders. Op de oudere lijst van 51 vragen, die geen kolom
+  `intentie` heeft, hield de vier-criteria-toets 12 van de 14 kritieke vragen
+  overeind — inclusief retourbeleid, voorraad, verfbad en twee rekenvragen. De
+  twee tests, toegepast op de vraagtekst, laten daar 4 over. **De oude definitie
+  is niet te breed maar te afhankelijk**: hij leunt op `intentie` en
+  `antwoordtype`, en glijdt geruisloos door zodra een lijst die niet goed invult.
+  Dat is precies het geval bij elke bank die van buiten komt.
+- De app kan "is dit een geschiktheidsvraag" niet zelf beslissen. Het signaal
+  staat in `intentie`: de 15 kritieke vragen van v4 staan op `fit` (7),
+  `function` (3), `safety` (2), `durability` (2) en `expectation` (1). Een harde
+  regel "alleen fit/function/safety" zou BUI-03 en OND-02 laten vallen — goed —
+  maar ook BUI-11, dat verkeerd gelabeld staat en gewoon een geschiktheidsvraag
+  is. Daarom **een waarschuwing en geen poort**: dezelfde redenering als bij het
+  koppelen, een gemiste koppeling zie je en een verkeerd verdwenen vraag niet.
+
+Stand van het werk: v4 corrigeren met de nieuwe bril is de eerste stap en vraagt
+geen code — BUI-03 en OND-02 naar hoog, BUI-11 blijft bevestigd kritiek. Daarna
+pas de code: `src/questions/critical.ts`, de methode, de plugin en de
+generatieprompt (geen vier zinnen onderbouwing meer per kritieke vraag).
 
 Niet in een browser gezien: `/dashboard/knopen` en `/api/admin/category-nodes`
 staan in de routetabel en de build haalt het, maar de gevulde lijst vraagt een
@@ -775,12 +929,13 @@ doet. Slaapt de laptop, dan staat de reeks stil. Oplossing: de taak in Render
 aanzetten (betaald; `APP_URL` en `BANK_EXECUTOR_KEY` in het dashboard), of een
 geplande GitHub Action met dezelfde twee als secret.
 
-**Stand woontextiel (14 september)** — v1 en v2 vrijgegeven; v3 ingetrokken (alle
-negen categorieën zonder bruikbare kenmerknamen, zie de beslissing hieronder);
-**v4 staat op review** en is nagekeken: 171 vragen, 729 kenmerken, geen enkele
-categorievraag zonder kenmerk en geen kenmerk dat een zin is. Volgende stap:
-v4 beoordelen en vrijgeven. Let bij de indeling op Tassenstoffen, Paneel en
-Buitenkussens.
+**Stand woontextiel (23 september)** — v1, v2 en **v4 vrijgegeven**; v3
+ingetrokken (alle negen categorieën zonder bruikbare kenmerknamen, zie de
+beslissing hieronder). v4: 171 vragen, 729 kenmerken, geen enkele categorievraag
+zonder kenmerk en geen kenmerk dat een zin is. De 32 `importance_corrections`
+zijn 15 bevestigingen, 16 verlagingen (4 vragen en 12 herwegingen) en 1
+verhoging; er blijven 15 kritieke vragen over plus de herweging van BAS-21 in
+Gordijnstoffen. Let bij de indeling op Tassenstoffen, Paneel en Buitenkussens.
 
 **Een categoriestap kreeg de vorm van een vraag niet te zien (11 september).**
 De overlay-prompt verwees naar "zelfde vorm als de basislaag", die het model in
