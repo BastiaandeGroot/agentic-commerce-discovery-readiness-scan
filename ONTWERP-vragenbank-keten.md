@@ -430,11 +430,51 @@ onder dezelfde vraag. Dat is het verbod uit paragraaf 5, langs de achterdeur.
 ### Wat deze route kost aan zekerheid
 
 De app vertrouwt de uitvoerder bewust niet op zijn woord: inlezen, poorten en
-degraderen gebeuren serverzijdig bij `/api/bank-result`. Een handmatige upload
-gaat door `importQuestionList`, en die controleert veel — maar of hij ook de
-nieuwere poorten haalt (`kritiek_toets`, de overlay-lat) is niet nagegaan. Dat
-moet uitgezocht zijn voordat deze route de echte weg wordt; anders glipt er
-handmatig iets binnen dat de pijplijn zou tegenhouden.
+degraderen gebeuren serverzijdig bij `/api/bank-result`. Op 18 september is
+nagegaan wát die deur werkelijk tegenhoudt, en het antwoord verschuift de vraag:
+**`/api/bank-result` doet niets bovenop `importQuestionList`.** De route roept
+precies dezelfde lezer aan (`deliver.ts`), en de poorten waar het hier om gaat
+staan nergens bij de deur — ze staan in de generatiefasen, vóór de CSV bestaat.
+Een handmatige upload mist ze dus, maar een handmatige *aflevering* bij
+`/api/bank-result` mist ze net zo goed. Wat daar nog wél gebeurt is één ding: een
+bank met bevindingen komt op `review` te staan, en die bevindingen levert de
+maker zelf aan.
+
+Gemeten op een proeflijst met precies die gebreken erin:
+
+| Poort | De pijplijn | Een aangeleverde lijst |
+|---|---|---|
+| Kritiek zonder `kritiek_toets` | `enforceCriticalTest` zet hem op hoog, met bevinding | blijft kritiek, geen waarschuwing |
+| Herweging naar kritiek zonder toets | idem, met bevinding | blijft kritiek, geen waarschuwing |
+| Criterium 3 (over het product) en 4 (uit de catalogus) | `notAboutProduct` | `enforceCriticalCriteria`, mét waarschuwing |
+| Overlay zonder één eigen vraag | de fase mislukt (`EmptyPhase`) | de overlay komt binnen; bij het scannen haalt `withCoveredOverlays` hem stil weg |
+| Meerderheid zonder kenmerknaam | de fase mislukt (`unmeasurable`) | een waarschuwing per vraag; de bank komt binnen |
+| Overlay zonder dekking > 0 | bevinding (`uncoveredFinding`) | `withCoveredOverlays` bij het scannen, stil |
+| Dubbel vraag-id | de pijplijn hernoemt | blokkerende fout |
+
+De ergste is de eerste: een lijst waarin élke vraag kritiek heet komt zonder één
+waarschuwing binnen, en kritiek is de poort voor basisgeschikt. De tweede in
+ernst is `unmeasurable` — een bank waarin geen enkele vraag een kenmerknaam
+draagt, precies waarop woontextiel v3 sneuvelde, leest foutloos in en meet dan
+overal nul.
+
+Het beoordeelscherm vangt het eerste wél (`critical-without-test` in
+`review.ts`), maar dat scherm staat in de beheerdersroute. Een bank die de
+merchant zelf in `BankStep` inleest komt er nooit langs.
+
+De voor de hand liggende reparatie — de toets uit `enforceCriticalTest` in
+`importQuestionList` zetten, kritiek zonder toets wordt hoog — is op 21 september
+afgevallen. Woontextiel v4 heeft namelijk helemaal geen kolom `kritiek_toets`; de
+bank is gegenereerd voordat die bestond. Die regel zou dus alle vijftien kritieke
+vragen van de enige vrijgegeven bank naar hoog zetten en basisgeschikt tot een
+lege trede maken — precies de fout waarvoor het vierde criterium ooit is
+toegevoegd.
+
+Wat er wél komt, en het is kleiner: een **waarschuwing** als een lijst kritieke
+vragen draagt zonder ergens een onderbouwing. Die verlaagt niets, breekt v4 niet,
+en zet een aangeleverde bank op `review` zodat er een mens naar kijkt.
+
+Daarnaast is de definitie zelf herzien — zie hieronder.
 
 Verder vervalt het hervatten per fase: valt een sessie om, dan is het aan de
 uitvoerder om te weten waar hij was. Dat is te ondervangen door per knoop een
@@ -651,9 +691,11 @@ zelfstandig bruikbaar. De knopenlijst zelf hoeft niet meer gebouwd te worden:
 `/dashboard/knopen` toont wat op `categorie` staat en kopieert het als één pad
 per regel.
 
-1. **Nagaan wat `importQuestionList` werkelijk tegenhoudt.** Haalt een handmatige
-   upload dezelfde poorten als `/api/bank-result`? Zonder dat antwoord leunt de
-   hele route op een aanname. Dit is een leestaak van een uur, geen bouwwerk.
+1. ~~**Nagaan wat `importQuestionList` werkelijk tegenhoudt.**~~ Gedaan op 18
+   september; het antwoord staat in 3c onder *Wat deze route kost aan zekerheid*.
+   Kort: `/api/bank-result` doet niets bovenop de lezer, en de toets op
+   `kritiek_toets` staat alleen in de generatiefasen. Eruit volgt één kleine
+   bouwstap die hiervoor komt: die toets in `importQuestionList` zetten.
 2. **De skill `vragenbank-maken` per knoop laten werken.** Nu werkt hij op
    marktniveau met één panel van vijf. Erbij: panel per knoop, de basislaag als
    invoer bij elke knoopbeurt, en per knoop een tussenbestand zodat een
