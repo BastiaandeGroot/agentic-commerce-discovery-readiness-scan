@@ -13,6 +13,15 @@
 //   node <tmp>/gen.mjs prompt <run.json> [--out=<opdracht.md>]     wat deze stap vraagt
 //   node <tmp>/gen.mjs answer <run.json> <antwoord.json> [--at=JJJJ-MM-DD]   het antwoord verwerken
 //   node <tmp>/gen.mjs status <run.json>
+//   node <tmp>/gen.mjs extend <run.json> <sites.json> --keep-findings=<n> [--at=JJJJ-MM-DD]
+//
+// `extend` breidt het panel uit nadat de oogst al gedaan is: de sites komen
+// erbij, de oogst die er ligt blijft, en de reeks gaat verder bij de eerste
+// nieuwe site. Alles wat ná de oogst uit het oude panel is afgeleid — de
+// onderwerpen, de indeling, de vragen — vervalt, want dekking en "op hoeveel
+// sites" hebben een andere noemer gekregen. `--keep-findings` is het aantal
+// bevindingen van vóór het samenvoegen dat blijft staan. `sites.json` is
+// `[{ "name", "url", "type", "reason" }]`.
 //
 // `segmenten.json` is `[{ "name": "...", "count": 0 }]`: categorienamen met
 // aantallen, verder niets. De stap `assemble` vraagt geen model; `answer` zonder
@@ -72,6 +81,44 @@ if (command === 'init') {
   };
   save(run);
   console.log(`Run aangemaakt voor ${vertical} (generatie ${GENERATION_VERSION}), ${segments.length} categorieën als afbakening. ${where(run)}`);
+} else if (command === 'extend') {
+  const run = load();
+  const sitesPath = positional[0];
+  const keep = Number(flag('keep-findings'));
+  if (!sitesPath || !Number.isInteger(keep)) {
+    console.error('extend vraagt een bestand met sites en --keep-findings=<aantal>.');
+    process.exit(1);
+  }
+  if (run.state.harvest.length !== run.state.panel.length) {
+    console.error('Uitbreiden kan pas als elke site van het huidige panel geoogst is.');
+    process.exit(1);
+  }
+  const at = flag('at') ?? new Date().toISOString().slice(0, 10);
+  const known = new Set(run.state.panel.map((site) => site.name.toLowerCase()));
+  const added = (JSON.parse(readFileSync(sitesPath, 'utf8')) as { name: string; url: string; type?: string; reason?: string }[])
+    .filter((site) => site.name && site.url && !known.has(site.name.toLowerCase()))
+    .map((site) => ({ name: site.name, url: site.url, type: site.type ?? 'onbekend', consultedAt: at, reason: site.reason }));
+  const first = run.state.panel.length;
+  const next: Run = {
+    ...run,
+    phase: encodePhase({ kind: 'harvest', index: first }),
+    state: {
+      ...run.state,
+      panel: [...run.state.panel, ...added],
+      topics: [],
+      grouping: [],
+      base: undefined,
+      overlays: [],
+      facets: [],
+      csv: undefined,
+      findings: [
+        ...run.state.findings.slice(0, keep),
+        `Het panel is na de eerste oogst uitgebreid van ${first} naar ${first + added.length} sites: ${added.map((site) => site.name).join(', ')}.`,
+      ],
+    },
+  };
+  save(next);
+  console.log(`Panel uitgebreid met ${added.length} sites. ${where(next)}`);
 } else if (command === 'status') {
   const run = load();
   console.log(where(run));
