@@ -870,17 +870,19 @@ Niet opnieuw voorstellen zonder dat er iets veranderd is.
 **Woontextiel v5 is gegenereerd, nog niet in de app** — 6 oktober. De reeks is in
 de sessie doorlopen (geen API-kosten) met `scripts/generate-local.ts`; de run staat
 in `~/Documents/Vragenbank/run-woontextiel-v5/`, de tabel in
-`~/Documents/Vragenbank/woontextiel-v5.csv`: 32 algemene vragen, 12 vragensets, 87
-vragen, vijf kritiek. Nog te doen vóór uploaden:
+`~/Documents/Vragenbank/woontextiel-v5.csv`: 32 algemene vragen, 12 vragensets, 89
+vragen, vijf kritiek. Met de boomregel en zonder koppelscherm: 1.850 van 3.746
+basisgeschikt. Nog te doen vóór uploaden:
 
-- **Paneel landt verkeerd.** De bank legt "Paneel" (De Groot, Textielstad) als
-  toepassing onder Kussenpanelen, maar bij De Groot hangt Paneel onder
-  Gordijnstoffen (270 producten). Die krijgen nu de paneelmaat-vraag in plaats van
-  de gordijnvragen en tellen te makkelijk als basisgeschikt.
-- **Windschermen mist zijn kernvraag** (hoeveel wind en inkijk houdt het doek
-  tegen): beide sites behandelen hem, de samenvoegstap maakte er geen onderwerp van.
-- Naaigarens en Onderhoudsproducten kwamen in de headless scan niet als categorie
-  naar voren; niet uitgezocht of dat de export of de naamherkenning is.
+- Hersteld op 6 oktober, na de reeks en met de hand in `run.json` (elk als bevinding
+  in de bank): Paneel is bij De Groot een gordijnsoort en staat nu als toepassing
+  bij Gordijnstoffen; Windschermen kreeg de vraag naar winddoorlatendheid (WIN-03)
+  en inkijk (WIN-04); Naaigarens en Onderhoudsproducten dragen nu ook de
+  categorienamen uit de lijst van de aanvrager als alias, zodat ze in zijn boom
+  landen. Headless nagemeten: 16 sets, alle onder hun eigen naam.
+- De garens en onderhoudsmiddelen (168 producten) zijn meteen basisgeschikt: hun
+  sets hebben geen kritieke vraag. Dat is hoe de trechter werkt, maar het is een
+  cijfer om bij stil te staan.
 - `keurmerken` viel automatisch op `product_label` (Bestseller, Op=Op); dat is fout
   en moet op het koppelscherm weg.
 - De kritieke vragen zijn nog langs vier criteria gelegd; de twee-criteria-definitie
