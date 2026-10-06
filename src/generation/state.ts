@@ -286,6 +286,23 @@ export function emptyState(brief: RunBrief): RunState {
   };
 }
 
+/**
+ * De panelsite die de winkel van de aanvrager is, als die in het panel zit.
+ *
+ * Zijn site is één van de panelsites en nooit de enige. Maar hij is ook de
+ * winkel die straks gemeten wordt, en wie zijn eigen meetlat mag leggen meet
+ * zichzelf rijk: bij de eerste markt kwam een derde van alle geoogste vragen van
+ * de aanvrager zelf. Daarom mag zijn site wel bijdragen maar niet dragen — zie
+ * `readStructure` en `enforceCriticalTest` in `pipeline.ts`.
+ *
+ * Herkend op het adres uit de aanvraag, zonder `www.` en zonder pad.
+ */
+export function requesterSite(state: Pick<RunState, 'brief' | 'panel'>): string | undefined {
+  const host = (url: string) => url.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split(/[/?#]/)[0];
+  const own = state.brief.merchantSite ? host(state.brief.merchantSite) : '';
+  return own === '' ? undefined : state.panel.find((site) => host(site.url) === own)?.name;
+}
+
 /** De categorieën die een eigen overlay verdienen, in vaste volgorde. */
 export function overlayCategories(state: RunState): string[] {
   // Losstaand hoort erbij: ook die categorie krijgt een eigen vragenset, alleen

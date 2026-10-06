@@ -516,7 +516,7 @@ gebruikt, met de site erbij. Herkomst staat bij elk getal, en nu ook bij elke na
 
 ### Wanneer een segment bestaat
 
-Twee poorten, allebei na te rekenen:
+Drie poorten, alle drie na te rekenen:
 
 1. **Het segment staat op minstens twee panelsites als categorie.** Eén site is
    de menukeuze van één winkel; twee is een indeling van de markt. Het getal
@@ -524,6 +524,14 @@ Twee poorten, allebei na te rekenen:
 2. **Er is minstens één eigen consumentenvraag die een panelsite behandelt.** Dat
    is de bestaande lat voor een overlay en die blijft. Haalt een segment de
    eerste poort en niet de tweede, dan is het een toepassingsprofiel.
+
+3. **Een ándere site dan de aanvrager behandelt er een vraag onder.** Toegevoegd
+   op 6 oktober 2026, na de eerste echte markt. De site van de aanvrager is één
+   van de panelsites, en daar leverde hij een derde van alle geoogste vragen: bij
+   de kleinere segmenten kwamen de eigen vragen grotendeels van hemzelf. Dan meet
+   de bank hem langs zijn eigen lat, en vindt ze zijn blinde vlekken niet. Zijn
+   site mag bijdragen, maar een vragenset moet op iemand anders rusten. Om
+   dezelfde reden kan een vraag die alleen op zijn site staat niet kritiek zijn.
 
 Een segment dat alleen de aanvrager voert, haalt de eerste poort niet. Het wordt
 een bevinding op het beoordeelscherm, en zijn categorie valt onder haar

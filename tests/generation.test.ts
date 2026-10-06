@@ -68,7 +68,10 @@ function antwoord(phase: string): unknown {
         { name: site === 3 ? 'Vorhangstoffe' : 'Gordijnstoffen' },
         ...(site === 4 ? [{ name: 'Tassenstoffen' }] : []),
       ],
-      questions: [{ question: 'Is dit sterk genoeg voor mijn bank?', source: 'faq', url: 'https://een.nl/faq', segment: 'Meubelstoffen' }],
+      questions: [
+        { question: 'Is dit sterk genoeg voor mijn bank?', source: 'faq', url: 'https://een.nl/faq', segment: 'Meubelstoffen' },
+        { question: 'Hoeveel licht laat het door?', source: 'faq', url: 'https://een.nl/faq', segment: site === 3 ? 'Vorhangstoffe' : 'Gordijnstoffen' },
+      ],
       attributes: [{ namedAs: 'slijtvastheid', meaning: 'schuurweerstand' }],
       rules: [{ name: 'martindale_bank', rule: '>= 30000 voor bankstof', url: 'https://een.nl/faq' }],
       notes: [],
@@ -308,6 +311,55 @@ test('een segment van meer sites zonder eigen vragenset wordt gemeld', async () 
   assert.ok(state.findings.some((finding) => finding.includes('Meubelstoffen (2 sites)') && finding.includes('alleen de algemene vragen')));
 });
 
+test('de site van de aanvrager draagt geen vragenset', async () => {
+  // Twee sites voeren tassenstoffen, maar alleen de aanvrager (Vijf) behandelt
+  // er een vraag. Dan legt hij zijn eigen meetlat, en komt er geen eigen set.
+  const ask: Ask = async (task) => {
+    const json = antwoord(task.phase) as Record<string, unknown>;
+    if (task.phase === 'harvest:2') return { json: { ...json, segments: [...(json.segments as unknown[]), { name: 'Tassenstoffen' }] }, usage: { input: 0, output: 0, cached: 0 } };
+    if (task.phase === 'harvest:4') {
+      return {
+        json: { ...json, questions: [...(json.questions as unknown[]), { question: 'Hoeveel kan deze tas dragen?', source: 'faq', segment: 'Tassenstoffen' }] },
+        usage: { input: 0, output: 0, cached: 0 },
+      };
+    }
+    if (task.phase === 'structure') {
+      return {
+        json: { segments: [{ category: 'Tassenstoffen', kind: 'overlay', reason: 'draagkracht', aliases: [{ site: 'Drie', name: 'Tassenstoffen' }, { site: 'Vijf', name: 'Tassenstoffen' }] }] },
+        usage: { input: 0, output: 0, cached: 0 },
+      };
+    }
+    return { json, usage: { input: 0, output: 0, cached: 0 } };
+  };
+  let state = emptyState(BRIEF);
+  let phase: Phase = FIRST_PHASE;
+  for (let stap = 0; stap < 40 && phase.kind !== 'base'; stap++) {
+    const result = await advance(state, phase, ask, '2026-10-06');
+    state = result.state;
+    phase = result.next;
+  }
+  const tassen = state.grouping.find((entry) => entry.category === 'Tassenstoffen');
+  assert.deepEqual(tassen?.sites, ['Drie', 'Vijf']);
+  assert.equal(tassen?.kind, 'profiel');
+  assert.ok(state.findings.some((finding) => finding.includes('Tassenstoffen') && finding.includes('eigen meetlat')));
+});
+
+test('een vraag die alleen de aanvrager behandelt kan niet kritiek zijn, vakkennis wel', () => {
+  const vraag = (id: string, coverageSites: string[]) => ({
+    id, questionNl: 'x', questionEn: 'x', intent: 'geschiktheid', importance: 'kritiek' as const,
+    coverage: coverageSites.length, coverageSites, sources: [], evidence: ['kenmerk'], synonyms: [],
+    answerType: 'boolean', answerable: 'true' as const,
+    criticalTest: { decisive: 'a', irreversible: 'b', product: 'c', catalogue: 'd' },
+  });
+  const uit = enforceCriticalTest(
+    [vraag('A', ['Vijf']), vraag('B', ['Vijf', 'Een']), vraag('C', [])],
+    'Proef',
+    'Vijf',
+  );
+  assert.deepEqual(uit.questions.map((question) => question.importance), ['hoog', 'kritiek', 'kritiek']);
+  assert.ok(uit.findings.some((finding) => finding.includes('eigen poort') && finding.includes('A')));
+});
+
 test('de app telt zelf op hoeveel sites een segment staat', async () => {
   const { state } = await draai();
   const gordijn = state.grouping.find((entry) => entry.category === 'Gordijnstoffen');
@@ -530,7 +582,11 @@ test('een losstaande categorie krijgt een eigen fase en komt zonder basislaag in
     // Twee sites voeren garen als categorie; daarmee is het een segment van de markt.
     if (task.phase === 'harvest:0' || task.phase === 'harvest:1') {
       return {
-        json: { ...json, segments: [...(json.segments as unknown[]), { name: 'Naaigarens' }] },
+        json: {
+          ...json,
+          segments: [...(json.segments as unknown[]), { name: 'Naaigarens' }],
+          questions: [...(json.questions as unknown[]), { question: 'Welke naald hoort bij dit garen?', source: 'faq', segment: 'Naaigarens' }],
+        },
         usage: { input: 1, output: 1, cached: 0 },
       };
     }

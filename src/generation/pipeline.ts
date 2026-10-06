@@ -20,6 +20,7 @@ import {
   nextPhase,
   NO_USAGE,
   overlayCategories,
+  requesterSite,
   type CriticalTest,
   type DraftQuestion,
   type FacetEntry,
@@ -160,18 +161,39 @@ const notAboutProduct = (question: DraftQuestion) =>
  * niet kritiek — en dat staat als bevinding in de bank, zodat de beheerder het
  * ziet en kan terugzetten.
  */
-export function enforceCriticalTest(questions: DraftQuestion[], where: string): { questions: DraftQuestion[]; findings: string[] } {
+export function enforceCriticalTest(
+  questions: DraftQuestion[],
+  where: string,
+  /** De panelsite van de aanvrager; zie `requesterSite`. */
+  requester?: string,
+): { questions: DraftQuestion[]; findings: string[] } {
   const lowered: string[] = [];
+  const ownBar: string[] = [];
+  // Alleen de aanvrager behandelt dit: dan is het zijn eigen lat. Dekking 0 valt
+  // hier niet onder — dat is vakkennis, en die legt een vakexpert vast.
+  const onlyRequester = (question: DraftQuestion) =>
+    requester !== undefined
+    && question.coverageSites.length > 0
+    && question.coverageSites.every((site) => site.toLowerCase() === requester.toLowerCase());
   const out = questions.map((question) => {
     if (question.importance !== 'kritiek') return { ...question, criticalTest: undefined };
+    if (onlyRequester(question)) {
+      ownBar.push(question.id);
+      return { ...question, importance: 'hoog' as const, criticalTest: undefined };
+    }
     if (question.criticalTest && !notAboutProduct(question)) return question;
     lowered.push(question.id);
     return { ...question, importance: 'hoog' as const, criticalTest: undefined };
   });
   return {
     questions: out,
-    findings: lowered.length === 0 ? [] : [
-      `${where}: ${lowered.length} vra${lowered.length === 1 ? 'ag' : 'gen'} kwam${lowered.length === 1 ? '' : 'en'} als kritiek terug zonder de volledige toets, ${lowered.length === 1 ? 'gaat' : 'gaan'} over beleid, levering of voorraad, of ${lowered.length === 1 ? 'is een berekening' : 'zijn berekeningen'}. Die staan op hoog: ${lowered.join(', ')}.`,
+    findings: [
+      ...(lowered.length === 0 ? [] : [
+        `${where}: ${lowered.length} vra${lowered.length === 1 ? 'ag' : 'gen'} kwam${lowered.length === 1 ? '' : 'en'} als kritiek terug zonder de volledige toets, ${lowered.length === 1 ? 'gaat' : 'gaan'} over beleid, levering of voorraad, of ${lowered.length === 1 ? 'is een berekening' : 'zijn berekeningen'}. Die staan op hoog: ${lowered.join(', ')}.`,
+      ]),
+      ...(ownBar.length === 0 ? [] : [
+        `${where}: ${ownBar.length} vra${ownBar.length === 1 ? 'ag wordt' : 'gen worden'} alleen op de site van de aanvrager behandeld en ${ownBar.length === 1 ? 'kan' : 'kunnen'} daarom niet kritiek zijn: wie gemeten wordt, legt niet zijn eigen poort. ${ownBar.length === 1 ? 'Die staat' : 'Die staan'} op hoog: ${ownBar.join(', ')}.`,
+      ]),
     ],
   };
 }
@@ -358,13 +380,31 @@ function readStructure(raw: unknown, state: RunState): { grouping: GroupingEntry
   });
   const finalName = new Map(named.map((one) => [one.working.toLowerCase(), one.name]));
 
+  // Onder welke namen een site vragen behandelt, om na te gaan wie een segment
+  // werkelijk van vragen voorziet. De toepassingen van een segment tellen mee:
+  // een vraag onder "Banken" is een vraag over meubelstof.
+  const requester = requesterSite(state);
+  const asked = new Set(state.harvest.flatMap((harvest) =>
+    harvest.questions
+      .filter((question) => question.segment)
+      .map((question) => `${harvest.site.toLowerCase()}|${(question.segment as string).toLowerCase()}`)));
+  const membersOf = (name: string) => named.filter((other) =>
+    other.name === name || (other.kind === 'profiel' && other.parent && finalName.get(other.parent.toLowerCase()) === name));
+  const askedElsewhere = (name: string) => membersOf(name).some((member) => member.aliases.some((alias) =>
+    alias.site !== requester && asked.has(`${alias.site.toLowerCase()}|${alias.name.toLowerCase()}`)));
+
   const single: string[] = [];
+  const ownOnly: string[] = [];
   const grouping = named.map((one): GroupingEntry => {
     const sites = [...new Set(one.aliases.map((alias) => alias.site))];
     const ownSet = one.kind === 'overlay' || one.kind === 'losstaand';
     const tooFew = ownSet && sites.length < SEGMENT_SITES;
+    // De aanvrager zit in het panel, maar draagt geen vragenset: er moet een
+    // ándere site zijn die onder dit segment een vraag behandelt.
+    const selfSet = ownSet && !tooFew && requester !== undefined && !askedElsewhere(one.name);
     if (tooFew) single.push(`${one.name} (${sites.join(', ')})`);
-    const kind = tooFew ? 'profiel' : one.kind;
+    if (selfSet) ownOnly.push(one.name);
+    const kind = tooFew || selfSet ? 'profiel' : one.kind;
     return {
       category: one.name,
       count: 0,
@@ -372,7 +412,9 @@ function readStructure(raw: unknown, state: RunState): { grouping: GroupingEntry
       parent: kind === 'profiel' && one.parent ? finalName.get(one.parent.toLowerCase()) : undefined,
       reason: tooFew
         ? `${one.reason} Alleen ${sites.join(', ')} voert dit als categorie; daarom geen eigen vragenset.`.trim()
-        : one.reason,
+        : selfSet
+          ? `${one.reason} Alleen de site van de aanvrager behandelt hier vragen; daarom geen eigen vragenset.`.trim()
+          : one.reason,
       distinct: kind === 'overlay' ? one.distinct : undefined,
       aliases: one.aliases,
       sites,
@@ -384,7 +426,7 @@ function readStructure(raw: unknown, state: RunState): { grouping: GroupingEntry
   // vragen. Dat is een geldige uitkomst, maar een die iemand bewust hoort te
   // laten staan.
   const baseOnly = grouping
-    .filter((entry) => entry.kind === 'profiel' && !entry.parent && (entry.sites?.length ?? 0) >= SEGMENT_SITES)
+    .filter((entry) => entry.kind === 'profiel' && !entry.parent && (entry.sites?.length ?? 0) >= SEGMENT_SITES && !ownOnly.includes(entry.category))
     .map((entry) => `${entry.category} (${entry.sites?.length} sites)`);
 
   const unplaced = [...carried.values()].flatMap((site) =>
@@ -398,6 +440,9 @@ function readStructure(raw: unknown, state: RunState): { grouping: GroupingEntry
     findings: [
       ...(single.length > 0
         ? [`${single.length} segment${single.length === 1 ? ' wordt' : 'en worden'} maar door één panelsite als categorie gevoerd en ${single.length === 1 ? 'krijgt' : 'krijgen'} daarom geen eigen vragenset: ${single.slice(0, 12).join('; ')}. Dat is de menukeuze van één winkel; zet het hier terug als het wél een segment van de markt is.`]
+        : []),
+      ...(ownOnly.length > 0
+        ? [`${ownOnly.length} segment${ownOnly.length === 1 ? ' wordt' : 'en worden'} door meer sites gevoerd, maar alleen de site van de aanvrager behandelt er vragen: ${ownOnly.join(', ')}. ${ownOnly.length === 1 ? 'Het krijgt' : 'Ze krijgen'} geen eigen vragenset, want wie gemeten wordt legt niet zijn eigen meetlat. Zet het hier terug als een vakexpert de vragen bevestigt.`]
         : []),
       ...(baseOnly.length > 0
         ? [`${baseOnly.length} segment${baseOnly.length === 1 ? ' wordt' : 'en worden'} door meer panelsites gevoerd en ${baseOnly.length === 1 ? 'krijgt' : 'krijgen'} toch alleen de algemene vragen, omdat er geen vraag is die alleen daar gesteld wordt: ${baseOnly.join('; ')}. Laat dat staan als het klopt, of maak er een eigen vragenset van.`]
@@ -656,7 +701,7 @@ export function applyReply(
     }
 
     case 'base': {
-      const tested = enforceCriticalTest(readQuestions(answer.questions, 'BAS', takenIds(state)), 'Basislaag');
+      const tested = enforceCriticalTest(readQuestions(answer.questions, 'BAS', takenIds(state)), 'Basislaag', requesterSite(state));
       const questions = tested.questions;
       if (questions.length === 0) {
         throw new EmptyPhase('De basislaag kwam terug zonder één vraag.', reply.usage);
@@ -705,7 +750,7 @@ export function applyReply(
 
       // Een overlay bestaat omdat hij eigen vragen heeft; dat is de lat die hij
       // bij het panel haalde. Zonder één vraag is de stap mislukt.
-      const tested = enforceCriticalTest(readQuestions(answer.questions, prefix, takenIds(state)), category);
+      const tested = enforceCriticalTest(readQuestions(answer.questions, prefix, takenIds(state)), category, requesterSite(state));
       const questions = tested.questions;
       if (questions.length === 0) {
         throw new EmptyPhase(`De categorie ${category} kwam terug zonder één eigen vraag.`, reply.usage);

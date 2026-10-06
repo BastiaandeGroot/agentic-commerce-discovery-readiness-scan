@@ -1014,6 +1014,37 @@ Met vaste antwoorden nagespeeld in `tests/generation.test.ts`. **Niet op een
 echte markt gedraaid**: of een oogstbeurt een menu betrouwbaar leest en of vijf
 sites genoeg indeling delen, weet niemand tot stap 4.
 
+**De aanvrager draagt bij, maar draagt niet** — 6 oktober, besloten na de eerste
+echte run. Zijn site is één van de panelsites, en leverde daar een derde van alle
+geoogste vragen (101 van de 302); bij de kleinere segmenten kwamen de eigen vragen
+grotendeels van hemzelf. Dan meet de bank hem langs zijn eigen lat. Twee regels,
+beide in `src/generation/pipeline.ts` en herkend via `requesterSite`:
+
+- een segment krijgt alleen een eigen vragenset als een ándere site er minstens
+  één vraag onder behandelt (derde poort in `readStructure`);
+- een vraag die alleen op de site van de aanvrager staat kan niet kritiek zijn
+  (`enforceCriticalTest`). Vakkennis met dekking 0 valt daar niet onder.
+
+Zijn site helemaal uit het panel halen is overwogen en niet gedaan: dan verliest
+de bank de meeste gepubliceerde drempels, en vallen segmenten weg waar hij één van
+de twee sites is.
+
+Wat de eerste run verder leerde, en wat een volgende moet weten:
+
+- **Het ongelijke aandeel is echt en geen leesfout.** Na ruim twintig pagina's
+  extra leeswerk bij de andere sites kwamen er dertig vragen bij; de meeste
+  winkels tonen op hun categoriepagina's alleen producten.
+- **Een site kan AI-agents uitsluiten in `robots.txt`.** Twee gekozen sites
+  deden dat (Meubelstoffenvoordeel, P.W. Hoofs) en zijn niet geraadpleegd. Loop
+  dat na vóórdat een panel wordt voorgelegd, niet erna.
+- **Bot-afscherming laat sterke kandidaten afvallen** (Esvo, Böttger,
+  Stoff4you). Het panel bestaat daardoor uit wie zich laat lezen, en dat is een
+  vertekening die bij het panel hoort te staan.
+- **Een site remt af bij veel verzoeken tegelijk** (429 bij De Groot en Terrys
+  Fabrics). Na elkaar, met pauzes.
+- **De panelgrootte is geen vijf meer.** Deze run heeft er acht; de opdrachten
+  en de dekkingsnoemer volgen het panel, `extend` in het script breidt uit.
+
 `scripts/generate-local.ts` stuurt dezelfde reeks met de hand aan: één stap
 vragen, één antwoord uit een bestand geven, toestand na elke stap op schijf. Zo
 kan een Claude-sessie op een abonnement het werk van het model doen zonder
