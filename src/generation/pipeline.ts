@@ -257,22 +257,32 @@ function uncoveredFinding(category: string, questions: { coverage: number | null
 /** Vanaf hoeveel panelsites een segment van de markt is, en niet van één winkel. */
 export const SEGMENT_SITES = 2;
 
+/** Twee schrijfwijzen van dezelfde naam: "Outdoorstoffen" en "Outdoor Stoffen". */
+const sameName = (name: string) => name.toLowerCase().replace(/[\s_-]+/g, '');
+
 /**
- * De naam van een segment: die de meeste panelsites gebruiken.
+ * De naam die panelsites samen aan een segment geven, als ze het eens zijn.
  *
- * Geen vinding van het model. Bij gelijke stand de kortste, en daarna op alfabet,
- * zodat dezelfde oogst altijd dezelfde naam geeft.
+ * Een naam telt per site één keer, en pas als minstens `SEGMENT_SITES` sites hem
+ * gebruiken is het de naam van de markt. Bij gelijke stand de kortste, en daarna
+ * op alfabet, zodat dezelfde oogst altijd dezelfde naam geeft.
+ *
+ * `undefined` als elke site het anders noemt. Dan valt er niets te tellen, en is
+ * de kortste naam geen betere keuze dan een willekeurige: bij de eerste echte
+ * markt werd gecoate tafelstof zo "PVC fabric" en lichtdoorlatende gordijnstof
+ * "vitrage". In dat geval geldt de werknaam van het model, zichtbaar als bevinding.
  */
-function segmentName(aliases: { name: string }[]): string | undefined {
-  const tally = new Map<string, { name: string; count: number }>();
+function agreedName(aliases: { site: string; name: string }[]): string | undefined {
+  const tally = new Map<string, { name: string; sites: Set<string> }>();
   for (const alias of aliases) {
-    const key = alias.name.toLowerCase();
-    const seen = tally.get(key);
-    if (seen) seen.count += 1;
-    else tally.set(key, { name: alias.name, count: 1 });
+    const key = sameName(alias.name);
+    const seen = tally.get(key) ?? { name: alias.name, sites: new Set<string>() };
+    seen.sites.add(alias.site);
+    tally.set(key, seen);
   }
   return [...tally.values()]
-    .sort((a, b) => b.count - a.count || a.name.length - b.name.length || a.name.localeCompare(b.name))[0]?.name;
+    .filter((one) => one.sites.size >= SEGMENT_SITES)
+    .sort((x, y) => y.sites.size - x.sites.size || x.name.length - y.name.length || x.name.localeCompare(y.name))[0]?.name;
 }
 
 /**
@@ -332,11 +342,17 @@ function readStructure(raw: unknown, state: RunState): { grouping: GroupingEntry
       return false;
     });
 
-  // De namen: wat de meeste sites zeggen, en elke naam maar één keer.
+  // De namen: wat de sites samen zeggen als ze het eens zijn, anders de werknaam.
+  // Elke naam maar één keer.
   const taken = new Set<string>();
+  const ownName: string[] = [];
   const named = read.map((one) => {
-    const preferred = segmentName(one.aliases) ?? one.working;
-    const name = taken.has(preferred.toLowerCase()) ? one.working : preferred;
+    const agreed = agreedName(one.aliases);
+    const name = agreed !== undefined && !taken.has(agreed.toLowerCase()) ? agreed : one.working;
+    // Alleen melden waar sites elkaar tegenspreken. Bij één site is er niemand
+    // om het mee oneens te zijn.
+    const sites = new Set(one.aliases.map((alias) => alias.site)).size;
+    if (agreed === undefined && sites >= SEGMENT_SITES) ownName.push(one.working);
     taken.add(name.toLowerCase());
     return { ...one, name };
   });
@@ -363,6 +379,14 @@ function readStructure(raw: unknown, state: RunState): { grouping: GroupingEntry
     };
   });
 
+  // Door de markt gevoerd, en toch zonder eigen vragenset en zonder overlay om
+  // onder te vallen: die categorie houdt bij een winkel alleen de algemene
+  // vragen. Dat is een geldige uitkomst, maar een die iemand bewust hoort te
+  // laten staan.
+  const baseOnly = grouping
+    .filter((entry) => entry.kind === 'profiel' && !entry.parent && (entry.sites?.length ?? 0) >= SEGMENT_SITES)
+    .map((entry) => `${entry.category} (${entry.sites?.length} sites)`);
+
   const unplaced = [...carried.values()].flatMap((site) =>
     [...site.names.entries()]
       .filter(([key]) => !claimed.has(`${site.site.toLowerCase()}|${key}`))
@@ -374,6 +398,12 @@ function readStructure(raw: unknown, state: RunState): { grouping: GroupingEntry
     findings: [
       ...(single.length > 0
         ? [`${single.length} segment${single.length === 1 ? ' wordt' : 'en worden'} maar door één panelsite als categorie gevoerd en ${single.length === 1 ? 'krijgt' : 'krijgen'} daarom geen eigen vragenset: ${single.slice(0, 12).join('; ')}. Dat is de menukeuze van één winkel; zet het hier terug als het wél een segment van de markt is.`]
+        : []),
+      ...(baseOnly.length > 0
+        ? [`${baseOnly.length} segment${baseOnly.length === 1 ? ' wordt' : 'en worden'} door meer panelsites gevoerd en ${baseOnly.length === 1 ? 'krijgt' : 'krijgen'} toch alleen de algemene vragen, omdat er geen vraag is die alleen daar gesteld wordt: ${baseOnly.join('; ')}. Laat dat staan als het klopt, of maak er een eigen vragenset van.`]
+        : []),
+      ...(ownName.length > 0
+        ? [`${ownName.length} segment${ownName.length === 1 ? ' heeft' : 'en hebben'} geen naam waar twee panelsites het over eens zijn en ${ownName.length === 1 ? 'draagt' : 'dragen'} de werknaam uit de indeling: ${ownName.slice(0, 20).join(', ')}. Loop die namen na; de namen van de sites reizen als alias mee.`]
         : []),
       ...(invented.length > 0
         ? [`${invented.length} segment${invented.length === 1 ? '' : 'en'} uit het antwoord ${invented.length === 1 ? 'is' : 'zijn'} op geen enkele panelsite terug te vinden en ${invented.length === 1 ? 'is' : 'zijn'} niet meegenomen: ${invented.slice(0, 8).join(', ')}.`]

@@ -531,8 +531,13 @@ bovenliggende segment of houdt de algemene vragen. Dat kost hem een rij, en het 
 de bedoeling: anders meet de bank weer de boom van één winkel. De beheerder kan
 het op het beoordeelscherm terugzetten, zoals hij nu de indeling vaststelt.
 
-De naam van een segment is **de naam die de meeste panelsites gebruiken**; bij
-gelijke stand de kortste. Geen eigen vinding van het model.
+De naam van een segment is **de naam waar twee of meer panelsites het over eens
+zijn**; een andere schrijfwijze van dezelfde naam telt mee. Noemt elke site het
+anders, dan geldt de werknaam uit de indeling — de gewone soortnaam in de taal van
+de markt — en staat dat als bevinding op het beoordeelscherm. Eerst won bij
+gelijke stand de kortste naam; op de eerste echte markt gaf dat "PVC fabric" voor
+gecoate tafelstof. Waar niets te tellen valt, is een zichtbare keuze eerlijker
+dan een willekeurige telling.
 
 ### Wat er met de boom van de merchant gebeurt
 

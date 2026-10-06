@@ -226,6 +226,88 @@ test('de indeling komt uit het panel: de naam die de meeste sites gebruiken', as
   assert.equal(state.grouping.some((entry) => entry.category === 'Bekleding' || entry.category === 'Raamstof'), false);
 });
 
+test('zonder twee sites die hetzelfde zeggen blijft de werknaam staan, zichtbaar', async () => {
+  const ask: Ask = async (task) => {
+    const json = antwoord(task.phase) as Record<string, unknown>;
+    if (task.phase !== 'structure') return { json, usage: { input: 0, output: 0, cached: 0 } };
+    return {
+      json: {
+        segments: [
+          // Twee sites, twee namen: er valt niets te tellen.
+          { category: 'Raamstoffen', kind: 'overlay', reason: 'licht', aliases: [{ site: 'Een', name: 'Gordijnstoffen' }, { site: 'Vier', name: 'Vorhangstoffe' }] },
+          // Eén site: daar is niemand om het mee oneens te zijn, dus geen melding.
+          { category: 'Fluweel', kind: 'facet', reason: 'materiaal', aliases: [{ site: 'Een', name: 'Velours' }] },
+        ],
+      },
+      usage: { input: 0, output: 0, cached: 0 },
+    };
+  };
+  let state = emptyState(BRIEF);
+  let phase: Phase = FIRST_PHASE;
+  for (let stap = 0; stap < 40 && phase.kind !== 'base'; stap++) {
+    const result = await advance(state, phase, ask, '2026-10-06');
+    state = result.state;
+    phase = result.next;
+  }
+  assert.deepEqual(state.grouping.map((entry) => entry.category), ['Raamstoffen', 'Fluweel']);
+  const melding = state.findings.find((finding) => finding.includes('werknaam'));
+  assert.ok(melding?.includes('Raamstoffen'));
+  assert.equal(melding?.includes('Fluweel'), false);
+});
+
+test('twee schrijfwijzen van dezelfde naam tellen als één naam', async () => {
+  const ask: Ask = async (task) => {
+    const json = antwoord(task.phase) as Record<string, unknown>;
+    if (task.phase === 'harvest:0') return { json: { ...json, segments: [...(json.segments as unknown[]), { name: 'Outdoorstoffen' }] }, usage: { input: 0, output: 0, cached: 0 } };
+    if (task.phase === 'harvest:1') return { json: { ...json, segments: [...(json.segments as unknown[]), { name: 'Outdoor Stoffen' }] }, usage: { input: 0, output: 0, cached: 0 } };
+    if (task.phase === 'harvest:2') return { json: { ...json, segments: [...(json.segments as unknown[]), { name: 'Buitenstoffen' }] }, usage: { input: 0, output: 0, cached: 0 } };
+    if (task.phase === 'structure') {
+      return {
+        json: {
+          segments: [{
+            category: 'Stof voor buiten', kind: 'overlay', reason: 'zon en regen',
+            aliases: [{ site: 'Een', name: 'Outdoorstoffen' }, { site: 'Twee', name: 'Outdoor Stoffen' }, { site: 'Drie', name: 'Buitenstoffen' }],
+          }],
+        },
+        usage: { input: 0, output: 0, cached: 0 },
+      };
+    }
+    return { json, usage: { input: 0, output: 0, cached: 0 } };
+  };
+  let state = emptyState(BRIEF);
+  let phase: Phase = FIRST_PHASE;
+  for (let stap = 0; stap < 40 && phase.kind !== 'base'; stap++) {
+    const result = await advance(state, phase, ask, '2026-10-06');
+    state = result.state;
+    phase = result.next;
+  }
+  assert.deepEqual(state.grouping.map((entry) => entry.category), ['Outdoorstoffen']);
+});
+
+test('een segment van meer sites zonder eigen vragenset wordt gemeld', async () => {
+  const ask: Ask = async (task) => {
+    const json = antwoord(task.phase) as Record<string, unknown>;
+    if (task.phase !== 'structure') return { json, usage: { input: 0, output: 0, cached: 0 } };
+    return {
+      json: {
+        segments: [{
+          category: 'Bekleding', kind: 'profiel', reason: 'geen vraag die alleen hier gesteld wordt',
+          aliases: [{ site: 'Een', name: 'Meubelstoffen' }, { site: 'Twee', name: 'Meubelstoffen' }],
+        }],
+      },
+      usage: { input: 0, output: 0, cached: 0 },
+    };
+  };
+  let state = emptyState(BRIEF);
+  let phase: Phase = FIRST_PHASE;
+  for (let stap = 0; stap < 40 && phase.kind !== 'base'; stap++) {
+    const result = await advance(state, phase, ask, '2026-10-06');
+    state = result.state;
+    phase = result.next;
+  }
+  assert.ok(state.findings.some((finding) => finding.includes('Meubelstoffen (2 sites)') && finding.includes('alleen de algemene vragen')));
+});
+
 test('de app telt zelf op hoeveel sites een segment staat', async () => {
   const { state } = await draai();
   const gordijn = state.grouping.find((entry) => entry.category === 'Gordijnstoffen');
@@ -253,7 +335,7 @@ test('een segment dat op geen enkele site terug te vinden is, komt niet in de ba
 
 test('een profiel hangt onder de naam die zijn overlay kreeg', async () => {
   const { state } = await draai();
-  assert.equal(state.grouping.find((entry) => entry.category === 'Velours')?.parent, 'Meubelstoffen');
+  assert.equal(state.grouping.find((entry) => entry.category === 'Eetkamerstoelen')?.parent, 'Meubelstoffen');
 });
 
 test('de namen van de sites reizen mee als alias, en de vragenset landt erop', async () => {
@@ -263,6 +345,9 @@ test('de namen van de sites reizen mee als alias, en de vragenset landt erop', a
   assert.ok(gordijn, 'de vragenset heet zoals de markt hem noemt');
   assert.match('Vorhangstoffe', new RegExp(`^(?:${gordijn?.match})$`, 'i'), 'en landt ook op de Duitse naam');
   assert.deepEqual(read.warnings.filter((warning) => warning.includes('niet herkend')), []);
+  // Een toepassing stelt de vragen van haar segment: haar naam landt op die set.
+  const meubel = read.bank?.overlays.find((overlay) => overlay.id === 'meubelstoffen');
+  assert.match('Velours', new RegExp(`^(?:${meubel?.match})$`, 'i'));
 });
 
 test('de panelfase deelt de categorieën van de aanvrager niet meer in', async () => {

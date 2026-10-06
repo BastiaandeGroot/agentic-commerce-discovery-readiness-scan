@@ -155,7 +155,7 @@ Welke vragensets er bestaan en hoe ze heten, volgt uit hoe de panelsites de mark
 Leg daarom bij de bronoogst per site vast hoe zij de markt indeelt — haar categorieën, onder haar eigen namen — en bij elke vraag onder welke categorie hij stond. Leg daarna de vijf indelingen op elkaar tot marktsegmenten. Drie regels, alle drie na te rekenen:
 
 - **Een segment bestaat pas als minstens twee panelsites het als categorie voeren.** Eén site is de menukeuze van één winkel. Het aantal sites staat bij het segment, zoals dekking bij een vraag. Wat maar één site voert, krijgt geen eigen vragenset; het is een bevinding voor de review.
-- **Het segment heet zoals de meeste sites het noemen.** Geen eigen vinding. De andere namen reizen mee als alias (`geldt_voor`), met de site erbij, zodat de vragenset ook landt bij een winkel die het anders noemt.
+- **Het segment heet zoals de sites het samen noemen.** Gebruiken twee of meer sites dezelfde naam, dan is dat de naam; een andere schrijfwijze van dezelfde naam telt mee. Noemt elke site het anders, dan valt er niets te tellen en krijgt het segment de gewone soortnaam in de taal van de markt — zichtbaar als bevinding, want dat is een keuze en geen telling. De namen van de sites reizen mee als alias (`geldt_voor`), zodat de vragenset ook landt bij een winkel die het anders noemt.
 - **Tellen doet de methode, niet de schrijver.** Een naam telt alleen als die site die categorie werkelijk voert.
 
 De boom van een merchant wordt daarna op dit skelet gelegd: op naam of alias, dan op voorstel, dan door zijn eigen keuze. Dat gaat voor de aanvrager precies zo als voor elke winkel die later komt.

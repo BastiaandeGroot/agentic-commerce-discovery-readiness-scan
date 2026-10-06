@@ -427,8 +427,11 @@ Maak hieruit de SEGMENTEN VAN DE MARKT: de indeling die de sites samen laten zie
    en "Tischdecken Stoffe" zijn één segment). Zet onder "aliases" per site de naam
    die díe site gebruikt, LETTERLIJK zoals hij hierboven staat. Verzin geen naam
    en geen site: wat niet hierboven staat, telt niet mee.
-2. Geef elk segment bij "category" een korte werknaam. De definitieve naam kiest
-   de app zelf: de naam die de meeste sites gebruiken.
+2. Geef elk segment bij "category" een korte werknaam: de gewone soortnaam in
+   de taal van deze markt, in het meervoud zoals een winkel hem in zijn menu zou
+   zetten ("Tafelstoffen", niet "PVC fabric" en niet de naam van één merk).
+   Gebruiken twee of meer sites dezelfde naam, dan neemt de app die. Noemt elke
+   site het anders, dan blijft jouw werknaam staan.
 3. Kies per segment één van vier:
    - "overlay": dit segment roept ándere vragen op dan de rest en verdient een
      eigen vragenset. Dat vraagt minstens ÉÉN consumentenvraag die hier gesteld

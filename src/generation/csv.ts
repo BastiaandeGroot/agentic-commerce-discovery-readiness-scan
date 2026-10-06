@@ -66,16 +66,22 @@ function joinList(values: string[]): string {
  * De lezer maakt er het patroon van waarmee een vragenset op een categorie
  * landt (`geldt_voor`). Zo landt de set ook bij een winkel die het segment
  * anders noemt dan de bank — met namen die het panel werkelijk gebruikt.
+ *
+ * De toepassingen binnen het segment horen erbij, met hun eigen naam en die van
+ * de sites: een profiel stelt per definitie de vragen van zijn overlay. Zonder
+ * dat valt "Stoffen voor banken" bij een winkel nergens, terwijl de bank precies
+ * weet dat het meubelstof is.
  */
 function aliasesOf(state: RunState, category: string): string[] {
-  const entry = state.grouping.find((one) => one.category === category);
+  const members = state.grouping.filter((one) =>
+    one.category === category || (one.kind === 'profiel' && one.parent === category));
   const seen = new Set([category.toLowerCase()]);
   const out: string[] = [];
-  for (const alias of entry?.aliases ?? []) {
-    const key = alias.name.toLowerCase();
+  for (const name of members.flatMap((one) => [one.category, ...(one.aliases ?? []).map((alias) => alias.name)])) {
+    const key = name.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(alias.name);
+    out.push(name);
   }
   return out;
 }
