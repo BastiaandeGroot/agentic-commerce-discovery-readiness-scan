@@ -374,6 +374,7 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
           row.unusable > 0 ? `${n(row.unusable)} ${s.report.states.unusable.toLowerCase()}` : '',
           row.incomplete > 0 ? `${n(row.incomplete)} ${s.report.states.incomplete.toLowerCase()}` : '',
           row.absent > 0 ? `${n(row.absent)} ${s.report.neither}` : '',
+          (row.fromTree ?? 0) > 0 ? `${n(row.fromTree ?? 0)} ${s.report.fromTree}` : '',
         ].filter(Boolean).join(', ');
         const critical = row.importance === 'critical' ? `${s.questions.importance.critical} · ` : '';
         return [
@@ -386,7 +387,7 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
       }),
     );
     w.text(s.report.pdfActionsLegend, { size: 9, bold: true, color: 'muted', after: 0.5 });
-    const keys: AdviceKey[] = ['qNextUnlinked', 'qNextEmpty', 'qNextAbsent', 'qNextWeak'];
+    const keys: AdviceKey[] = ['qNextUnlinked', 'qNextEmpty', 'qNextAbsent', 'qNextWeak', 'qNextTree'];
     for (const key of keys) {
       w.text(`${s.report.pdfActions[key]}: ${s.report[key]}`, { size: 8.5, color: 'muted', after: 0.8 });
     }

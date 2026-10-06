@@ -164,6 +164,14 @@ de lijst `modus: een` zegt. Eén van vier volstaat niet: een materiaalsamenstell
 beantwoordt niet of een stof echt voor buiten is. Binnen één attribuut volstaat
 wél één van zijn kolommen.
 
+Eén kenmerk mag uit de **categorieboom** komen: waar een product voor bedoeld is
+(`src/spec/placement.ts`). Draagt geen kolom het, en hangt het product op een plek
+die de bank als segment kent (een set met een eigen overlay), dan is de vraag
+beantwoord — en telt het rapport dat apart, met het advies het als kenmerk vast te
+leggen. Rek dit nooit op naar andere kenmerken of naar plekken die de bank niet
+kent: een categorie "Verduisterend" draagt geen lichtdoorlatendheid, en dan
+verdwijnt een gat dat er wél is.
+
 Wat een lijst niet draagt, vult de lezer niet aan: geen sitepanel betekent
 `dekking: null` en status `in-review`, en een beslisregel zonder bron blijft
 beredeneerd en wordt niet gerekend. Elke aanname die de lezer wél doet — het

@@ -11,6 +11,7 @@
 // attributen.
 
 import type { FieldDef } from '../domain/types';
+import { PLACEMENT_FIELD } from './placement';
 
 export const FIELDS: FieldDef[] = [
   // --- Identificatie en herkenning ----------------------------------------
@@ -372,6 +373,8 @@ export function fieldsByOwner(): Map<FieldDef['owner'], FieldDef[]> {
  * lezen.
  */
 export function requirementLabel(requirement: string, locale: 'nl' | 'en'): string {
+  // Geen kolom maar een herkomst: het antwoord kwam uit de plek in de boom.
+  if (requirement === PLACEMENT_FIELD) return locale === 'nl' ? 'categorieboom' : 'category tree';
   if (requirement.startsWith('attr:')) {
     // `.?` is het scheidingsteken uit het zoekpatroon en geen leesteken; laten
     // staan zet een halve regex voor de neus van een merchant.

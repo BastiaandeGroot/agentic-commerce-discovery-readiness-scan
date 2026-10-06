@@ -17,6 +17,7 @@ import type {
 } from '../domain/types';
 import { CUSTOM_IMPORTANCE, isScored, weightOf } from '../questions/compose';
 import { FIELD_BY_KEY, requirementLabel } from '../spec/fields';
+import { PLACEMENT_FIELD, isPlacementAttribute } from '../spec/placement';
 import { isBlank, isPlaceholder, isValidGtin, str } from '../intake/normalize';
 import { placeProduct } from './join';
 
@@ -120,25 +121,34 @@ function groupSatisfied(product: ProductRecord, group: RequirementGroup): boolea
     : group.fields.every((field) => satisfies(product, field));
 }
 
-function answersQuestion(product: ProductRecord, question: Question) {
+function answersQuestion(product: ProductRecord, question: Question, placed = false) {
   const groups = evidenceGroups(question);
-  const satisfied = groups.map((group) => groupSatisfied(product, group));
+  // Waar een product voor bedoeld is, staat bij veel winkels in de boom en niet
+  // in een kolom. Draagt geen kolom het, en hangt het product op een plek die de
+  // vragenbank als segment kent, dan is dát het antwoord. Een kolom gaat altijd
+  // voor: wat als kenmerk vastligt, hoeft niet uit de boom te komen.
+  const byColumn = groups.map((group) => groupSatisfied(product, group));
+  const byTree = groups.map((group, at) => !byColumn[at] && placed && isPlacementAttribute(group.attributeKey));
   // Pas beantwoord als élk kenmerk er staat. Eén van de vier volstaat niet: een
   // materiaalsamenstelling zegt niet of een stof echt voor buiten is, en een
   // vraag die op vier kenmerken leunt vraagt die vier. De modus van een vraag
   // telt hier niet meer; binnen één kenmerk volstaat nog steeds één van zijn
   // kolommen (`groupSatisfied`).
-  const answered = satisfied.every(Boolean);
+  const answered = groups.every((_, at) => byColumn[at] || byTree[at]);
 
   const fields = groups.flatMap((group) => group.fields);
+  // Wat de boom droeg, is geen gat meer — ook niet als een ánder kenmerk van
+  // dezelfde vraag nog ontbreekt.
+  const open = groups.flatMap((group, at) => (byTree[at] ? [] : group.fields));
+  const found = fields.filter((field) => satisfies(product, field));
   return {
     answered,
     fields,
-    missing: answered ? [] : fields.filter((field) => !satisfies(product, field)),
+    missing: answered ? [] : open.filter((field) => !satisfies(product, field)),
     /** Wat het antwoord droeg. Dezelfde berekening, andere kant op. */
-    found: fields.filter((field) => satisfies(product, field)),
+    found: byTree.some(Boolean) ? [...found, PLACEMENT_FIELD] : found,
     /** Er staat iets, maar niet genoeg: onvolledig in plaats van ontbrekend. */
-    partial: !answered && fields.some((field) => satisfies(product, field)),
+    partial: !answered && (found.length > 0 || byTree.some(Boolean)),
     /** Gevuld maar te mager om een antwoord te heten. */
     weak: !answered && fields.some((field) => fieldState(product, field) === 'weak'),
   };
@@ -228,6 +238,9 @@ export function evaluateProduct(
   excluded: ReadonlySet<string> = new Set(),
 ): ProductResult {
   const placement = placeProduct(product, sets, level, facets, excluded);
+  // Alleen een plek die de vragenbank als segment van de markt kent zegt waar een
+  // product voor bedoeld is; zie `spec/placement.ts`.
+  const placed = placement.sets.some((set) => set.overlayId !== undefined);
   return assembleResult(
     {
       key: product.key,
@@ -239,7 +252,7 @@ export function evaluateProduct(
       facetOnly: placement.facetOnly,
     },
     (question) => {
-      const outcome = answersQuestion(product, question);
+      const outcome = answersQuestion(product, question, placed);
       return { state: answerState(outcome, catalog), missing: outcome.missing, found: outcome.found };
     },
     (key, questionId) => gapFor(key, questionId, catalog),

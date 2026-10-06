@@ -28,6 +28,8 @@ export interface ModelQuestion {
   /** Alleen bij een oudere snapshot, die de twee samen bewaarde. */
   weak?: number;
   absent: number;
+  /** Beantwoord uit de categorieboom en nergens als kenmerk vastgelegd. */
+  fromTree?: number;
   evidence?: { attributeKey: string; label: Bilingual; fields: string[] }[];
   /**
    * Waarmee de beantwoorde producten beantwoord zijn: per kolom hoeveel. Onbekend

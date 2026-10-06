@@ -654,6 +654,8 @@ export const STRINGS = {
       qNextAbsent: 'Je catalogus heeft geen kolom voor dit kenmerk. Dat is een beslissing over je datamodel, en pas daarna invulwerk.',
       qNextUnlinked: 'Dit kenmerk is aan geen enkele kolom gekoppeld. Ga terug naar "Kenmerken koppelen" en wijs de kolom aan — misschien staat het antwoord er gewoon.',
       qNextWeak: 'De velden zijn gevuld, maar te mager om een antwoord te heten. Hier helpt herschrijven, niet aanvullen.',
+      qNextTree: 'Waar deze producten voor bedoeld zijn, volgt uit de categorie waar ze onder hangen en staat nergens als kenmerk. Dat telt als beantwoord. Maar een feed geeft per product meestal één categorie door: leg alle toepassingen vast als kenmerk, dan gaat het hele antwoord mee.',
+      fromTree: 'alleen uit de categorieboom',
       causes: {
         unfilled: 'Invulwerk',
         unmodelled: 'Modelwerk',
@@ -708,6 +710,7 @@ export const STRINGS = {
         qNextEmpty: 'Veld invullen',
         qNextAbsent: 'Kolom toevoegen',
         qNextWeak: 'Herschrijven',
+        qNextTree: 'Als kenmerk vastleggen',
       } as Record<string, string>,
       pdfActionsLegend: 'Wat de acties betekenen',
       pdfAllUnanswered: 'Alle onbeantwoorde vragen, beste eerst.',
@@ -1820,6 +1823,8 @@ export const STRINGS = {
       qNextAbsent: 'Your catalogue has no column for this characteristic. That is a decision about your data model, and only then data entry.',
       qNextUnlinked: 'This characteristic is linked to no column at all. Go back to "Link characteristics" and point at the column — the answer may simply be there.',
       qNextWeak: 'The fields are filled but too thin to count as an answer. Rewriting helps here, not adding.',
+      qNextTree: 'What these products are intended for follows from the category they sit in and is not recorded as a characteristic anywhere. That counts as answered. But a feed usually passes on one category per product: record every application as a characteristic, and the whole answer travels along.',
+      fromTree: 'from the category tree only',
       causes: {
         unfilled: 'Data entry',
         unmodelled: 'Model work',
@@ -1874,6 +1879,7 @@ export const STRINGS = {
         qNextEmpty: 'Fill in the field',
         qNextAbsent: 'Add a column',
         qNextWeak: 'Rewrite',
+        qNextTree: 'Record as characteristic',
       } as Record<string, string>,
       pdfActionsLegend: 'What the actions mean',
       pdfAllUnanswered: 'All unanswered questions, best first.',

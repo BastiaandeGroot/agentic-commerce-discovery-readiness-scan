@@ -815,6 +815,37 @@ koppeling. Niet in een browser gezien: de knop, de meldingen en de waarschuwing 
 regel zijn gebouwd en getypecheckt, de logica staat onder test, maar het scherm is
 niet doorlopen met een catalogus erin.
 
+**Waar een product voor bedoeld is, mag uit de categorieboom komen** — 6 oktober,
+`SCAN_VERSION` 6.1.0. Aanleiding: de proefscan van woontextiel v5 op De Groot kwam op
+0 basisgeschikt, omdat de kritieke vraag "waar is deze stof voor bedoeld" een kolom
+`toepassing` zocht die er niet is — terwijl de winkel het wél vastlegt, als categorie
+(Stoelen, Banken, Tassenstoffen). Een agent die de catalogus krijgt ziet die
+categorieën ook.
+
+- Alleen dit ene begrip (`isPlacementAttribute` in `src/spec/placement.ts`, op de
+  hele naam: `toepassing`, `geschikt_voor`, `intended_use` — niet `toepassing_garen`).
+  Een categorie "Verduisterend" draagt geen lichtdoorlatendheid; dat blijft een gat.
+- Alleen als geen kolom het draagt, en alleen op een plek die de bank als segment
+  kent (een set met `overlayId`). Decoratiestoffen, Motieven, een actiecategorie
+  zeggen niet waar een product voor dient. Zo bepaalt de bank wat een toepassing
+  is en niet de winkel, en blijven twee merchants vergelijkbaar.
+- Het telt als beantwoord, maar het rapport telt het apart
+  (`QuestionCoverage.fromTree`, in `found` staat `PLACEMENT_FIELD`) en houdt de
+  vraag in de lijst met het advies het als kenmerk vast te leggen: een feed geeft
+  per product meestal één categorie door. Het reist mee in de snapshot en door het
+  herberekenen, zonder de vorm van het detail te veranderen.
+
+Gemeten op De Groot met v5, zonder koppelscherm: 3.715 van 3.746 producten krijgen
+de toepassing uit de boom, 30 hangen alleen onder Decoratiestoffen en houden het
+gat, basisgeschikt gaat van 0 naar 1.948. Wat daarna tegenhoudt is
+lichtdoorlatendheid (1.513, nog niet gekoppeld) en slijtvastheid (268). 1.536
+producten hangen onder meer dan één vragenset — precies wat in een feed verloren
+gaat. Bekend gevolg: de algemene toepassingsvraag is hiermee licht geworden; de
+poort rust op de kritieke vraag van de set zelf.
+
+Niet in een browser gezien: de regel "alleen uit de categorieboom" op het
+rapportscherm en in de pdf is gebouwd en getypecheckt, de telling staat onder test.
+
 ## Bewust afgevallen
 
 Niet opnieuw voorstellen zonder dat er iets veranderd is.
@@ -835,6 +866,25 @@ Niet opnieuw voorstellen zonder dat er iets veranderd is.
 ---
 
 ## Open
+
+**Woontextiel v5 is gegenereerd, nog niet in de app** — 6 oktober. De reeks is in
+de sessie doorlopen (geen API-kosten) met `scripts/generate-local.ts`; de run staat
+in `~/Documents/Vragenbank/run-woontextiel-v5/`, de tabel in
+`~/Documents/Vragenbank/woontextiel-v5.csv`: 32 algemene vragen, 12 vragensets, 87
+vragen, vijf kritiek. Nog te doen vóór uploaden:
+
+- **Paneel landt verkeerd.** De bank legt "Paneel" (De Groot, Textielstad) als
+  toepassing onder Kussenpanelen, maar bij De Groot hangt Paneel onder
+  Gordijnstoffen (270 producten). Die krijgen nu de paneelmaat-vraag in plaats van
+  de gordijnvragen en tellen te makkelijk als basisgeschikt.
+- **Windschermen mist zijn kernvraag** (hoeveel wind en inkijk houdt het doek
+  tegen): beide sites behandelen hem, de samenvoegstap maakte er geen onderwerp van.
+- Naaigarens en Onderhoudsproducten kwamen in de headless scan niet als categorie
+  naar voren; niet uitgezocht of dat de export of de naamherkenning is.
+- `keurmerken` viel automatisch op `product_label` (Bestseller, Op=Op); dat is fout
+  en moet op het koppelscherm weg.
+- De kritieke vragen zijn nog langs vier criteria gelegd; de twee-criteria-definitie
+  staat hierboven als beslissing en zit nog niet in de code.
 
 **De Cowork-route is vastgelegd, nog niet gebouwd** — 18 september. Het ontwerp
 staat in `ONTWERP-vragenbank-keten.md` 3c (onderzoek per categorieknoop, eigen
