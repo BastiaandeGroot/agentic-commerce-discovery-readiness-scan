@@ -100,3 +100,12 @@ test('zonder betekenisvol woord wordt er niets gekoppeld', () => {
   assert.deepEqual(meaningfulWords('info_value_cm'), []);
   assert.deepEqual(columnsFor('info_value_cm', ['info_value_cm'], ['info', 'value']), []);
 });
+
+test('een kolom met stickers is geen keurmerk', () => {
+  // `product_label` draagt Bestseller en Op=Op. Stond `label` in de woordenlijst
+  // als keurmerk, dan telde de keurmerkvraag bij elk product met een sticker als
+  // beantwoord: een gat dat verdwijnt terwijl het er wél is.
+  const keurmerk = { key: 'keurmerken', namedAs: ['keurmerk', 'certificaat', 'certification'] };
+  assert.deepEqual(matchAttributes([keurmerk], ['product_label']), []);
+  assert.equal(matchAttributes([keurmerk], ['certification'])[0]?.columns[0], 'certification');
+});

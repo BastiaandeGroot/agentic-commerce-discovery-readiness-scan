@@ -106,7 +106,11 @@ const LEXICON: Record<string, string> = {
   norm: 'standard', standaard: 'standard', standard: 'standard',
   certificering: 'certification', certificeringen: 'certification',
   certificate: 'certification', certification: 'certification',
-  certifications: 'certification', keurmerk: 'certification', label: 'certification',
+  // `label` staat hier bewust niet. Een keurmerk heet soms een label, maar een
+  // kolom `product_label` draagt in een webwinkel de stickers op de productfoto
+  // (Bestseller, Op=Op) — en die koppeling liet "welke keurmerken heeft dit" bij
+  // elk product met een actiesticker als beantwoord tellen.
+  certifications: 'certification', keurmerk: 'certification', keurmerken: 'certification',
 };
 
 /** Splits op scheidingstekens én op camelCase, zodat `fabricWidth` ook uiteenvalt. */
