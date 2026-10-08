@@ -82,6 +82,9 @@ export async function requestMapping(
       input.attributes,
       input.columns.filter((column) => known.has(column.key)),
     );
+    // Een onleesbaar antwoord is een storing en geen lege lijst: de aanroeper
+    // laat op een leeg antwoord eerdere voorstellen vervallen.
+    if (read.unreadable) throw new MappingFailed(read.rejected[0] ?? 'Onleesbaar antwoord.');
     return {
       pairs: read.proposals.map((proposal) => ({ key: proposal.key, columns: [proposal.column] })),
       model: body.model ?? 'onbekend',

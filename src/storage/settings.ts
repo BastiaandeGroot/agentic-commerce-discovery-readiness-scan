@@ -21,6 +21,10 @@ export interface BankSettings {
   mapping: Record<string, string[]>;
   categories: Record<string, string | null>;
   work?: QuestionWork;
+  /** Welke koppelingen nog een voorstel van een model zijn; zie `Proposed`. */
+  proposed?: Record<string, string>;
+  /** Onder welke `PROPOSAL_VERSION` die voorstellen gedaan zijn. */
+  proposalVersion?: string;
 }
 
 export interface SettingsStore {
@@ -80,51 +84,77 @@ export class SupabaseSettingsStore implements SettingsStore {
   constructor(private readonly client: SupabaseClient) {}
 
   async load(accountId: string, vertical: string): Promise<BankSettings | undefined> {
-    const { data, error } = await this.client
+    const query = (columns: string) => this.client
       .from('merchant_bank_settings')
-      .select('vertical, bank_version, mapping, categories, question_work')
+      .select(columns)
       .eq('account_id', accountId)
       .eq('vertical', vertical)
       .maybeSingle();
-    if (error || !data) return undefined;
-    return {
-      vertical: data.vertical as string,
-      bankVersion: (data.bank_version as string | null) ?? '',
-      mapping: (data.mapping as Record<string, string[]> | null) ?? {},
-      categories: (data.categories as Record<string, string | null> | null) ?? {},
-      work: (data.question_work as QuestionWork | null) ?? undefined,
-    };
+    // Zonder migratie 0014 bestaan de kolommen voor voorstellen niet. Dan komt
+    // het eerdere werk gewoon terug, alleen zonder herkomst.
+    let found = await query(`${COLUMNS}, ${PROPOSAL_COLUMNS}`);
+    if (found.error) found = await query(COLUMNS);
+    if (found.error || !found.data) return undefined;
+    return fromRow(found.data as unknown as Row);
   }
 
   async list(accountId: string): Promise<BankSettings[]> {
     const { data, error } = await this.client
       .from('merchant_bank_settings')
-      .select('vertical, bank_version, mapping, categories, question_work')
+      .select(COLUMNS)
       .eq('account_id', accountId);
     if (error) throw new Error(error.message);
-    return (data ?? []).map((row) => ({
-      vertical: row.vertical as string,
-      bankVersion: (row.bank_version as string | null) ?? '',
-      mapping: (row.mapping as Record<string, string[]> | null) ?? {},
-      categories: (row.categories as Record<string, string | null> | null) ?? {},
-      work: (row.question_work as QuestionWork | null) ?? undefined,
-    }));
+    return ((data ?? []) as unknown as Row[]).map(fromRow);
   }
 
   async save(accountId: string, settings: BankSettings): Promise<boolean> {
     // Overschrijven: de laatste stand telt. De sleutel is account plus markt.
-    const { error } = await this.client.from('merchant_bank_settings').upsert(
-      {
-        account_id: accountId,
-        vertical: settings.vertical,
-        bank_version: settings.bankVersion,
-        mapping: settings.mapping,
-        categories: settings.categories,
-        question_work: settings.work ?? null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'account_id,vertical' },
-    );
-    return !error;
+    const row = {
+      account_id: accountId,
+      vertical: settings.vertical,
+      bank_version: settings.bankVersion,
+      mapping: settings.mapping,
+      categories: settings.categories,
+      question_work: settings.work ?? null,
+      updated_at: new Date().toISOString(),
+    };
+    const upsert = (values: Record<string, unknown>) => this.client
+      .from('merchant_bank_settings')
+      .upsert(values, { onConflict: 'account_id,vertical' });
+    const withProposals = await upsert({
+      ...row,
+      proposed: settings.proposed ?? {},
+      proposal_version: settings.proposalVersion ?? null,
+    });
+    if (!withProposals.error) return true;
+    // Zonder migratie 0014: het werk zelf hoort bewaard te blijven. Alleen de
+    // herkomst van de voorstellen gaat dan niet mee.
+    const without = await upsert(row);
+    return !without.error;
   }
+}
+
+const COLUMNS = 'vertical, bank_version, mapping, categories, question_work';
+const PROPOSAL_COLUMNS = 'proposed, proposal_version';
+
+interface Row {
+  vertical: string;
+  bank_version: string | null;
+  mapping: Record<string, string[]> | null;
+  categories: Record<string, string | null> | null;
+  question_work: QuestionWork | null;
+  proposed?: Record<string, string> | null;
+  proposal_version?: string | null;
+}
+
+function fromRow(row: Row): BankSettings {
+  return {
+    vertical: row.vertical,
+    bankVersion: row.bank_version ?? '',
+    mapping: row.mapping ?? {},
+    categories: row.categories ?? {},
+    work: row.question_work ?? undefined,
+    proposed: row.proposed ?? undefined,
+    proposalVersion: row.proposal_version ?? undefined,
+  };
 }

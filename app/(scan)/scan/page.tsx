@@ -16,7 +16,7 @@ import { generateQuestionSets } from '../../../src/questions/generate';
 import { importQuestionList } from '../../../src/questions/list';
 import { applyAttributeShapes, applyOverlaySettings, excludeFromScore } from '../../../src/questions/bank';
 import { applyImportanceCorrections } from '../../../src/questions/critical';
-import type { Mapping } from '../../../src/questions/mapping';
+import type { Linked, Mapping, Proposed } from '../../../src/questions/mapping';
 import { bankStore, LOCAL_ACCOUNT, type StoredBank } from '../../../src/storage/banks';
 import { LocalSettingsStore, SupabaseSettingsStore, type SettingsStore } from '../../../src/storage/settings';
 import { applyWork, mergeWork, setKey, type QuestionWork } from '../../../src/questions/work';
@@ -71,6 +71,11 @@ export default function Home() {
   // keuze beslist alleen de regex, en die faalt zodra de lijst zijn categorieën
   // anders noemt dan de catalogus.
   const [categories, setCategories] = useState<Record<string, string | null>>({});
+  // Welke koppelingen nog een voorstel van een model zijn. Bewaard naast de
+  // koppeling: een voorstel dat na herladen een gewone koppeling lijkt, wordt
+  // nooit meer nagelopen.
+  const [proposed, setProposed] = useState<Proposed>({});
+  const [proposalVersion, setProposalVersion] = useState<string>();
   /**
    * De nieuwste koppeling en categoriekeuze, buiten de render om.
    *
@@ -83,16 +88,24 @@ export default function Home() {
    */
   const latest = useRef<{
     mapping: Mapping;
+    proposed: Proposed;
+    proposalVersion?: string;
     categories: Record<string, string | null>;
     /** Wat de merchant op de vragensets deed; zie `src/questions/work.ts`. */
     work?: QuestionWork;
     /** De laatste samenstelling zonder dat werk erover, om het werk uit te halen. */
     pristine?: QuestionSetState;
-  }>({ mapping: {}, categories: {} });
+  }>({ mapping: {}, proposed: {}, categories: {} });
   /** Categorieën die opnieuw bevestigd moeten worden omdat de bank ze veranderde. */
   const [reconfirm, setReconfirm] = useState<{ categories: string[]; base: boolean }>({ categories: [], base: false });
   const [saveFailed, setSaveFailed] = useState(false);
   const storeMapping = (next: Mapping) => { latest.current.mapping = next; setMapping(next); };
+  const storeProposed = (next: Proposed, version = latest.current.proposalVersion) => {
+    latest.current.proposed = next;
+    latest.current.proposalVersion = version;
+    setProposed(next);
+    setProposalVersion(version);
+  };
   const storeCategories = (next: Record<string, string | null>) => { latest.current.categories = next; setCategories(next); };
   /** Wat de merchant zelf over zijn categoriepaden zei; zie SegmentStep. */
   const [verdicts, setVerdicts] = useState<Verdicts>({});
@@ -279,6 +292,7 @@ export default function Home() {
       // elke sessie opnieuw met tientallen ongekoppelde kenmerken.
       const saved = stored.find((entry) => entry.mapping || entry.categories);
       if (saved?.mapping) storeMapping(saved.mapping);
+      if (saved?.proposed) storeProposed(saved.proposed, saved.proposalVersion);
       if (saved?.categories) storeCategories(saved.categories);
     });
   }, []);
@@ -342,13 +356,18 @@ export default function Home() {
    */
   function remember(nextMapping: Mapping, nextCategories: Record<string, string | null>) {
     for (const entry of banks) {
-      void bankStore.save({ ...entry, mapping: nextMapping, categories: nextCategories });
+      const { proposed: nextProposed, proposalVersion: nextVersion } = latest.current;
+      void bankStore.save({
+        ...entry, mapping: nextMapping, categories: nextCategories, proposed: nextProposed, proposalVersion: nextVersion,
+      });
       void settingsStore.save(accountId ?? LOCAL_ACCOUNT, {
         vertical: entry.bank.meta.vertical,
         bankVersion: entry.bank.meta.version,
         mapping: nextMapping,
         categories: nextCategories,
         work: latest.current.work,
+        proposed: nextProposed,
+        proposalVersion: nextVersion,
       }).then((ok) => setSaveFailed(!ok));
     }
   }
@@ -375,6 +394,10 @@ export default function Home() {
       const saved = await settingsStore.load(who, entry.bank.meta.vertical);
       if (!alive || !saved) return;
       storeMapping({ ...saved.mapping, ...latest.current.mapping });
+      // De herkomst uit het account, tenzij deze sessie al voorstellen deed.
+      if (saved.proposed && Object.keys(latest.current.proposed).length === 0) {
+        storeProposed(saved.proposed, saved.proposalVersion);
+      }
       if (saved.bankVersion === entry.bank.meta.version) {
         storeCategories({ ...saved.categories, ...latest.current.categories });
       }
@@ -386,15 +409,16 @@ export default function Home() {
   }, [accountId, banks, settingsStore]);
 
   /**
-   * Een gewijzigde koppeling. Mag een functie zijn, en dat is voor wie laat
-   * terugkomt: die werkt dan op de koppeling van nu en niet op die van toen hij
-   * begon.
+   * Een gewijzigde koppeling, mét haar herkomst. Een functie, en dat is voor wie
+   * laat terugkomt: die werkt dan op de koppeling van nu en niet op die van toen
+   * hij begon. `version` is het stempel waaronder de voorstellen gedaan zijn.
    */
-  function handleMapping(update: Mapping | ((current: Mapping) => Mapping)) {
-    const next = typeof update === 'function' ? update(latest.current.mapping) : update;
-    storeMapping(next);
-    compose(banks, catalog, next, latest.current.categories);
-    remember(next, latest.current.categories);
+  function handleMapping(update: (current: Linked) => Linked, version?: string) {
+    const next = update({ mapping: latest.current.mapping, proposed: latest.current.proposed });
+    storeMapping(next.mapping);
+    storeProposed(next.proposed, version ?? latest.current.proposalVersion);
+    compose(banks, catalog, next.mapping, latest.current.categories);
+    remember(next.mapping, latest.current.categories);
   }
 
   /** Een andere vragenset per categorie verandert wélke vragen er gesteld worden. */
@@ -713,6 +737,8 @@ export default function Home() {
             catalog={catalog}
             state={questionState}
             mapping={mapping}
+            proposed={proposed}
+            proposalVersion={proposalVersion}
             onChange={handleMapping}
             onRun={() => void handleRun()}
             running={scanning}

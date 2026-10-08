@@ -121,20 +121,25 @@ export function scoreRows(report: ScanReport, allLabel: string): ScoreRow[] {
  */
 export function unansweredQuestions(report: ScanReport, setId = 'all'): Coverage[] {
   return report.questionCoverage
-    .filter((row) => row.scored && row.answered < row.applicable)
+    // Ook een vraag die alleen dankzij de categorieboom beantwoord is: dat is
+    // geen gat, maar wel werk, en het hoort niet stil uit de lijst te vallen.
+    .filter((row) => row.scored && (row.answered < row.applicable || (row.fromTree ?? 0) > 0))
     .filter((row) => setId === 'all' || row.setId === setId)
     .sort((a, b) => b.answered / Math.max(b.applicable, 1) - a.answered / Math.max(a.applicable, 1));
 }
 
-export type AdviceKey = 'qNextUnlinked' | 'qNextEmpty' | 'qNextAbsent' | 'qNextWeak';
+export type AdviceKey = 'qNextUnlinked' | 'qNextEmpty' | 'qNextAbsent' | 'qNextWeak' | 'qNextTree';
 
 /**
  * Wat een merchant nu kan doen aan deze vraag, op volgorde van goedkoopst: een
  * ontbrekende koppeling, een leeg veld, een ontbrekende kolom, een te mager veld.
  */
 export function adviceKey(row: Pick<Coverage, 'evidence' | 'empty' | 'absent'> & {
-  unusable?: number; incomplete?: number; weak?: number;
+  unusable?: number; incomplete?: number; weak?: number; fromTree?: number;
 }): AdviceKey {
+  // Niets meer open, maar het antwoord ligt nergens als kenmerk vast.
+  const open = row.empty + row.absent + (row.unusable ?? 0) + (row.incomplete ?? 0) + (row.weak ?? 0);
+  if (open === 0 && (row.fromTree ?? 0) > 0) return 'qNextTree';
   if ((row.evidence ?? []).some((group) => group.fields.length === 0)) return 'qNextUnlinked';
   if (row.empty >= row.absent && row.empty > 0) return 'qNextEmpty';
   if (row.absent > 0) return 'qNextAbsent';

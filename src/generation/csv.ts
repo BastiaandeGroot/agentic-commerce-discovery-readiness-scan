@@ -22,6 +22,7 @@ const HEADER = [
   'vraag_en',
   'laag',
   'categorie',
+  'geldt_voor',
   'intentie',
   'belang',
   'dekking',
@@ -58,6 +59,33 @@ function joinList(values: string[]): string {
   return values.map((value) => value.replace(/[;,]/g, ' ').trim()).filter(Boolean).join('; ');
 }
 
+/**
+ * De namen waaronder panelsites dit segment voeren, zonder de naam die het al
+ * heeft.
+ *
+ * De lezer maakt er het patroon van waarmee een vragenset op een categorie
+ * landt (`geldt_voor`). Zo landt de set ook bij een winkel die het segment
+ * anders noemt dan de bank — met namen die het panel werkelijk gebruikt.
+ *
+ * De toepassingen binnen het segment horen erbij, met hun eigen naam en die van
+ * de sites: een profiel stelt per definitie de vragen van zijn overlay. Zonder
+ * dat valt "Stoffen voor banken" bij een winkel nergens, terwijl de bank precies
+ * weet dat het meubelstof is.
+ */
+function aliasesOf(state: RunState, category: string): string[] {
+  const members = state.grouping.filter((one) =>
+    one.category === category || (one.kind === 'profiel' && one.parent === category));
+  const seen = new Set([category.toLowerCase()]);
+  const out: string[] = [];
+  for (const name of members.flatMap((one) => [one.category, ...(one.aliases ?? []).map((alias) => alias.name)])) {
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
+}
+
 /** De toets als één cel, leesbaar voor een mens. */
 function criticalTestText(test: DraftQuestion['criticalTest']): string {
   return test
@@ -78,6 +106,7 @@ function row(
     question.questionEn,
     layer,
     category,
+    layer === 'basis' ? '' : joinList(aliasesOf(state, category)),
     question.intent,
     question.importance,
     question.coverage === null || question.coverage === undefined ? '' : String(question.coverage),

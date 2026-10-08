@@ -19,7 +19,12 @@ import { isStandaloneCategory, overlayCategories } from './state';
 
 /** Omhoog zodra een prompt de uitkomst op dezelfde markt kan verschuiven. */
 // 1.6.0 — kritiek volgt een toets van vier criteria, per vraag onderbouwd.
-export const GENERATION_VERSION = '1.6.0';
+// 1.7.0 — de oogst legt per site vast hoe zij de markt indeelt. Nog niets
+//         gebruikt het; de indeling uit het panel volgt in 2.0.0 (ontwerp 3d).
+// 2.0.0 — de indeling komt uit het panel en niet van de aanvrager: een eigen fase
+//         maakt uit de indeling van de vijf sites de marktsegmenten, en de
+//         vragensets worden per segment geschreven (ontwerp 3d).
+export const GENERATION_VERSION = '2.0.0';
 
 /**
  * Wat een vraag moet bevatten, en in welke vorm.
@@ -194,8 +199,71 @@ const topicBlock = (topics: Topic[]) =>
     })
     .join('\n');
 
+/**
+ * De oogst zonder de indeling per site. De samenvoegstap weegt onderwerpen, en de
+ * menu's van vijf winkels zijn daar ruis; de fase die de indeling wél weegt
+ * krijgt ze apart.
+ */
+const withoutSegments = (site: RunState['harvest'][number]) => ({
+  site: site.site,
+  questions: site.questions,
+  attributes: site.attributes,
+  rules: site.rules,
+  notes: site.notes,
+});
+
 const groupingBlock = (grouping: GroupingEntry[]) =>
-  grouping.map((entry) => `- ${entry.category} (${entry.count}): ${entry.kind}`).join('\n');
+  grouping.map((entry) => `- ${entry.category} (op ${entry.sites?.length ?? 0} panelsites): ${entry.kind}`).join('\n');
+
+/** Hoeveel vragen er per categorie van een site hoogstens meegaan. */
+const QUESTIONS_PER_SEGMENT = 12;
+
+/**
+ * De indeling van elke panelsite, met de vragen die onder elke categorie stonden.
+ *
+ * Dit is wat de indelingsfase weegt. De vragen horen erbij: of een categorie een
+ * eigen vragenset verdient, volgt uit wat klanten dáár vragen en nergens anders.
+ */
+const siteStructureBlock = (state: RunState) =>
+  state.harvest.map((site) => {
+    const lines = (site.segments ?? []).map((segment) => {
+      const asked = site.questions
+        .filter((question) => question.segment?.toLowerCase() === segment.name.toLowerCase())
+        .slice(0, QUESTIONS_PER_SEGMENT)
+        .map((question) => `      · ${question.question}`);
+      return [`  - ${segment.name}${segment.parent ? ` (onder ${segment.parent})` : ''}`, ...asked].join('\n');
+    });
+    return [`${site.site}:`, ...(lines.length > 0 ? lines : ['  (deze site gaf haar indeling niet prijs)'])].join('\n');
+  }).join('\n\n');
+
+/**
+ * Wat panelsites onder dit segment vragen, letterlijk uit de oogst.
+ *
+ * Tot versie 2.0.0 schreef een categoriefase haar vragen uit de samenvatting van
+ * de hele markt. Juist deze vragen dragen de fout die een koper niet terugdraait;
+ * ze horen uit de bronnen te komen en niet uit een samenvatting ervan.
+ */
+const segmentSourcesBlock = (state: RunState, category: string, profiles: string[]) => {
+  const members = state.grouping.filter((entry) => entry.category === category || profiles.includes(entry.category));
+  const names = new Map<string, Set<string>>();
+  for (const entry of members) {
+    for (const alias of entry.aliases ?? []) {
+      const known = names.get(alias.site) ?? new Set<string>();
+      known.add(alias.name.toLowerCase());
+      names.set(alias.site, known);
+    }
+  }
+  const lines = state.harvest.flatMap((site) => site.questions
+    .filter((question) => question.segment && names.get(site.site)?.has(question.segment.toLowerCase()))
+    .map((question) => `- ${question.question} (${site.site}${question.url ? `, ${question.url}` : ''})`));
+  const called = members.flatMap((entry) => (entry.aliases ?? []).map((alias) => `${alias.name} (${alias.site})`));
+  return [
+    called.length > 0 ? `Zo heet dit segment op de panelsites: ${called.join('; ')}.` : '',
+    lines.length > 0
+      ? `Vragen die panelsites onder dit segment behandelen:\n${lines.join('\n')}`
+      : 'Onder dit segment is op geen enkele panelsite een vraag gevonden.',
+  ].filter(Boolean).join('\n\n');
+};
 
 /**
  * De vraag die bij deze stap hoort.
@@ -215,7 +283,9 @@ export function promptFor(phase: Phase, state: RunState): PhasePrompt {
         maxTokens: 64000,
         prompt: `Markt: ${vertical}
 
-De merchant bevestigde deze categorieën:
+De winkel die de aanvraag deed voert deze categorieën. Ze bakenen af over welke
+markt het gaat; je deelt ze NIET in en neemt hun namen nergens over. Hoe de markt
+is ingedeeld volgt later uit het panel als geheel.
 ${segmentTable(state)}
 ${state.brief.merchantSite ? `\nZijn eigen winkel: ${state.brief.merchantSite}` : ''}
 ${state.brief.suggestedSites.length > 0 ? `\nWebshops die hij aandroeg:\n${list(state.brief.suggestedSites)}` : ''}
@@ -236,45 +306,9 @@ diepte van de productinformatie, fysieke aanwezigheid of leeftijd. Gebruik
 nadrukkelijk NIET: advertenties, zoekpositie of verkooppraat op de site zelf.
 Controleer dat elke site bestaat en werkelijk in deze markt handelt.
 
-TWEE — bepaal de vorm van de markt, en groepeer de categorieën hierboven.
-
-Per categorie kies je één van vier:
-- "overlay": deze categorie roept ándere vragen op dan de rest en verdient een
-  eigen vragenset.
-- "profiel": een toepassing binnen een overlay. Dezelfde vragen, andere drempels
-  of berekeningen (banken, eetkamerstoelen en poefs binnen meubelstoffen). Noem
-  bij "parent" onder welke overlay hij hangt.
-- "facet": geen categorie maar een eigenschap die een attribuutwaarde hoort te
-  zijn (Vlekwerend, Duurzaam, Effen, Vlamvertragend).
-- "losstaand": de producten zijn niet het kernproduct van deze markt maar iets
-  wat ernaast verkocht wordt — garen, onderhoudsmiddelen, gereedschap,
-  onderdelen, verpakking. Ze krijgen een eigen vragenset zónder de algemene
-  vragen van de markt.
-
-**De toets voor losstaand.** Neem de algemene vragen die in deze markt voor élk
-product gelden — de maat, het materiaal, het gebruik van het kernproduct. Slaan
-de meeste daarvan op deze producten nergens op ("hoe breed is de stof" bij een
-klos garen), dan is de categorie losstaand. Hangt de categorie in de boom van de
-winkel onder een kernproduct, dan verandert dat niets: waar een winkel iets in
-zijn menu zet, zegt niet wat het is.
-
-**De toets voor een overlay.** Een eigen vragenset is alleen terecht als er
-minstens ÉÉN consumentenvraag is die in deze categorie gesteld wordt en in geen
-enkele andere categorie van deze markt, én die op minstens één panelsite
-voorkomt. Zet die vragen in "distinct". Kun je er geen enkele noemen die een
-panelsite behandelt, dan is het een toepassingsprofiel: dezelfde vragen, andere
-drempels.
-
-Die toets is er omdat een reden altijd te vinden is en dit de duurste fout is
-die je kunt maken. Een overlay die geen eigen vragen heeft, geeft de producten
-eronder een dúnnere vragenset dan wanneer ze bij hun moedercategorie hadden
-gehoord — ze erven dan niet de rijke vragenset van die categorie — en het rapport
-krijgt een rij die een onderscheid suggereert dat de vragenlijst niet maakt.
-
-Een lampenkapstof lijkt een eigen soort, maar stelt dezelfde vragen als een
-gordijnstof met een andere drempel voor lichtdoorlatendheid: profiel. Naaigaren
-stelt werkelijk andere vragen — dikte, treksterkte, en niets over slijtage of
-licht — en de algemene vragen over stof slaan er niet op: losstaand.
+TWEE — bepaal de vorm van de markt: de eenheid waarin verkocht wordt, de
+aankoopfout die een koper niet kan terugdraaien, de normen om op te ankeren en de
+wetgeving die dit producttype dwingend raakt.
 
 Antwoord met dit JSON-object:
 {
@@ -285,7 +319,6 @@ Antwoord met dit JSON-object:
     "standards": ["ETIM, ISO/EN-normen, ... — alleen wat je kunt onderbouwen"],
     "legal": ["alleen echte verplichtingen"]
   },
-  "grouping": [{"category": "exact zoals hierboven", "count": 0, "kind": "overlay|profiel|facet|losstaand", "parent": "alleen bij profiel", "reason": "in één zin; bij losstaand welke algemene vragen er niet op slaan", "distinct": ["alleen bij overlay: vragen die hier gesteld worden en nergens anders, en op een panelsite voorkomen"]}],
   "findings": ["wat een mens hierover moet weten voordat hij dit vaststelt"]
 }`,
       };
@@ -318,9 +351,20 @@ reproduceerbaar. Laadt de site niet of vind je een bron niet, zet dat dan in
 "notes" — een site die zwijgt is een bevinding en geen reden om iets aan te
 nemen.
 
+Leg daarnaast vast HOE DEZE SITE DE MARKT INDEELT: de categorieën en
+subcategorieën uit haar menu binnen deze markt, onder de naam die zij zelf
+gebruikt. Neem die namen letterlijk over, vertaal of verbeter ze niet: uit de
+indeling van alle panelsites samen volgt straks welke vragensets er bestaan en
+hoe ze heten. Alleen wat een productsoort of toepassing is; een filter op kleur,
+materiaal, merk of prijs is geen categorie. Zet bij elke vraag onder welke van
+die categorieën je hem vond, of laat "segment" leeg als hij voor de hele winkel
+geldt. Kun je het menu niet lezen, zet dat in "notes" en laat "segments" leeg —
+raad geen indeling.
+
 Antwoord met dit JSON-object:
 {
-  "questions": [{"question": "zoals een klant hem stelt", "source": "faq|categorietekst|blog|productpagina|review", "url": "https://..."}],
+  "segments": [{"name": "letterlijk zoals de site hem noemt", "parent": "de categorie erboven, als die er is", "url": "https://..."}],
+  "questions": [{"question": "zoals een klant hem stelt", "source": "faq|categorietekst|blog|productpagina|review", "url": "https://...", "segment": "onder welke categorie van deze site, of leeg"}],
   "attributes": [{"namedAs": "de naam op deze site", "meaning": "welk kenmerk dit is"}],
   "rules": [{"name": "korte naam", "rule": "de regel inclusief getallen", "url": "https://..."}],
   "notes": ["wat er niet lukte of opviel"]
@@ -337,7 +381,7 @@ Antwoord met dit JSON-object:
 
 Dit is de ruwe oogst per site:
 
-${JSON.stringify(state.harvest, null, 1)}
+${JSON.stringify(state.harvest.map(withoutSegments), null, 1)}
 
 Voeg samen tot één lijst onderwerpen.
 
@@ -361,6 +405,60 @@ Antwoord met dit JSON-object:
 {
   "topics": [{"topic": "korte sleutel", "question": "de klantvraag", "coverage": 0, "coverageSites": ["..."], "sources": ["faq|categorietekst|blog|productpagina|review|vakkennis"], "conflict": "alleen als sites elkaar tegenspreken"}],
   "findings": ["wat een mens moet weten"]
+}`,
+      };
+
+    case 'structure':
+      return {
+        model: 'judge',
+        web: false,
+        maxTokens: 48000,
+        prompt: `Markt: ${vertical}. Panel van ${state.panel.length} sites: ${state.panel.map((site) => site.name).join(', ')}.
+
+Zo deelt elke panelsite deze markt in, onder haar eigen namen, met de vragen die
+onder elke categorie gevonden zijn:
+
+${siteStructureBlock(state)}
+
+Maak hieruit de SEGMENTEN VAN DE MARKT: de indeling die de sites samen laten zien.
+
+1. Leg categorieën van verschillende sites op elkaar als ze dezelfde productsoort
+   of toepassing zijn, ook als ze anders heten ("Tafelzeil", "Tafelkleedstoffen"
+   en "Tischdecken Stoffe" zijn één segment). Zet onder "aliases" per site de naam
+   die díe site gebruikt, LETTERLIJK zoals hij hierboven staat. Verzin geen naam
+   en geen site: wat niet hierboven staat, telt niet mee.
+2. Geef elk segment bij "category" een korte werknaam: de gewone soortnaam in
+   de taal van deze markt, in het meervoud zoals een winkel hem in zijn menu zou
+   zetten ("Tafelstoffen", niet "PVC fabric" en niet de naam van één merk).
+   Gebruiken twee of meer sites dezelfde naam, dan neemt de app die. Noemt elke
+   site het anders, dan blijft jouw werknaam staan.
+3. Kies per segment één van vier:
+   - "overlay": dit segment roept ándere vragen op dan de rest en verdient een
+     eigen vragenset. Dat vraagt minstens ÉÉN consumentenvraag die hier gesteld
+     wordt en in geen enkel ander segment, én die hierboven onder dit segment
+     staat. Zet die vragen in "distinct".
+   - "profiel": een toepassing binnen een overlay. Dezelfde vragen, andere
+     drempels of berekeningen (banken, eetkamerstoelen en poefs binnen
+     meubelstoffen). Noem bij "parent" de werknaam van die overlay.
+   - "facet": geen productsoort maar een eigenschap die een site als categorie
+     voert (Vlekwerend, Duurzaam, Effen, Vlamvertragend).
+   - "losstaand": de producten zijn niet het kernproduct van deze markt maar iets
+     wat ernaast verkocht wordt — garen, onderhoudsmiddelen, gereedschap,
+     onderdelen. Slaan de algemene vragen van de markt er nergens op, dan is het
+     losstaand, waar een winkel het ook in zijn menu zet.
+
+Een reden is altijd te vinden, en een overlay zonder eigen vragen is de duurste
+fout die je kunt maken: de producten eronder krijgen een dúnnere vragenset dan
+bij hun moedersegment, en het rapport krijgt een rij die een onderscheid
+suggereert dat de vragenlijst niet maakt. Bij twijfel: profiel.
+
+Een segment dat maar één site voert, is de menukeuze van één winkel. Neem het op
+met wat je erover weet; de app geeft het geen eigen vragenset.
+
+Antwoord met dit JSON-object:
+{
+  "segments": [{"category": "werknaam", "kind": "overlay|profiel|facet|losstaand", "parent": "alleen bij profiel: de werknaam van de overlay", "aliases": [{"site": "naam van de panelsite", "name": "letterlijk zoals die site hem noemt"}], "reason": "in één zin; bij losstaand welke algemene vragen er niet op slaan", "distinct": ["alleen bij overlay: vragen die alleen hier gesteld worden"]}],
+  "findings": ["wat een mens hierover moet weten voordat hij de indeling vaststelt"]
 }`,
       };
 
@@ -422,6 +520,8 @@ ${topicBlock(state.topics)}
 
 ${profiles.length > 0 ? `Toepassingen binnen deze categorie: ${profiles.join(', ')}.` : 'Er zijn geen aparte toepassingen binnen deze categorie.'}
 
+${segmentSourcesBlock(state, category, profiles)}
+
 ${standalone
   ? `Bouw de volledige vragenset voor ${category}: alles wat een koper over deze producten vraagt,
 ook wat in een gewone categorie uit de basislaag zou komen. Laat "reweight" leeg — er is geen
@@ -463,7 +563,7 @@ Antwoord met dit JSON-object:
         maxTokens: 32000,
         prompt: `Markt: ${vertical}.
 
-De groepering die in fase 0 is voorgesteld:
+De indeling van de markt, zoals die uit het panel volgde:
 ${groupingBlock(state.grouping)}
 
 Werk de facetten uit: de categorieën die eigenlijk een eigenschap zijn en dus een
@@ -475,8 +575,8 @@ Veiligheids- en claimgerelateerde facetten (brandveiligheid, duurzaamheid,
 gezondheid) staan altijd bovenaan: een categorie zonder onderliggend attribuut is
 daar een claim zonder bewijs.
 
-Kom je tot de conclusie dat een categorie verkeerd is ingedeeld in fase 0, zeg
-dat dan in "regroup" — met de reden. Dat is geen fout maar het hele punt van
+Kom je tot de conclusie dat een segment verkeerd is ingedeeld, zeg dat dan in
+"regroup" — met de reden, en onder precies de naam uit de lijst hierboven. Dat is geen fout maar het hele punt van
 deze stap: nu heb je de vragen gezien en toen niet.
 
 Antwoord met dit JSON-object:

@@ -32,3 +32,5 @@ import './coveredoverlays.test';
 import './rescore.test';
 import './critical.test';
 import './proposals.test';
+import './review.proposals.test';
+import './placement.test';

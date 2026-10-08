@@ -52,7 +52,23 @@ export interface ColumnProfile {
    * het veld.
    */
   shared: boolean;
+  /**
+   * Waarom deze kolom geen kenmerk kan dragen, als dat zo is. Zo'n kolom wordt
+   * niet voorgesteld; de merchant kan hem nog wel zelf kiezen. Zie `unfitFor`.
+   */
+  unfit?: Unfit;
 }
+
+/**
+ * Drie soorten kolommen waar een antwoord nooit als kenmerk in staat.
+ *
+ * `prose` is lopende tekst: de scan beantwoordt vragen uit gestructureerde
+ * attributen en niet uit een omschrijving, dus een omschrijving als bron
+ * voorstellen is die regel langs de achterdeur omzeilen. `file` is een
+ * verwijzing naar een bestand of een adres, `timestamp` een tijdstip dat het
+ * systeem zelf schreef.
+ */
+export type Unfit = 'prose' | 'file' | 'timestamp';
 
 /** Boven dit aantal verschillende waarden tellen we niet verder. */
 const DISTINCT_CAP = 1000;
@@ -62,6 +78,22 @@ const LIST_MAX = 40;
 const SHARE = 0.9;
 const SAMPLES = 5;
 const VALUE_LENGTH = 40;
+/**
+ * Vanaf hoeveel woorden per cel vrije tekst lopende tekst is. Gemeten op een
+ * Magento-export van 3.746 producten: de omschrijving had er 503, de korte
+ * omschrijving 42, de meta-omschrijving 20 en de paginatitel 10; het langste
+ * echte kenmerk in vrije tekst, de samenstelling, had er 5. De grens ligt
+ * daartussen. Een korte zin die vaak terugkomt ("Wassen op 30 graden, niet in
+ * de droger") haalt deze toets niet eens: die is een vaste lijst en geen tekst.
+ */
+const PROSE_WORDS = 8;
+/** Een bestand of een adres: een afbeeldingspad, een pdf, een url. */
+const FILE = /^(?:https?:\/\/\S+|[\w\-./%]+\.(?:jpe?g|png|gif|webp|avif|svg|pdf))$/i;
+/**
+ * Een datum mét tijd. Zonder tijd kan het een kenmerk zijn (een verschijnings-
+ * of houdbaarheidsdatum); met een tijd erbij schreef het systeem hem zelf.
+ */
+const TIMESTAMP = /^\d{4}-\d{2}-\d{2}[ T]\d{1,2}:\d{2}|^\d{1,2}[-/.]\d{1,2}[-/.]\d{4}[ T]\d{1,2}:\d{2}/;
 
 /**
  * Woorden voor ja en nee, in de talen waarin een Europese export ze schrijft.
@@ -143,6 +175,11 @@ function valueOf(product: ProductRecord, column: string, canonical: string | und
 
 interface Tally {
   filled: number;
+  /** Woorden over alle gevulde cellen; niet afgekapt, anders telt alleen het begin van de catalogus. */
+  words: number;
+  /** Gevulde cellen die een bestand of adres zijn, en die een tijdstip zijn. */
+  files: number;
+  timestamps: number;
   /** De ruwe celwaarden; pas na de hele catalogus weten we of ze gesplitst moeten worden. */
   raw: Map<string, number>;
   byCategory: Map<string, { filled: number; total: number }>;
@@ -164,7 +201,7 @@ export function profileCatalog(
 
   const tallies = new Map<string, Tally>();
   for (const column of catalog.columns) {
-    tallies.set(column, { filled: 0, raw: new Map(), byCategory: new Map() });
+    tallies.set(column, { filled: 0, words: 0, files: 0, timestamps: 0, raw: new Map(), byCategory: new Map() });
   }
 
   let included = 0;
@@ -185,6 +222,9 @@ export function profileCatalog(
       }
       if (value === undefined) continue;
       tally.filled += 1;
+      tally.words += value.split(/\s+/).length;
+      if (FILE.test(value)) tally.files += 1;
+      else if (TIMESTAMP.test(value)) tally.timestamps += 1;
       const seen = tally.raw.get(value);
       if (seen !== undefined) tally.raw.set(value, seen + 1);
       else if (tally.raw.size < DISTINCT_CAP) tally.raw.set(value, 1);
@@ -215,9 +255,33 @@ export function profileCatalog(
         .map(([category, entry]) => ({ category, ...entry }))
         .sort((a, b) => b.filled / b.total - a.filled / a.total || b.total - a.total || a.category.localeCompare(b.category)),
       shared: canonical !== undefined && (byCanonical.get(canonical) ?? 0) > 1,
+      unfit: unfitFor(kind, separator !== undefined, tally),
     };
   }
   return out;
+}
+
+/**
+ * Kan deze kolom een kenmerk dragen?
+ *
+ * Alleen de gevallen die zeker zijn, en op de waarden in plaats van op de naam:
+ * een kolom heet in elk systeem anders, maar een afbeeldingspad ziet er overal
+ * hetzelfde uit. Wat hier afvalt verdwijnt niet — de merchant kan de kolom nog
+ * zelf kiezen — het wordt alleen niet meer vóórgesteld.
+ */
+function unfitFor(kind: ValueKind, multi: boolean, tally: Tally): Unfit | undefined {
+  if (tally.filled === 0) return undefined;
+  if (tally.files / tally.filled >= SHARE) return 'file';
+  if (tally.timestamps / tally.filled >= SHARE) return 'timestamp';
+  // Een meervoudige keuze is geen tekst, hoe lang de cel ook is: een product in
+  // acht categorieën heeft een lange cel vol korte namen.
+  if (kind === 'text' && !multi && tally.words / tally.filled >= PROSE_WORDS) return 'prose';
+  return undefined;
+}
+
+/** Mag deze kolom voorgesteld worden als bron voor een kenmerk? */
+export function carriesCharacteristic(profile: ColumnProfile | undefined): boolean {
+  return profile !== undefined && profile.filled > 0 && profile.unfit === undefined;
 }
 
 /** Een bedrag: een valutateken of -code naast een getal. */
@@ -363,25 +427,43 @@ const UNIT_FAMILIES: string[][] = [
   ['bar', 'pa'],
 ];
 
+/** Vanaf hoeveel waarden een klasse niet meer in een ja/nee past. */
+const CLASS_VALUES = 3;
+
 const familyOf = (unit: string) => UNIT_FAMILIES.findIndex((family) => family.includes(unit.toLowerCase()));
 
 /**
  * Kan deze kolom dit kenmerk nooit dragen?
  *
  * Alleen de gevallen die zeker zijn, want een afgewezen koppeling die wél klopte
- * kost de merchant een gat dat er niet is. Drie:
+ * kost de merchant een gat dat er niet is. Vijf:
  *
  *   - een getal verwacht, en de kolom is ja/nee;
  *   - een getal verwacht, en de kolom is een lijst of tekst zonder één cijfer;
  *   - een getal met eenheid verwacht, en de kolom meet in een andere grootheid
- *     (°C tegen cm).
+ *     (°C tegen cm);
+ *   - een klasse uit drie of meer waarden verwacht, en de kolom is ja/nee: een
+ *     vinkje "brandvertragend" zegt niet of het B1 of M1 is;
+ *   - een code verwacht (een norm, een certificaatnummer), en de kolom is ja/nee.
  *
- * Een ja/nee-kenmerk wordt nooit afgewezen: een waterkolom in mm beantwoordt
- * "is hij waterdicht" ook, en een certificaatnummer "heeft hij een keurmerk". Een
- * lege kolom evenmin — leeg is invulwerk, en dat is de bevinding.
+ * De vierde is de enige die niet waterdicht is, en dat is een keuze. Gemeten op
+ * een echte catalogus viel `brandklasse` op `flame_retardant` erdoor af, maar
+ * ook `binnen_of_buitengebruik` (binnen, buiten, beide) op een ja/nee-kolom voor
+ * buitengebruik, en dat laatste is verdedigbaar. Het vervallen voorstel staat
+ * als melding op het scherm en de merchant kan de kolom alsnog kiezen; een
+ * brandklasse die door een vinkje beantwoord lijkt, ziet niemand meer.
+ *
+ * Een klasse van twee waarden blijft staan: "waterdicht of waterafstotend" kán in
+ * een ja/nee-kolom zitten. Een ja/nee-kenmerk wordt nooit afgewezen: een
+ * waterkolom in mm beantwoordt "is hij waterdicht" ook, en een certificaatnummer
+ * "heeft hij een keurmerk". Een lege kolom evenmin — leeg is invulwerk, en dat
+ * is de bevinding.
  */
 export function shapeMisfit(shape: AttributeShape, profile: ColumnProfile): boolean {
-  if (profile.kind === 'empty' || shape.kind !== 'number') return false;
+  if (profile.kind === 'empty') return false;
+  if (shape.kind === 'list') return profile.kind === 'boolean' && (shape.values?.length ?? 0) >= CLASS_VALUES;
+  if (shape.kind === 'code') return profile.kind === 'boolean';
+  if (shape.kind !== 'number') return false;
   if (profile.kind === 'boolean') return true;
   if ((profile.kind === 'list' || profile.kind === 'text') && !profile.samples.some((value) => /\d/.test(value))) {
     return true;

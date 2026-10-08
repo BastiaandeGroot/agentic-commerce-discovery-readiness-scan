@@ -422,6 +422,13 @@ function QuestionCoverageCard({ s, model, locale, onReviewQuestion }: {
                     <span className="text-ok">{n(row.answered)}</span> {s.report.fromFeed}
                   </span>
                 )}
+                {/* Beantwoord, maar alleen dankzij de plek in de boom: geen gat, wel
+                    werk. Los geteld, anders verdwijnt het in het groene getal. */}
+                {(row.fromTree ?? 0) > 0 ? (
+                  <span className="tnum" title={s.report.qNextTree}>
+                    <span className="text-warn">{n(row.fromTree ?? 0)}</span> {s.report.fromTree}
+                  </span>
+                ) : null}
                 {row.empty > 0 ? (
                   <span className="tnum" title={s.report.statesExplain.empty}>
                     <span className="text-warn">{n(row.empty)}</span> {s.report.enrichable}

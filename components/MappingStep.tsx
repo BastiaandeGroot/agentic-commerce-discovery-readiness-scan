@@ -15,12 +15,15 @@
 // niet past valt af (`keepFitting`).
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Sparkles } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Sparkles } from 'lucide-react';
 import type { AttributeShape, Dataset, Locale, QuestionSetState } from '../src/domain/types';
-import { attributeInventory, mappingSummary, type Mapping } from '../src/questions/mapping';
+import {
+  applyReview, attributeInventory, liveProposals, mappingSummary, type Linked, type Mapping, type Proposed,
+} from '../src/questions/mapping';
+import { PROPOSAL_VERSION } from '../src/semantic/prompt';
 import { allValidated, stillToConfirm } from '../src/questions/mutate';
 import { describeAttribute, describeColumn } from '../src/semantic/describe';
-import { filledIn, profileCatalog, shapeMisfit, type ColumnProfile } from '../src/engine/profile';
+import { carriesCharacteristic, filledIn, profileCatalog, shapeMisfit, type ColumnProfile } from '../src/engine/profile';
 import { suggestMappings } from '../src/semantic/suggest';
 import { embed, ModelUnavailable, type LoadProgress } from '../src/semantic/model';
 import { MappingNotConfigured, requestMapping } from '../src/semantic/remote';
@@ -33,12 +36,18 @@ interface Props {
   catalog: Dataset;
   state: QuestionSetState;
   mapping: Mapping;
+  /** Welke koppelingen nog een voorstel van een model zijn; bewaard naast de koppeling. */
+  proposed: Proposed;
+  /** Onder welke `PROPOSAL_VERSION` die voorstellen gedaan zijn. */
+  proposalVersion?: string;
   /**
    * Een functie in plaats van een waarde werkt op de koppeling van nú. Dat is
    * nodig voor alles wat asynchroon terugkomt: een voorstel dat na een minuut
-   * landt, hoort niet de keuzes te wissen die de merchant intussen maakte.
+   * landt, hoort niet de keuzes te wissen die de merchant intussen maakte. De
+   * koppeling en haar herkomst gaan samen, want ze veranderen samen. `version`
+   * zet het stempel waaronder de voorstellen van nu gedaan zijn.
    */
-  onChange: (mapping: Mapping | ((current: Mapping) => Mapping)) => void;
+  onChange: (update: (current: Linked) => Linked, version?: string) => void;
   /**
    * De scan starten. Dit is de laatste stap vóór het rapport: de vragen zijn op
    * het vorige scherm bevestigd, hier komen de kolommen erbij.
@@ -74,7 +83,7 @@ const MAX_COLUMNS = 300;
 const CATEGORIES_SHOWN = 3;
 
 export function MappingStep({
-  s, locale, catalog, state, mapping, onChange, onRun, running, error, onBack,
+  s, locale, catalog, state, mapping, proposed, proposalVersion, onChange, onRun, running, error, onBack,
 }: Props) {
   const ready = allValidated(state);
   const [busy, setBusy] = useState<LoadProgress | 'remote'>();
@@ -83,8 +92,6 @@ export function MappingStep({
   const [source, setSource] = useState<string>();
   /** Wat er aan het antwoord opviel; geen fout, wel iets om na te lopen. */
   const [notes, setNotes] = useState<string[]>([]);
-  /** Welke keuzes van het model komen; ze blijven gemarkeerd tot je ze wijzigt. */
-  const [proposed, setProposed] = useState<Record<string, string>>({});
 
   // De keuze van nu telt mee, anders blijft de waarschuwing hieronder staan
   // bij een kenmerk dat de merchant zojuist gekoppeld heeft.
@@ -131,7 +138,16 @@ export function MappingStep({
   const noColumnChosen = (key: string, current: Mapping = mapping) =>
     Array.isArray(current[key]) && current[key].length === 0;
   const open = rows.filter((row) => row.fields.length === 0 && !noColumnChosen(row.key));
-  const proposals = Object.keys(proposed).length;
+  /** Voorstellen waar de merchant nog niets aan veranderde. */
+  const live = useMemo(() => liveProposals({ mapping, proposed }), [mapping, proposed]);
+  const proposals = Object.keys(live).length;
+  /**
+   * Voorstellen van een oudere versie van model, opdracht of zeef. Die worden
+   * één keer opnieuw beoordeeld; daarna dragen ze het stempel van nu.
+   */
+  const stale = proposals > 0 && proposalVersion !== PROPOSAL_VERSION;
+  /** Kenmerken met een kolom uit de koppeling; daar gaat "alles opnieuw" over. */
+  const mapped = rows.filter((row) => (mapping[row.key]?.length ?? 0) > 0).length;
 
   /**
    * Koppel wat er te koppelen valt, zodra het scherm er is.
@@ -163,7 +179,7 @@ export function MappingStep({
     void (async () => {
       await Promise.resolve();
       setPhase('done');
-      if (open.length > 0) await suggest();
+      if (open.length > 0 || stale) await suggest(stale ? 'proposals' : 'open');
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
@@ -182,25 +198,29 @@ export function MappingStep({
     return state.ratio === undefined ? text : `${text} ${Math.round(state.ratio * 100)}%`;
   }
 
-  /** Neem voorstellen over en markeer ze, zodat ze na te lopen blijven. */
-  function accept(pairs: { key: string; columns: string[] }[], from: string) {
-    // Op de koppeling van nu. Een voorstelronde duurt bij een grote bank een
-    // minuut; wat de merchant in die tijd zelf koos, blijft staan.
-    const chosen = chosenByMerchant.current;
-    const marks: Record<string, string> = {};
-    for (const pair of pairs) {
-      if (pair.columns.length === 0 || chosen.has(pair.key)) continue;
-      marks[pair.key] = pair.columns[0];
-    }
-    setProposed(marks);
-    setSource(from);
+  /**
+   * Verwerk wat het model over een blok kenmerken zei, en geef terug wat er
+   * daardoor aan eerdere koppelingen veranderde.
+   *
+   * Op de koppeling van nu. Een ronde duurt bij een grote bank een minuut; wat de
+   * merchant in die tijd zelf koos, blijft staan.
+   */
+  function settle(asked: string[], pairs: { key: string; columns: string[] }[], from: string): string[] {
+    const changes: string[] = [];
     onChange((current) => {
-      const next = { ...current };
-      for (const [key, column] of Object.entries(marks)) {
-        if (!noColumnChosen(key, current)) next[key] = [column];
+      const outcome = applyReview(current, asked, pairs, chosenByMerchant.current);
+      changes.length = 0;
+      for (const change of outcome.replaced) {
+        changes.push(s.mapping.reviewReplaced
+          .replace('{kenmerk}', change.key).replace('{oud}', change.from).replace('{nieuw}', change.to));
       }
-      return next;
+      for (const change of outcome.dropped) {
+        changes.push(s.mapping.reviewDropped.replace('{kenmerk}', change.key).replace('{oud}', change.from));
+      }
+      return { mapping: outcome.mapping, proposed: outcome.proposed };
     });
+    setSource(from);
+    return changes;
   }
 
   /** Een vorm in de woorden van het scherm: "getal (°c)", "ja/nee". */
@@ -236,13 +256,37 @@ export function MappingStep({
     return { kept, dropped };
   }
 
-  async function suggest() {
+  /**
+   * Vraag voorstellen op.
+   *
+   * `open` is alleen wat nog geen kolom heeft. `proposals` legt daarnaast de
+   * voorstellen die de merchant nooit aanraakte opnieuw voor, en `all` elke
+   * koppeling op het scherm behalve wat hij in deze sessie zelf koos — dat is
+   * de uitweg voor koppelingen van vóór de herkomst bewaard werd, waarvan niet
+   * meer te zeggen is of ze een voorstel waren.
+   */
+  async function suggest(mode: 'open' | 'proposals' | 'all' = 'open') {
     setFailed(false);
-    // Alleen wat nog open staat, en alleen de kolommen die nog vrij zijn: wat al
-    // gekoppeld is hoeft niet opnieuw en mag niet weggekaapt worden.
-    const taken = rows.flatMap((row) => mapping[row.key] ?? []);
-    const free = columns.filter((column) => !taken.includes(column));
-    const described = open.map((row) => ({
+    const reviewing = new Set(
+      mode === 'all'
+        ? rows.filter((row) => (mapping[row.key]?.length ?? 0) > 0 && !chosenByMerchant.current.has(row.key)).map((row) => row.key)
+        : mode === 'proposals' ? Object.keys(live) : [],
+    );
+    const asked = rows.filter((row) => reviewing.has(row.key) || open.includes(row));
+    // Alleen de kolommen die nog vrij zijn: wat vaststaat mag niet weggekaapt
+    // worden. De kolom van een koppeling die opnieuw beoordeeld wordt is vrij.
+    const taken = rows.filter((row) => !reviewing.has(row.key)).flatMap((row) => mapping[row.key] ?? []);
+    const untaken = columns.filter((column) => !taken.includes(column));
+    // Lopende tekst, bestanden en tijdstippen worden niet voorgesteld: de scan
+    // beantwoordt vragen uit kenmerken, niet uit een omschrijving. Lege kolommen
+    // evenmin: daar valt niets in te herkennen. Wat om de eerste reden afvalt
+    // staat erbij, want de merchant kan zo'n kolom nog wel zelf kiezen.
+    const free = untaken.filter((column) => carriesCharacteristic(profiles[column]));
+    const skipped = untaken.filter((column) => profiles[column]?.unfit !== undefined);
+    const skippedNote = skipped.length > 0
+      ? [s.mapping.unfitSkipped.replace('{kolommen}', skipped.join(', '))]
+      : [];
+    const described = asked.map((row) => ({
       key: row.key,
       text: describeAttribute({
         key: row.key,
@@ -259,15 +303,11 @@ export function MappingStep({
     try {
       // In blokken: de route neemt hoogstens 200 kenmerken en 300 kolommen per
       // aanvraag, en een bank als woontextiel v4 vraagt er ruim 700. Eén grote
-      // aanvraag gaf een 400 en dus stil geen enkel voorstel. Lege kolommen gaan
-      // niet mee: daar valt niets in te herkennen, en ze drukken de kolommen die
-      // wél iets zeggen onder de grens.
+      // aanvraag gaf een 400 en dus stil geen enkel voorstel.
       const describedColumns = free
-        .filter((column) => (profiles[column]?.filled ?? 0) > 0)
         .slice(0, MAX_COLUMNS)
         .map((column) => ({ key: column, text: describeColumn(column, catalog, profiles[column]) }));
-      const pairs: { key: string; columns: string[] }[] = [];
-      const seenNotes: string[] = [];
+      const seenNotes: string[] = [...skippedNote];
       const blocks: (typeof described)[] = [];
       for (let start = 0; start < described.length; start += ATTRIBUTE_BATCH) {
         blocks.push(described.slice(start, start + ATTRIBUTE_BATCH));
@@ -284,15 +324,19 @@ export function MappingStep({
           // dragen; het bewijs per koppeling houdt dat eerlijk.
           const result = await requestMapping({ attributes: block, columns: describedColumns }, catalog.columns);
           const fitting = keepFitting(result.pairs);
-          pairs.push(...fitting.kept);
-          seenNotes.push(...result.notes, ...result.rejected, ...fitting.dropped);
           // Wat binnen is, staat er meteen; bij 700 kenmerken hoort niemand
-          // minuten naar een lege lijst te kijken.
+          // minuten naar een lege lijst te kijken. Per blok, en pas als het
+          // antwoord er is: valt een blok om, dan verandert er aan die
+          // kenmerken niets.
+          const changes = settle(block.map((entry) => entry.key), fitting.kept, result.model);
+          seenNotes.push(...result.notes, ...result.rejected, ...fitting.dropped, ...changes);
           setNotes([...seenNotes]);
-          accept([...pairs], result.model);
         }
       };
       await Promise.all(Array.from({ length: Math.min(PARALLEL_BLOCKS, blocks.length) }, worker));
+      // Het stempel pas als elk blok terug is, en niet als er verouderde
+      // voorstellen bleven liggen die deze ronde niet voorlegde.
+      if (mode !== 'open' || !stale) onChange((current) => current, PROPOSAL_VERSION);
       setBusy(undefined);
       return;
     } catch (caught) {
@@ -309,13 +353,15 @@ export function MappingStep({
         [...described.map((entry) => entry.text), ...free.map((column) => (profiles[column]?.sensitive ? column : describeColumn(column, catalog)))],
         setBusy,
       );
+      // Het browsermodel is de zwakste van de drie en vult alleen aan: het
+      // oordeelt niet opnieuw over een voorstel dat er al staat.
       const found = suggestMappings(
         described.map((entry, i) => ({ key: entry.key, vector: vectors[i] })),
         free.map((column, i) => ({ key: column, vector: vectors[described.length + i] })),
-      );
+      ).filter((one) => !reviewing.has(one.key));
       const fitting = keepFitting(found.map((f) => ({ key: f.key, columns: [f.column] })));
-      setNotes(fitting.dropped);
-      accept(fitting.kept, 'browser');
+      setNotes([...skippedNote, ...fitting.dropped]);
+      settle(fitting.kept.map((pair) => pair.key), fitting.kept, 'browser');
     } catch (caught) {
       setFailed(caught instanceof ModelUnavailable);
     } finally {
@@ -326,12 +372,14 @@ export function MappingStep({
   /** Een eigen keuze haalt het voorstel-label weg; het is dan van de merchant. */
   function choose(key: string, column: string) {
     chosenByMerchant.current.add(key);
-    setProposed((current) => {
-      const next = { ...current };
-      delete next[key];
-      return next;
+    onChange((current) => {
+      const stillProposed = { ...current.proposed };
+      delete stillProposed[key];
+      return {
+        mapping: { ...current.mapping, [key]: column === NONE ? [] : [column] },
+        proposed: stillProposed,
+      };
     });
-    onChange((current) => ({ ...current, [key]: column === NONE ? [] : [column] }));
   }
 
   return (
@@ -355,13 +403,27 @@ export function MappingStep({
             <Sparkles className="size-4 animate-pulse" aria-hidden />
             {label(busy)}
           </p>
-        ) : open.length > 0 && phase === 'done' ? (
-          <div className="mt-3">
-            <Button variant="secondary" onClick={() => void suggest()}>
-              <Sparkles className="size-4" aria-hidden />
-              {s.mapping.suggestAgain}
-            </Button>
+        ) : phase === 'done' && (open.length > 0 || mapped > 0) ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {open.length > 0 ? (
+              <Button variant="secondary" onClick={() => void suggest(stale ? 'proposals' : 'open')}>
+                <Sparkles className="size-4" aria-hidden />
+                {s.mapping.suggestAgain}
+              </Button>
+            ) : null}
+            {/* De uitweg voor koppelingen waarvan niemand meer weet of het een
+                voorstel was. Uitdrukkelijk een knop: hij gaat ook over wat de
+                merchant eerder zelf koos. */}
+            {mapped > 0 ? (
+              <Button variant="secondary" onClick={() => void suggest('all')}>
+                <RefreshCw className="size-4" aria-hidden />
+                {s.mapping.reviewAll}
+              </Button>
+            ) : null}
           </div>
+        ) : null}
+        {!busy && phase === 'done' && mapped > 0 ? (
+          <p className="mt-2 text-xs leading-relaxed text-muted">{s.mapping.reviewAllNote}</p>
         ) : null}
 
         <p className="mt-2 text-xs leading-relaxed text-muted">{s.mapping.suggestNote}</p>
@@ -385,7 +447,7 @@ export function MappingStep({
         {proposals > 0 ? (
           <p className="mt-3 text-sm leading-relaxed text-ink">
             <span className="tnum font-semibold">{proposals}</span> {s.mapping.proposedCount}{' '}
-            {source === 'browser' ? s.mapping.bySelf : `${s.mapping.byModel} ${source}.`}
+            {source === undefined ? null : source === 'browser' ? s.mapping.bySelf : `${s.mapping.byModel} ${source}.`}
           </p>
         ) : null}
       </Card>
@@ -456,6 +518,14 @@ export function MappingStep({
                                 .replace('{verwacht}', shapeLabel(row.shape))
                                 .replace('{gevonden}', shapeLabel(profile))}
                             </span>
+                          </p>
+                        ) : null}
+                        {/* Zelfde toon: de scan beantwoordt vragen uit kenmerken,
+                            maar wie zijn catalogus kent mag het beter weten. */}
+                        {profile.unfit ? (
+                          <p className="mt-0.5 flex items-start gap-1.5 text-xs leading-relaxed text-warn">
+                            <AlertTriangle className="mt-0.5 size-3 shrink-0" aria-hidden />
+                            <span className="min-w-0">{s.mapping.unfitColumn[profile.unfit]}</span>
                           </p>
                         ) : null}
                       </>

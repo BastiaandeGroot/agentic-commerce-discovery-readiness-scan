@@ -36,10 +36,23 @@ const MODEL = 'claude-haiku-4-5';
  * woontextielbank (16 september 2026): Haiku 4.5 hing `martindale` aan
  * weefdichtheid en `roll_length` aan voorraad, en kopieerde als bewijs de hele
  * waardenrij; Opus 5 wees bij elk voorstel één waarde aan die klopte en vond
- * `machine_washable` en `sustainable`, die Haiku miste. Ongeveer $0,20 per
- * honderd kenmerken, één keer per catalogus.
+ * `machine_washable` en `sustainable`, die Haiku miste.
+ *
+ * Sinds 5 oktober 2026 Opus 5.5 op effort medium. Gemeten op De Groot met
+ * woontextiel v4 en zijn bevestigde kenmerktypen (430 open kenmerken, 109
+ * kolommen), één run elk:
+ *
+ *   Opus 5.5 medium   97 voorstellen   ~$0,12 per honderd kenmerken
+ *   Opus 5.5 low      88               ~$0,08
+ *
+ * Low is goedkoper maar mist gewone koppelingen (`vezelsamenstelling` op
+ * `composition_info`, `gewicht_gm2` op `weight_per_m2`) en doet er meer waarbij
+ * een gat ten onrechte verdwijnt (`fr_wasbestendig_boolean` op een ja/nee-kolom
+ * voor brandvertragend). Een eerdere vergelijking mét Opus 5 draaide zonder de
+ * kenmerktypen en is daardoor niet met deze getallen te vergelijken; de volgorde
+ * was dezelfde. Zie NOTES.md.
  */
-const ATTRIBUTE_MODEL = 'claude-opus-5';
+const ATTRIBUTE_MODEL = 'claude-opus-5-5';
 
 /** Ruim genoeg voor honderd koppelregels. */
 const MAX_TOKENS = 4096;
@@ -118,6 +131,9 @@ export async function POST(request: Request) {
         system: SYSTEM,
         messages: [{ role: 'user', content: prompt(payload) }],
         output_config: {
+          // Expliciet, ook al is medium de standaard van dit model: de keuze is
+          // gemeten en hoort niet mee te schuiven met een standaard. Denken staat
+          // altijd aan en telt mee in `max_tokens`; effort is de enige knop.
           effort: 'medium',
           format: { type: 'json_schema', schema: PROPOSALS_SCHEMA as unknown as Record<string, unknown> },
         },

@@ -32,6 +32,7 @@ export const STRINGS = {
         requests: 'Aanvragen',
         shopScan: 'Winkel doormeten',
         banks: 'Vragenbanken',
+        nodes: 'Categorieknopen',
         settings: 'Instellingen',
       } as Record<string, string>,
       account: 'Account',
@@ -392,6 +393,16 @@ export const STRINGS = {
       expects: 'verwacht',
       misfit: 'Dit kenmerk verwacht {verwacht}; deze kolom bevat {gevonden}. Weet je zeker dat het antwoord hierin staat, laat hem dan staan.',
       misfitDropped: 'Voorstel {kenmerk} → {kolom} vervallen: het kenmerk verwacht {verwacht}, de kolom bevat {gevonden}.',
+      unfitSkipped: 'Niet voorgesteld als bron: {kolommen}. Daar staat lopende tekst, een bestand of een tijdstip in en geen kenmerk. Weet je dat het antwoord er toch in staat, kies de kolom dan zelf.',
+      unfitColumn: {
+        prose: 'In deze kolom staat lopende tekst. De scan beantwoordt vragen uit kenmerken, niet uit een omschrijving: staat het antwoord ook in een eigen kolom, kies die dan, en anders "geen kolom".',
+        file: 'In deze kolom staat een bestand of een adres, geen kenmerk. Kies een andere kolom, of "geen kolom".',
+        timestamp: 'In deze kolom staat een tijdstip dat je systeem zelf schreef, geen kenmerk. Kies een andere kolom, of "geen kolom".',
+      } as Record<string, string>,
+      reviewAll: 'Alles opnieuw laten voorstellen',
+      reviewAllNote: 'Legt elke koppeling op dit scherm opnieuw voor aan het model, ook wat je eerder zelf koos. Wat het anders ziet wordt vervangen, wat het niet meer aanwijst komt weer open te staan; elke wijziging staat daarna hierboven. "Geen kolom" blijft staan.',
+      reviewReplaced: '{kenmerk}: {oud} is vervangen door {nieuw}.',
+      reviewDropped: '{kenmerk}: de koppeling met {oud} is vervallen, het model wijst die kolom niet meer aan. Het kenmerk staat weer open.',
       openSummary:
         'Onbeantwoordbaar met deze koppeling: {vragen} vragen, door {kenmerken} ongekoppelde kenmerken. Staat een kenmerk echt niet in je catalogus, laat dan "geen kolom" staan — dat is de bevinding. Welke vragen het zijn, zie je in het rapport.',
       moreQuestions: 'meer vragen',
@@ -643,6 +654,8 @@ export const STRINGS = {
       qNextAbsent: 'Je catalogus heeft geen kolom voor dit kenmerk. Dat is een beslissing over je datamodel, en pas daarna invulwerk.',
       qNextUnlinked: 'Dit kenmerk is aan geen enkele kolom gekoppeld. Ga terug naar "Kenmerken koppelen" en wijs de kolom aan — misschien staat het antwoord er gewoon.',
       qNextWeak: 'De velden zijn gevuld, maar te mager om een antwoord te heten. Hier helpt herschrijven, niet aanvullen.',
+      qNextTree: 'Waar deze producten voor bedoeld zijn, volgt uit de categorie waar ze onder hangen en staat nergens als kenmerk. Dat telt als beantwoord. Maar een feed geeft per product meestal één categorie door: leg alle toepassingen vast als kenmerk, dan gaat het hele antwoord mee.',
+      fromTree: 'alleen uit de categorieboom',
       causes: {
         unfilled: 'Invulwerk',
         unmodelled: 'Modelwerk',
@@ -697,6 +710,7 @@ export const STRINGS = {
         qNextEmpty: 'Veld invullen',
         qNextAbsent: 'Kolom toevoegen',
         qNextWeak: 'Herschrijven',
+        qNextTree: 'Als kenmerk vastleggen',
       } as Record<string, string>,
       pdfActionsLegend: 'Wat de acties betekenen',
       pdfAllUnanswered: 'Alle onbeantwoorde vragen, beste eerst.',
@@ -744,6 +758,21 @@ export const STRINGS = {
       allRecords: 'Alle',
     },
 
+    nodes: {
+      heading: 'Categorieknopen voor de vragenbank',
+      intro:
+        'Wat elke merchant op zijn categoriescherm als categorie heeft aangemerkt. Dit is de opdracht voor het onderzoek: per knoop wordt er een panel van vijf sites langsgegaan die díé subcategorie werkelijk voeren.',
+      rule:
+        'Alleen categorieën staan hier. Een pad dat de merchant een kenmerk noemde — een materiaal, een collectie, een kleur — krijgt nooit een vragenset en wordt dus ook niet onderzocht. Dat scheelt het meeste werk: van een boom van zestig knopen blijft ongeveer de helft over.',
+      nodeCount: 'categorieknopen',
+      copy: 'Kopieer de lijst',
+      copied: 'Gekopieerd',
+      emptyTitle: 'Nog geen categorieknopen',
+      emptyBody:
+        'Zodra een merchant zijn catalogus aanlevert en op het categoriescherm zijn kenmerken van zijn categorieën scheidt, staat zijn lijst hier.',
+      failedNext: 'Draait de migratie voor `category_verdicts` al? Zonder die tabel is er niets te tonen.',
+      retry: 'Opnieuw proberen',
+    },
     shopScan: {
       heading: 'Winkel doormeten',
       intro: 'Meet wat een AI-assistent van een webshop kan zien, zonder dat de eigenaar iets aanlevert. We halen een steekproef productpagina\u2019s op en leggen daar de vragen van zijn markt naast.',
@@ -1177,6 +1206,7 @@ export const STRINGS = {
         requests: 'Requests',
         shopScan: 'Measure a shop',
         banks: 'Question banks',
+        nodes: 'Category nodes',
         settings: 'Settings',
       } as Record<string, string>,
       account: 'Account',
@@ -1534,6 +1564,16 @@ export const STRINGS = {
       expects: 'expects',
       misfit: 'This characteristic expects {verwacht}; this column holds {gevonden}. If you are sure the answer is in here, keep it.',
       misfitDropped: 'Proposal {kenmerk} → {kolom} dropped: the characteristic expects {verwacht}, the column holds {gevonden}.',
+      unfitSkipped: 'Not proposed as a source: {kolommen}. These hold running text, a file or a timestamp rather than a characteristic. If you know the answer is in there, pick the column yourself.',
+      unfitColumn: {
+        prose: 'This column holds running text. The scan answers questions from characteristics, not from a description: if the answer also sits in a column of its own, pick that one, otherwise "no column".',
+        file: 'This column holds a file or an address, not a characteristic. Pick another column, or "no column".',
+        timestamp: 'This column holds a timestamp your system wrote itself, not a characteristic. Pick another column, or "no column".',
+      } as Record<string, string>,
+      reviewAll: 'Have everything proposed again',
+      reviewAllNote: 'Puts every link on this screen before the model again, including what you chose yourself earlier. What it sees differently is replaced, what it no longer points to is open again; every change is listed above afterwards. "No column" stays.',
+      reviewReplaced: '{kenmerk}: {oud} was replaced by {nieuw}.',
+      reviewDropped: '{kenmerk}: the link to {oud} was dropped, the model no longer points to that column. The characteristic is open again.',
       openSummary:
         'Unanswerable with this mapping: {vragen} questions, because of {kenmerken} unlinked characteristics. If a characteristic really is not in your catalogue, leave "no column" — that is the finding. The report shows which questions they are.',
       moreQuestions: 'more questions',
@@ -1783,6 +1823,8 @@ export const STRINGS = {
       qNextAbsent: 'Your catalogue has no column for this characteristic. That is a decision about your data model, and only then data entry.',
       qNextUnlinked: 'This characteristic is linked to no column at all. Go back to "Link characteristics" and point at the column — the answer may simply be there.',
       qNextWeak: 'The fields are filled but too thin to count as an answer. Rewriting helps here, not adding.',
+      qNextTree: 'What these products are intended for follows from the category they sit in and is not recorded as a characteristic anywhere. That counts as answered. But a feed usually passes on one category per product: record every application as a characteristic, and the whole answer travels along.',
+      fromTree: 'from the category tree only',
       causes: {
         unfilled: 'Data entry',
         unmodelled: 'Model work',
@@ -1837,6 +1879,7 @@ export const STRINGS = {
         qNextEmpty: 'Fill in the field',
         qNextAbsent: 'Add a column',
         qNextWeak: 'Rewrite',
+        qNextTree: 'Record as characteristic',
       } as Record<string, string>,
       pdfActionsLegend: 'What the actions mean',
       pdfAllUnanswered: 'All unanswered questions, best first.',
@@ -1884,6 +1927,21 @@ export const STRINGS = {
       closeDetail: 'Hide details',
     },
 
+    nodes: {
+      heading: 'Category nodes for the question bank',
+      intro:
+        'What each merchant marked as a category on their category screen. This is the research brief: per node a panel of five sites that actually carry that subcategory.',
+      rule:
+        'Only categories appear here. A path the merchant called a characteristic — a material, a collection, a colour — never gets a question set and is therefore never researched. That saves most of the work: of a sixty-node tree, roughly half remains.',
+      nodeCount: 'category nodes',
+      copy: 'Copy the list',
+      copied: 'Copied',
+      emptyTitle: 'No category nodes yet',
+      emptyBody:
+        'As soon as a merchant supplies a catalogue and separates characteristics from categories on the category screen, their list appears here.',
+      failedNext: 'Has the migration for `category_verdicts` run? Without that table there is nothing to show.',
+      retry: 'Try again',
+    },
     shopScan: {
       heading: 'Measure a shop',
       intro: 'Measure what an AI assistant can see of a web shop, without the owner supplying anything. We fetch a sample of product pages and lay the questions of their market alongside.',

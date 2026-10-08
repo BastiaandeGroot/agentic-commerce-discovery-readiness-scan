@@ -1,7 +1,7 @@
 # Werknotities
 
 Sessiestand: wat er staat, wat er besloten is, wat er open is.
-Laatst bijgewerkt: 2026-09-16.
+Laatst bijgewerkt: 2026-09-23.
 
 Structurele regels die altijd gelden staan **niet** hier maar in `CLAUDE.md`.
 
@@ -678,10 +678,173 @@ vond `machine_washable` en `sustainable` die de anderen misten; twijfelgevallen
 `merk → supplier` en `meubeltype_advies → categories`. ~$0,20 en ~80 seconden per
 blok van honderd kenmerken; vier blokken lopen tegelijk.
 
-Wat er nog niet in zit: een koppeling die eerder al bewaard is, blijft staan. Het
-model stelt alleen voor wat open staat, dus foute koppelingen van vóór deze
-wijziging haalt de merchant zelf weg. Het browsermodel (zonder sleutel) werkt nog
-zoals het werkte en is de zwakste van de drie.
+**Sinds 5 oktober 2026: Opus 5.5 op effort medium.** Gevraagd was low; de meting
+wees medium aan. Drie instellingen met dezelfde opstelling op De Groot en
+woontextiel v4 (430 open kenmerken, 119 kolommen, vijf blokken), één run elk:
+
+| | voorstellen | uitvoertokens | per honderd kenmerken | gevaarlijk (van 9) |
+|---|---|---|---|---|
+| Opus 5 medium (was live) | 130 | 22.475 | ~$0,18, ~47 s | 5 |
+| Opus 5.5 low | 108 | 8.047 | ~$0,09, ~14 s | 7 |
+| Opus 5.5 medium | 112 | 17.685 | ~$0,13, ~33 s | 2 |
+
+"Gevaarlijk" zijn negen nagelopen voorstellen waarbij een gat ten onrechte
+verdwijnt: `brandklasse`, `brandgedrag_classificatie` en `fr_wasbestendig_boolean`
+op `flame_retardant` (ja/nee), `waterdichtheid_klasse` op `water_proof`,
+`testnorm_lichtechtheid` op `lightfatness`, `weefdichtheid` op `curtain_density`,
+`leverbaarheid_status` op `internal_comment` (de opdracht verbiedt die letterlijk),
+en `soepelheid` en `valgedrag_omschrijving` op `short_description` (lopende tekst
+als bron, een afgevallen richting). 5.5 medium houdt er twee over
+(`waterdichtheid_klasse`, `weefdichtheid`) en maakt één nieuwe van hetzelfde soort
+(`testnorm_slijtvastheid` op `martindale`). Low miste daarnaast gewone koppelingen
+die de andere twee vonden, zoals `vezelsamenstelling` en `materiaalsamenstelling`
+op `composition_info`. Kanttekening: één run per instelling, en de vorige meting
+gaf tussen runs al 31–33; de verschillen van een paar voorstellen zijn ruis, het
+verschil 7 tegen 2 is dat niet.
+
+**Die vergelijking draaide zonder de kenmerktypen, en dat vertekende haar.** De
+meetopstelling las de CSV zonder de bevestigde typering uit de database; de app
+geeft die wél mee, en dan staat er `brandklasse [vaste lijst: B1, M1, schwer
+entflammbar]` in plaats van alleen een naam met een vraag. Opnieuw gemeten met
+`--types` (430 open kenmerken, 109 kolommen na het schiften):
+
+| | voorstellen | per honderd kenmerken | van de negen gevaarlijke |
+|---|---|---|---|
+| Opus 5.5 medium, mét typen | 97 | ~$0,12 | 1 |
+| Opus 5.5 low, mét typen | 88 | ~$0,08 | 2 |
+
+Met typen verdwijnt de fout "een vinkje voor een klasse" bijna vanzelf. Wat
+overblijft is `waterdichtheid_klasse → water_proof`, een tweedeling op een
+ja/nee-kolom en dus verdedigbaar; low doet daarnaast `fr_wasbestendig_boolean →
+flame_retardant`. `weefdichtheid → curtain_density` stond eerder op de lijst van
+gevaarlijke, ten onrechte: de bank typeert dat kenmerk zelf als transparant,
+lichtfilterend of verduisterend. De keuze voor medium blijft staan — low mist ook
+mét typen gewone koppelingen als `vezelsamenstelling → composition_info`.
+
+**De les: meet nooit zonder `--types`.** En de keerzijde: een bank zónder
+bevestigde typering — een handmatige upload, of een bank die nog op review staat
+— krijgt de slechte getallen van de eerste tabel. De typering is de grootste
+hefboom op de kwaliteit van het koppelen, groter dan het model of de opdracht.
+
+**Kolommen schiften vóór het koppelen (5 oktober 2026).** De eerste van de
+bedachte stappen, en de enige die bleef. Aanleiding: `droogvoorschrift` stond op het live
+scherm op `description`. De app kende maar één soort vrije tekst, dus een
+omschrijving van 503 woorden was even goed kandidaat als een samenstelling van 5,
+en de regel "proza is geen antwoordbron" stond alleen in deze notities.
+
+- `ColumnProfile.unfit` in `src/engine/profile.ts`: `prose` (vrije tekst, geen
+  meervoudige keuze, gemiddeld acht woorden of meer per cel), `file` (pad of
+  url) en `timestamp` (datum mét tijd). Op de waarden, niet op de naam. Op De
+  Groot vallen er tien van de 120 gevulde kolommen af: `description`,
+  `short_description`, `meta_description`, `meta_title`, drie afbeeldingspaden
+  en drie tijdstippen. `url_key` en de afbeeldingslabels blijven: een slug is
+  niet met zekerheid van een code te onderscheiden zonder naar de naam te kijken.
+- Zo'n kolom wordt niet meer vóórgesteld, door Claude noch door het
+  browsermodel (`carriesCharacteristic`). De merchant kan hem nog zelf kiezen, en
+  het scherm zegt welke kolommen zijn overgeslagen.
+- `shapeMisfit` kende alleen getallen. Erbij: een klasse van drie of meer
+  waarden, of een code, op een ja/nee-kolom.
+
+Nagerekend op de drie metingen hierboven, zonder nieuwe modelaanroep: van de
+negen gevaarlijke voorstellen vallen er vier af (`brandklasse` en
+`brandgedrag_classificatie` op de vorm, `soepelheid` en `valgedrag_omschrijving`
+op de lopende tekst). Eén voorstel valt af dat verdedigbaar was:
+`binnen_of_buitengebruik` (binnen, buiten, beide) op de ja/nee-kolom
+`outdoor_usage`. Dat is de prijs van de klasse-regel en een bewuste keuze — het
+vervallen voorstel staat als melding op het scherm. Voor de gekozen instelling
+(5.5 medium) verandert stap 1 in deze meting verder niets: de twee gevaarlijke
+voorstellen die dat model overhoudt zijn geen vormfout. Stap 1 is een vloer onder
+élk model, geen verbetering van dit ene getal.
+
+**Stap 2 gebouwd, gemeten en afgevallen (5 oktober 2026).** Het idee: het model
+stelt eerst per kolom vast wat hij vastlegt (`flame_retardant`: "ja/nee, of de
+stof brandvertragend is; niet volgens welke norm of klasse") en legt de kenmerken
+daarna tegen die vaste betekenis, met een strengere toets: "legt de kolom dít
+kenmerk vast" in plaats van "raakt een waarde de vraag". Headless gebouwd en
+gemeten, alles mét typen op Opus 5.5 medium:
+
+| | voorstellen | kosten | van de negen gevaarlijke |
+|---|---|---|---|
+| A — de opdracht die er staat | 97 | $0,58 | 1 |
+| B — de strengere opdracht | 88 | $0,55 | 0 |
+| C — strenger, mét kolomduiding | 82 | $0,75 | 0 |
+
+De kolomduiding zelf was goed: 105 van de 109 kolommen kregen een leesbare zin,
+en 32 werden terecht als beheer aangemerkt (`url_key`, SEO-velden,
+winkelinstellingen). Maar het koppelen werd er niet beter van. C deed niets wat B
+niet deed, verloor koppelingen die klopten (`geschikt_voor_buiten → outdoor_usage`,
+`wasbaar_ja_nee → machine_washable`) en kostte een derde meer. Geen enkele run
+stelde ooit een beheerkolom voor, dus ook dat oordeel won niets. En B tegen A is
+één verdedigbaar voorstel minder tegen negen voorstellen minder, waaronder
+`kleurnaam → color` — binnen de ruis van één run. De opdracht is dus gebleven
+zoals hij was. Het experiment staat op de branch `proef-kolomduiding`.
+
+**Een voorstel onthoudt dat het een voorstel is (5 oktober 2026).** De regel was
+altijd "een voorstel is nooit een koppeling", maar alleen het scherm wist welke
+koppelingen een voorstel waren. Ze werden meteen als gewone koppeling bewaard, en
+na herladen was niet meer te zien dat de merchant er nooit naar had gekeken. Het
+model stelt alleen voor wat open staat, dus een koppeling van een zwakker model
+bleef voorgoed staan — `droogvoorschrift` op `description` is er zo een.
+
+- De herkomst staat nu naast de koppeling: `Proposed` (kenmerk → voorgestelde
+  kolom) in `src/questions/mapping.ts`, bewaard in `merchant_bank_settings`
+  (migratie 0014) en bij de bank in de browser. Kiest de merchant zelf, dan is het
+  zijn koppeling en vervalt het merk.
+- `PROPOSAL_VERSION` in `src/semantic/prompt.ts` gaat omhoog als het model, de
+  opdracht of de zeef verandert. Voorstellen van een oudere versie worden bij het
+  openen van het koppelscherm **één keer** opnieuw voorgelegd. Niet bij elk
+  bezoek: twee beurten geven niet precies dezelfde lijst (zo'n tien procent
+  verschil tussen runs), en een scan hoort niet te verschuiven omdat iemand het
+  scherm opnieuw opende.
+- `applyReview` verwerkt het oordeel: een andere kolom vervangt de oude, een
+  kenmerk dat het model niet meer aanwijst staat weer open, en beide staan als
+  melding op het scherm. "Geen kolom" blijft altijd staan, en wat de merchant
+  tijdens de ronde zelf koos ook. Een onleesbaar antwoord is een storing en geen
+  lege lijst (`ReadProposals.unreadable`) — anders gooit een storing koppelingen weg.
+- Voor koppelingen van vóór deze wijziging is niet meer te zeggen wat een voorstel
+  was. Daarvoor is de knop **Alles opnieuw laten voorstellen**: uitdrukkelijk, want
+  hij gaat ook over wat de merchant eerder zelf koos.
+- Een gekozen kolom met lopende tekst, een bestand of een tijdstip krijgt een
+  waarschuwing op zijn regel, zoals een vorm die niet past.
+
+Het browsermodel vult alleen aan en oordeelt niet opnieuw over wat er staat.
+
+**Nog te doen:** migratie 0014 draaien. Zonder blijft alles werken, maar gaat de
+herkomst in het account niet mee en wordt een voorstel na herladen weer een gewone
+koppeling. Niet in een browser gezien: de knop, de meldingen en de waarschuwing per
+regel zijn gebouwd en getypecheckt, de logica staat onder test, maar het scherm is
+niet doorlopen met een catalogus erin.
+
+**Waar een product voor bedoeld is, mag uit de categorieboom komen** — 6 oktober,
+`SCAN_VERSION` 6.1.0. Aanleiding: de proefscan van woontextiel v5 op De Groot kwam op
+0 basisgeschikt, omdat de kritieke vraag "waar is deze stof voor bedoeld" een kolom
+`toepassing` zocht die er niet is — terwijl de winkel het wél vastlegt, als categorie
+(Stoelen, Banken, Tassenstoffen). Een agent die de catalogus krijgt ziet die
+categorieën ook.
+
+- Alleen dit ene begrip (`isPlacementAttribute` in `src/spec/placement.ts`, op de
+  hele naam: `toepassing`, `geschikt_voor`, `intended_use` — niet `toepassing_garen`).
+  Een categorie "Verduisterend" draagt geen lichtdoorlatendheid; dat blijft een gat.
+- Alleen als geen kolom het draagt, en alleen op een plek die de bank als segment
+  kent (een set met `overlayId`). Decoratiestoffen, Motieven, een actiecategorie
+  zeggen niet waar een product voor dient. Zo bepaalt de bank wat een toepassing
+  is en niet de winkel, en blijven twee merchants vergelijkbaar.
+- Het telt als beantwoord, maar het rapport telt het apart
+  (`QuestionCoverage.fromTree`, in `found` staat `PLACEMENT_FIELD`) en houdt de
+  vraag in de lijst met het advies het als kenmerk vast te leggen: een feed geeft
+  per product meestal één categorie door. Het reist mee in de snapshot en door het
+  herberekenen, zonder de vorm van het detail te veranderen.
+
+Gemeten op De Groot met v5, zonder koppelscherm: 3.715 van 3.746 producten krijgen
+de toepassing uit de boom, 30 hangen alleen onder Decoratiestoffen en houden het
+gat, basisgeschikt gaat van 0 naar 1.948. Wat daarna tegenhoudt is
+lichtdoorlatendheid (1.513, nog niet gekoppeld) en slijtvastheid (268). 1.536
+producten hangen onder meer dan één vragenset — precies wat in een feed verloren
+gaat. Bekend gevolg: de algemene toepassingsvraag is hiermee licht geworden; de
+poort rust op de kritieke vraag van de set zelf.
+
+Niet in een browser gezien: de regel "alleen uit de categorieboom" op het
+rapportscherm en in de pdf is gebouwd en getypecheckt, de telling staat onder test.
 
 ## Bewust afgevallen
 
@@ -698,10 +861,127 @@ Niet opnieuw voorstellen zonder dat er iets veranderd is.
 | Titel gebruiken om andere vragen te beantwoorden | Titel is retrieval, geen filtering. En de grens naar "dan de omschrijving ook" is niet te verdedigen. |
 | De generatie als agent, in een cloud-routine of in Cowork | Een agent die elk kwartier wakker wordt om te concluderen dat de wachtrij leeg is, kost ~96 sessies per dag aan niets. En een agentische generatie kan niet hervatten: valt hij om bij site vier, dan begint hij bij nul. De methode ís een vaste reeks, dus hem als reeks draaien geeft hervatten, een prijs per stap en een model per fase. Pollen hoort goedkoop te zijn en werken duur; die twee in één ding stoppen was de fout. |
 | Een eigen agentlus op Render die de bank zelf schrijft | Dat is dezelfde pijplijn plus onderhoud: een gereedschapslus, herhalingen, en hetzelfde hervattingsprobleem opnieuw oplossen. De fasenreeks doet het met minder code en met de tussenstand in de database. |
+| Het model eerst per kolom laten vaststellen wat hij vastlegt, en daar de kenmerken tegen leggen | Gebouwd en gemeten op 5 oktober 2026: geen gevaarlijk voorstel minder dan de bestaande opdracht, wel minder goede voorstellen en een derde meer kosten, plus een extra tabel voor de merchant. De hefboom bleek de kenmerktypering van de bank te zijn, niet de volgorde. Branch `proef-kolomduiding`. Wél opnieuw overwegen als het doel verandert: de duiding per kolom is leesbaar en zou het koppelscherm voor de merchant kunnen verduidelijken. |
 
 ---
 
 ## Open
+
+**Woontextiel v5 is gegenereerd, nog niet in de app** — 6 oktober. De reeks is in
+de sessie doorlopen (geen API-kosten) met `scripts/generate-local.ts`; de run staat
+in `~/Documents/Vragenbank/run-woontextiel-v5/`, de tabel in
+`~/Documents/Vragenbank/woontextiel-v5.csv`: 32 algemene vragen, 12 vragensets, 89
+vragen, vijf kritiek. Met de boomregel en zonder koppelscherm: 1.850 van 3.746
+basisgeschikt. Nog te doen vóór uploaden:
+
+- Hersteld op 6 oktober, na de reeks en met de hand in `run.json` (elk als bevinding
+  in de bank): Paneel is bij De Groot een gordijnsoort en staat nu als toepassing
+  bij Gordijnstoffen; Windschermen kreeg de vraag naar winddoorlatendheid (WIN-03)
+  en inkijk (WIN-04); Naaigarens en Onderhoudsproducten dragen nu ook de
+  categorienamen uit de lijst van de aanvrager als alias, zodat ze in zijn boom
+  landen. Headless nagemeten: 16 sets, alle onder hun eigen naam.
+- De garens en onderhoudsmiddelen (168 producten) zijn meteen basisgeschikt: hun
+  sets hebben geen kritieke vraag. Dat is hoe de trechter werkt, maar het is een
+  cijfer om bij stil te staan.
+- `keurmerken` viel automatisch op `product_label` (Bestseller, Op=Op); dat is fout
+  en moet op het koppelscherm weg.
+- De kritieke vragen zijn nog langs vier criteria gelegd; de twee-criteria-definitie
+  staat hierboven als beslissing en zit nog niet in de code.
+
+**De Cowork-route is vastgelegd, nog niet gebouwd** — 18 september. Het ontwerp
+staat in `ONTWERP-vragenbank-keten.md` 3c (onderzoek per categorieknoop, eigen
+panel per knoop), 4c (een tweede merchant in dezelfde markt vult de bestaande
+bank aan) en 5 (vastliggend: nooit een vragenset uit een kenmerkknoop). De
+opdracht is uit de app te halen: `/dashboard/knopen` toont per account de paden
+die op `categorie` staan en kopieert ze als één pad per regel. De boom van De
+Groot levert een kleine dertig knopen, dus rond de honderdvijftig
+onderzoeksbeurten.
+
+Stap 1 uit de bouwvolgorde is gedaan — 18 september. De vraag was of een
+handmatige upload dezelfde poorten haalt als `/api/bank-result`; het antwoord is
+dat **die deur er zelf geen heeft**. `deliverBank` roept dezelfde
+`importQuestionList` aan die de merchant gebruikt en voegt niets toe behalve de
+status `review` bij bevindingen — en die bevindingen levert de maker zelf aan.
+De poorten waar het om ging staan in de generatiefasen, vóór de CSV bestaat, en
+een aangeleverde bank passeert ze dus hoe hij ook binnenkomt.
+
+Op een proeflijst nagemeten. Wat de lezer wél doet: criterium 3 en 4 van de
+kritiek-toets toepassen, met waarschuwing (`enforceCriticalCriteria`), een dubbel
+vraag-id blokkeren, en een vraag zonder kenmerken melden. Wat hij niet doet, en
+de pijplijn wel:
+
+- **Kritiek zonder `kritiek_toets` blijft kritiek**, zonder één waarschuwing. De
+  pijplijn zet die op hoog (`enforceCriticalTest`), net als een herweging naar
+  kritiek zonder toets. Dit is de ergste: kritiek is de poort voor
+  basisgeschikt, en een lijst waarin alles kritiek heet komt schoon binnen.
+- **Geen `unmeasurable`-lat.** Een bank waarin geen enkele vraag een kenmerknaam
+  draagt — precies waarop woontextiel v3 sneuvelde — leest foutloos in en meet
+  dan overal nul. De pijplijn laat zo'n fase mislukken.
+- **De overlay-lat werkt wél, maar stil.** Een overlay zonder eigen vraag met
+  dekking > 0 haalt `withCoveredOverlays` bij het scannen weg, inclusief zijn
+  herwegingen. Dat is de juiste uitkomst; alleen zegt niemand het.
+
+Het beoordeelscherm vangt het eerste punt (`critical-without-test` in
+`review.ts`), maar daar komt een bank die de merchant zelf inleest nooit langs.
+
+Die reparatie leek eerst "de toets uit `enforceCriticalTest` in
+`importQuestionList` zetten". **Dat gaat niet door** — 21 september. Woontextiel
+v4 heeft geen kolom `kritiek_toets`; de bank is van vóór die kolom. Die regel zou
+alle vijftien kritieke vragen van de enige vrijgegeven bank naar hoog zetten en
+basisgeschikt leeg maken. Wat er wel komt is een **waarschuwing** als een lijst
+kritieke vragen draagt zonder enige onderbouwing: die verlaagt niets, breekt v4
+niet, en zet een aangeleverde bank op `review`.
+
+Stap 3 (één markt end-to-end, naast woontextiel v2) blijft de beslissing: valt
+die tegen, dan is de app-route goedkoper én beter.
+
+---
+
+**De definitie van kritiek gaat naar twee criteria** — 23 september, besloten.
+
+In plaats van vier:
+
+1. De vraag zegt zelf of het product **geschikt** is voor wat de koper ermee gaat
+   doen — geen getal waaruit dat pas volgt, en geen tegenvaller.
+2. Het antwoord komt **uit de catalogus**, zonder de maten of keuzes van de koper.
+
+*Onherstelbaar* en *over het product* vervallen als aparte eis. Niet omdat ze
+onwaar zijn, maar omdat ze niets wegfilterden: in een markt waar alles op maat
+geknipt wordt is alles onherstelbaar, en dat liet 31 van de 171 vragen door.
+Onherstelbaar blijft wél de reden dát we dit meten; het hoort in de uitleg aan de
+merchant, niet in de zeef.
+
+Wat de meting hierachter opleverde, op v4 (171 vragen, 15 kritiek na de 32
+correcties):
+
+- Op v4 verandert de nieuwe definitie bijna niets: 13 blijven, 2 vervallen
+  (BUI-03 lichtechtheid is verloop en geen geschiktheid; OND-02 is een risico met
+  een gebruiksadvies). GOR-01 blijft, maar is als informatie geformuleerd
+  ("hoeveel licht laat hij door") terwijl het een geschiktheidsvraag is — tekst
+  meenemen naar een volgende versie.
+- De winst zit elders. Op de oudere lijst van 51 vragen, die geen kolom
+  `intentie` heeft, hield de vier-criteria-toets 12 van de 14 kritieke vragen
+  overeind — inclusief retourbeleid, voorraad, verfbad en twee rekenvragen. De
+  twee tests, toegepast op de vraagtekst, laten daar 4 over. **De oude definitie
+  is niet te breed maar te afhankelijk**: hij leunt op `intentie` en
+  `antwoordtype`, en glijdt geruisloos door zodra een lijst die niet goed invult.
+  Dat is precies het geval bij elke bank die van buiten komt.
+- De app kan "is dit een geschiktheidsvraag" niet zelf beslissen. Het signaal
+  staat in `intentie`: de 15 kritieke vragen van v4 staan op `fit` (7),
+  `function` (3), `safety` (2), `durability` (2) en `expectation` (1). Een harde
+  regel "alleen fit/function/safety" zou BUI-03 en OND-02 laten vallen — goed —
+  maar ook BUI-11, dat verkeerd gelabeld staat en gewoon een geschiktheidsvraag
+  is. Daarom **een waarschuwing en geen poort**: dezelfde redenering als bij het
+  koppelen, een gemiste koppeling zie je en een verkeerd verdwenen vraag niet.
+
+Stand van het werk: v4 corrigeren met de nieuwe bril is de eerste stap en vraagt
+geen code — BUI-03 en OND-02 naar hoog, BUI-11 blijft bevestigd kritiek. Daarna
+pas de code: `src/questions/critical.ts`, de methode, de plugin en de
+generatieprompt (geen vier zinnen onderbouwing meer per kritieke vraag).
+
+Niet in een browser gezien: `/dashboard/knopen` en `/api/admin/category-nodes`
+staan in de routetabel en de build haalt het, maar de gevulde lijst vraagt een
+beheerderstoken en rijen in `category_verdicts`.
 
 **Woontextiel v4 gecorrigeerd; opnieuw scannen** — 16 september. Migratie 0013
 is gedraaid. v4 heeft 32 correcties in `importance_corrections`: de voorstellen
@@ -738,10 +1018,96 @@ kenmerken, 5 blokken op Sonnet), nalopen en bevestigen. 0010 maakt
 0010 werkt de scan, maar valt bewaren in het account stil terug (het scherm meldt
 dat) en mislukt het bewaren van een uitgesloten categorie.
 
-**Een categorie die de bank als facet kent, krijgt een verkeerde overlay** — 14
-september. In v4 is Decoratiestoffen een facet; op het koppelscherm koos Haiku er
-Tafelkleedstoffen voor, en Outdoorstoffen kreeg Schaduwdoek. Zo'n categorie hoort
-standaard op "alleen de algemene vragen" te staan.
+**Een categorie zonder eigen set kreeg de set van haar subcategorie** — gemeld 14
+september, opgelost 5 oktober. In v4 heeft Decoratiestoffen geen eigen vragen; het
+model zocht de dichtstbijzijnde set en koos Tafelkleedstoffen, en Outdoorstoffen
+kreeg Schaduwdoek. Daarmee kreeg elke decoratiestof de tafelkleedvragen én verdween
+de regel van Tafelkleedstoffen zelf, want die mat nu hetzelfde als haar
+bovenliggende categorie. Het model krijgt nu alleen de sets voorgelegd die nog
+nergens op naam geland zijn (`overlaysToPropose`); blijft er geen over, dan gaat er
+niets de deur uit en houdt de categorie de algemene vragen. De merchant kan in de
+keuzelijst nog elke set kiezen. Een fout voorstel dat al bewaard stond, blijft
+staan tot hij het zelf omzet.
+
+**De categorieën van een bank zijn die van de aanvrager** — vastgesteld 5 oktober.
+De vragen komen van het panel, de indeling niet: de aanvraag draagt de
+categorienamen van de merchant, en de generatie schrijft per naam een vragenset.
+Woontextiel v4 heet daardoor tot op de spelfout "Onderhoudsprodukten" zoals de
+boom van De Groot. Voor de aanvrager klopt elke naam; een tweede winkel in dezelfde
+markt die "Tafelzeil" of "Verduisterende gordijnen" zegt, landt nergens op naam en
+is aangewezen op een voorstel of op de keuzelijst. Dit schuurt met "een bank hoort
+bij een vertical, niet bij een merchant": dat geldt nu voor de vragen, niet voor
+het skelet. Zie ook "Subcategorieën landen alleen op de volle naam" hieronder en
+paragraaf 4c van het ontwerp (een tweede merchant vult de bank aan).
+
+**Besloten: de indeling komt uit het panel** — 5 oktober. Het ontwerp staat in
+`ONTWERP-vragenbank-keten.md` 3d. Bastiaan bevestigde de twee regels: een segment
+bestaat pas als minstens twee panelsites het als categorie voeren
+(`SEGMENT_SITES`), en wat alleen één site voert — ook de aanvrager — wordt een
+bevinding en geen vragenset.
+
+Stap 1 tot en met 3 staan (`GENERATION_VERSION` 2.0.0):
+
+- de oogst legt per site haar indeling vast (`SiteHarvest.segments`) en bij elke
+  vraag de categorie waaronder hij stond;
+- de panelfase deelt de categorieën van de aanvrager niet meer in; ze gaan nog
+  mee als afbakening van de markt;
+- de nieuwe fase `structure` legt de vijf indelingen op elkaar. Het model beslist
+  wat bij elkaar hoort; de app telt zelf op hoeveel sites een segment staat (een
+  alias telt alleen als die site die categorie werkelijk voert), kiest de naam die
+  de meeste sites gebruiken, en zet een segment van één site terug naar profiel;
+- de categoriefasen lopen over marktsegmenten en krijgen de vragen die panelsites
+  ónder dat segment behandelen letterlijk mee — tot nu toe schreven ze uit de
+  samenvatting van de hele markt, de zwakte uit ontwerp 3c;
+- de tabel draagt `geldt_voor` met de namen van de sites; de lezer kende die
+  kolom al en maakt er het patroon van waarmee een vragenset landt.
+
+Met vaste antwoorden nagespeeld in `tests/generation.test.ts`. **Niet op een
+echte markt gedraaid**: of een oogstbeurt een menu betrouwbaar leest en of vijf
+sites genoeg indeling delen, weet niemand tot stap 4.
+
+**De aanvrager draagt bij, maar draagt niet** — 6 oktober, besloten na de eerste
+echte run. Zijn site is één van de panelsites, en leverde daar een derde van alle
+geoogste vragen (101 van de 302); bij de kleinere segmenten kwamen de eigen vragen
+grotendeels van hemzelf. Dan meet de bank hem langs zijn eigen lat. Twee regels,
+beide in `src/generation/pipeline.ts` en herkend via `requesterSite`:
+
+- een segment krijgt alleen een eigen vragenset als een ándere site er minstens
+  één vraag onder behandelt (derde poort in `readStructure`);
+- een vraag die alleen op de site van de aanvrager staat kan niet kritiek zijn
+  (`enforceCriticalTest`). Vakkennis met dekking 0 valt daar niet onder.
+
+Zijn site helemaal uit het panel halen is overwogen en niet gedaan: dan verliest
+de bank de meeste gepubliceerde drempels, en vallen segmenten weg waar hij één van
+de twee sites is.
+
+Wat de eerste run verder leerde, en wat een volgende moet weten:
+
+- **Het ongelijke aandeel is echt en geen leesfout.** Na ruim twintig pagina's
+  extra leeswerk bij de andere sites kwamen er dertig vragen bij; de meeste
+  winkels tonen op hun categoriepagina's alleen producten.
+- **Een site kan AI-agents uitsluiten in `robots.txt`.** Twee gekozen sites
+  deden dat (Meubelstoffenvoordeel, P.W. Hoofs) en zijn niet geraadpleegd. Loop
+  dat na vóórdat een panel wordt voorgelegd, niet erna.
+- **Bot-afscherming laat sterke kandidaten afvallen** (Esvo, Böttger,
+  Stoff4you). Het panel bestaat daardoor uit wie zich laat lezen, en dat is een
+  vertekening die bij het panel hoort te staan.
+- **Een site remt af bij veel verzoeken tegelijk** (429 bij De Groot en Terrys
+  Fabrics). Na elkaar, met pauzes.
+- **De panelgrootte is geen vijf meer.** Deze run heeft er acht; de opdrachten
+  en de dekkingsnoemer volgen het panel, `extend` in het script breidt uit.
+
+`scripts/generate-local.ts` stuurt dezelfde reeks met de hand aan: één stap
+vragen, één antwoord uit een bestand geven, toestand na elke stap op schijf. Zo
+kan een Claude-sessie op een abonnement het werk van het model doen zonder
+API-kosten, met dezelfde opdrachten en dezelfde poorten als de app. De uitkomst is
+een CSV plus bijlagen; in de database komt hij pas via `/api/bank-result`.
+
+Nog te doen: stap 4 (woontextiel opnieuw genereren en naast v4 leggen — het
+beslismoment), stap 5 (het beoordeelscherm toont nog `count` per categorie en
+weet niets van sites en aliassen), en de promptreeks voor Cowork in
+`kennis/_methode/prompt-vragenbank-genereren.md` plus haar kopie in de plugin: die
+beschrijft nog de oude indeling. De methode zelf is bijgewerkt.
 
 **Eén kolom, meerdere kenmerken, en andersom** — een koppeling wijst nu naar
 één kolom. `washing_label` draagt zowel maximale wastemperatuur als bleekbaar, en
@@ -755,12 +1121,13 @@ doet. Slaapt de laptop, dan staat de reeks stil. Oplossing: de taak in Render
 aanzetten (betaald; `APP_URL` en `BANK_EXECUTOR_KEY` in het dashboard), of een
 geplande GitHub Action met dezelfde twee als secret.
 
-**Stand woontextiel (14 september)** — v1 en v2 vrijgegeven; v3 ingetrokken (alle
-negen categorieën zonder bruikbare kenmerknamen, zie de beslissing hieronder);
-**v4 staat op review** en is nagekeken: 171 vragen, 729 kenmerken, geen enkele
-categorievraag zonder kenmerk en geen kenmerk dat een zin is. Volgende stap:
-v4 beoordelen en vrijgeven. Let bij de indeling op Tassenstoffen, Paneel en
-Buitenkussens.
+**Stand woontextiel (23 september)** — v1, v2 en **v4 vrijgegeven**; v3
+ingetrokken (alle negen categorieën zonder bruikbare kenmerknamen, zie de
+beslissing hieronder). v4: 171 vragen, 729 kenmerken, geen enkele categorievraag
+zonder kenmerk en geen kenmerk dat een zin is. De 32 `importance_corrections`
+zijn 15 bevestigingen, 16 verlagingen (4 vragen en 12 herwegingen) en 1
+verhoging; er blijven 15 kritieke vragen over plus de herweging van BAS-21 in
+Gordijnstoffen. Let bij de indeling op Tassenstoffen, Paneel en Buitenkussens.
 
 **Een categoriestap kreeg de vorm van een vraag niet te zien (11 september).**
 De overlay-prompt verwees naar "zelfde vorm als de basislaag", die het model in

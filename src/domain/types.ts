@@ -527,6 +527,12 @@ export interface QuestionCoverage {
   incomplete: number;
   /** De catalogus kent het kenmerk niet. */
   absent: number;
+  /**
+   * Van de beantwoorde: bij hoeveel producten het antwoord uit de categorieboom
+   * kwam en nergens als kenmerk vastligt. Beantwoord, maar wel werk: een feed
+   * geeft per product meestal één categorie door. Zie `spec/placement.ts`.
+   */
+  fromTree?: number;
   applicable: number;
   importance: Importance;
   /** Algemene vraag of categorie-eigen; zie `Question.layer`. */

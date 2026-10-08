@@ -20,4 +20,7 @@
 // het belang dat een beheerder corrigeerde telt mee.
 // 6.0.0 — een vraag is pas beantwoord als élk attribuut waar hij op leunt er
 // staat. Eerst volstond er één zodra de vraag geen beslisregel had.
-export const SCAN_VERSION = '6.0.0';
+// 6.1.0 — waar een product voor bedoeld is (het kenmerk toepassing) telt als
+// beantwoord uit de categorieboom, als geen kolom het draagt en het product op een
+// plek hangt die de vragenbank als segment kent. Het rapport telt die apart.
+export const SCAN_VERSION = '6.1.0';

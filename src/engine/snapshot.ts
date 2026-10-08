@@ -64,6 +64,8 @@ export interface SnapshotQuestion {
   incomplete?: number;
   /** Geen veld voor. */
   absent: number;
+  /** Beantwoord uit de categorieboom, nergens als kenmerk vastgelegd. Ontbreekt bij oudere snapshots. */
+  fromTree?: number;
   /** Per kenmerk de kolommen waar het antwoord vandaan zou komen: veldnamen, geen waarden. */
   evidence?: { attributeKey: string; label: Bilingual; fields: string[] }[];
 }
@@ -188,7 +190,7 @@ export function toSnapshot(
       questions: gap.questions.length,
     })),
     questions: report.questionCoverage
-      .filter((row) => row.scored && row.answered < row.applicable)
+      .filter((row) => row.scored && (row.answered < row.applicable || (row.fromTree ?? 0) > 0))
       .sort((a, b) => b.answered / Math.max(b.applicable, 1) - a.answered / Math.max(a.applicable, 1))
       .slice(0, MAX_QUESTIONS)
       .map((row) => ({
@@ -204,6 +206,7 @@ export function toSnapshot(
         unusable: row.unusable,
         incomplete: row.incomplete,
         absent: row.absent,
+        ...(row.fromTree ? { fromTree: row.fromTree } : {}),
         evidence: row.evidence?.map((group) => ({ attributeKey: group.attributeKey, label: group.label, fields: [...group.fields] })),
       })),
     advisory: [...report.advisory.reduce((byId, row) => {

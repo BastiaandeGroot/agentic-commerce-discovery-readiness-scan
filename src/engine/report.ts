@@ -17,6 +17,7 @@ import { evaluateProduct } from './evaluate';
 import { isExcludedProduct, segmentLevel } from './join';
 import { FIELD_REGISTER_ID } from '../spec/snapshot';
 import { SCAN_VERSION } from './version';
+import { PLACEMENT_FIELD } from '../spec/placement';
 
 /** Tel gaps samen over een verzameling producten, op veld en oorzaak. */
 function aggregateGaps(results: ProductResult[]): Gap[] {
@@ -220,6 +221,7 @@ export function aggregateScan(
       // De vijf toestanden wijzen elk naar een andere handeling. Ze op één hoop
       // gooien levert een lijst op waar niemand mee verder kan.
       entry[question.state] += 1;
+      if (question.answered && question.found.includes(PLACEMENT_FIELD)) entry.fromTree = (entry.fromTree ?? 0) + 1;
       coverage.set(id, entry);
 
       if (!question.scored && !advisory.has(id)) {

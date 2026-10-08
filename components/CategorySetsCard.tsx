@@ -12,6 +12,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { Locale, QuestionSetState } from '../src/domain/types';
+import { overlaysToPropose } from '../src/questions/mapping';
 import { MIN_MARGIN_CATEGORIES, suggestMappings } from '../src/semantic/suggest';
 import { embed } from '../src/semantic/model';
 import { MappingNotConfigured, requestMapping } from '../src/semantic/remote';
@@ -69,8 +70,11 @@ export function CategorySetsCard({ s, locale, state, categories, onCategories, o
    * erbij hoort, en het is data die er niet hoeft te zijn.
    */
   async function matchCategories(open: typeof state.sets) {
-    const namen = state.overlays.map((overlay) => ({ key: overlay.id, text: overlay.label[locale] }));
+    // Alleen sets die nog nergens geland zijn; zie `overlaysToPropose`. Blijft er
+    // geen over, dan valt er niets voor te stellen en gaat er niets de deur uit.
+    const namen = overlaysToPropose(state).map((overlay) => ({ key: overlay.id, text: overlay.label[locale] }));
     const eigen = open.map((set) => ({ key: set.category as string, text: set.category as string }));
+    if (namen.length === 0) return;
 
     const toepassen = (pairs: { key: string; columns: string[] }[], from: string) => {
       if (pairs.length === 0) return false;

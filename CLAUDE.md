@@ -28,7 +28,7 @@ mens ziet en bevestigt — geen oordeel dat stilzwijgend doorwerkt.
 
 1. Het **koppelscherm** (`components/MappingStep.tsx`, met `src/semantic/` en
    `app/api/mapping/`). Daar bepaalt een model welk kenmerk in welke kolom staat:
-   Claude Opus 5 via de serverroute, en anders een embeddingmodel in de
+   Claude Opus 5.5 via de serverroute, en anders een embeddingmodel in de
    browser. Een voorstel van Claude telt alleen als het een waarde uit die kolom
    aanwijst die de vraag beantwoordt (`readProposals` in `src/semantic/prompt.ts`). Er gaan kenmerknamen, vraagteksten en kolomnamen de deur uit, geen
    productrij en geen veldwaarde.
@@ -164,6 +164,14 @@ de lijst `modus: een` zegt. Eén van vier volstaat niet: een materiaalsamenstell
 beantwoordt niet of een stof echt voor buiten is. Binnen één attribuut volstaat
 wél één van zijn kolommen.
 
+Eén kenmerk mag uit de **categorieboom** komen: waar een product voor bedoeld is
+(`src/spec/placement.ts`). Draagt geen kolom het, en hangt het product op een plek
+die de bank als segment kent (een set met een eigen overlay), dan is de vraag
+beantwoord — en telt het rapport dat apart, met het advies het als kenmerk vast te
+leggen. Rek dit nooit op naar andere kenmerken of naar plekken die de bank niet
+kent: een categorie "Verduisterend" draagt geen lichtdoorlatendheid, en dan
+verdwijnt een gat dat er wél is.
+
 Wat een lijst niet draagt, vult de lezer niet aan: geen sitepanel betekent
 `dekking: null` en status `in-review`, en een beslisregel zonder bron blijft
 beredeneerd en wordt niet gerekend. Elke aanname die de lezer wél doet — het
@@ -192,8 +200,12 @@ model.
   gebruikt (breedte/width, gewicht/weight). Vaktaal hoort bij de markt en dus bij
   de vragenlijst, in een kolom `synoniemen`. Zet nooit een vakwoordenlijst per
   vertical in de motor.
-- **Een voorstel van het model is nooit een koppeling.** Het staat gemarkeerd in
-  de lijst tot de merchant het laat staan of wijzigt. Twee regels houden het
+- **Een voorstel van het model is nooit een koppeling.** De herkomst wordt naast
+  de koppeling bewaard (`Proposed` in `src/questions/mapping.ts`) tot de merchant
+  zelf kiest. Verandert het model, de opdracht of de zeef, dan gaat
+  `PROPOSAL_VERSION` omhoog en worden onaangeraakte voorstellen één keer opnieuw
+  beoordeeld — niet bij elk bezoek, want een scan mag niet verschuiven doordat
+  iemand het scherm opende. Twee regels houden het
   bruikbaar, allebei gemeten en beide onmisbaar: vectoren worden **gecentreerd**
   (anders lijken alle namen in één catalogus op elkaar) en een voorstel vraagt
   een **wederzijds beste match** (anders krijgt élk kenmerk er een, ook de

@@ -21,6 +21,109 @@ import type { MappingPair } from '../spec/mapping';
 /** De koppeling zoals een scherm hem vasthoudt: kenmerk -> kolommen. */
 export type Mapping = Record<string, string[]>;
 
+/**
+ * Welke koppelingen een voorstel zijn: kenmerk -> de kolom die een model aanwees.
+ *
+ * Een voorstel is nooit een koppeling, en dat moet een herlaadbeurt overleven.
+ * Voorheen stond dit alleen in het scherm: een voorstel werd meteen als gewone
+ * koppeling bewaard, en bij het volgende bezoek was niet meer te zien dat de
+ * merchant er nooit naar gekeken had. Een koppeling van een zwakker model bleef
+ * dan voorgoed staan.
+ *
+ * Alleen namen, zoals de koppeling zelf.
+ */
+export type Proposed = Record<string, string>;
+
+/** De koppeling met zijn herkomst; die twee veranderen altijd samen. */
+export interface Linked {
+  mapping: Mapping;
+  proposed: Proposed;
+}
+
+/**
+ * De voorstellen die nog voorstel zijn.
+ *
+ * Wijst de koppeling intussen naar een andere kolom, of naar geen, dan heeft de
+ * merchant gekozen en is het zijn koppeling geworden.
+ */
+export function liveProposals({ mapping, proposed }: Linked): Proposed {
+  const out: Proposed = {};
+  for (const [key, column] of Object.entries(proposed)) {
+    const current = mapping[key];
+    if (current && current.length === 1 && current[0] === column) out[key] = column;
+  }
+  return out;
+}
+
+export interface ReviewOutcome extends Linked {
+  /** Kenmerken waar een andere kolom voor in de plaats kwam. */
+  replaced: { key: string; from: string; to: string }[];
+  /** Kenmerken waar het model geen kolom meer voor aanwees; die staan weer open. */
+  dropped: { key: string; from: string }[];
+}
+
+/**
+ * Verwerk een beoordeling: nieuwe voorstellen, en een nieuw oordeel over oude.
+ *
+ * `asked` zijn de kenmerken die aan het model zijn voorgelegd, `pairs` wat het
+ * erover zei. Een kenmerk dat gevraagd is en niet terugkomt, verliest de kolom
+ * die het had: het model wijst hem niet meer aan, en dan is "nog open" eerlijker
+ * dan een koppeling die niemand ooit bevestigde. `keep` zijn de kenmerken die de
+ * merchant intussen zelf koos; daar komt niets overheen.
+ *
+ * "Geen kolom" — een lege lijst — is een keuze en blijft altijd staan.
+ */
+export function applyReview(
+  current: Linked,
+  asked: readonly string[],
+  pairs: readonly MappingPair[],
+  keep: ReadonlySet<string> = new Set(),
+): ReviewOutcome {
+  const mapping = { ...current.mapping };
+  const proposed = { ...current.proposed };
+  const replaced: ReviewOutcome['replaced'] = [];
+  const dropped: ReviewOutcome['dropped'] = [];
+  const answer = new Map(pairs.filter((pair) => pair.columns.length > 0).map((pair) => [pair.key, pair.columns[0]]));
+
+  for (const key of asked) {
+    const had = current.mapping[key];
+    if (keep.has(key) || (Array.isArray(had) && had.length === 0)) continue;
+    const from = had?.[0];
+    const to = answer.get(key);
+    if (to === undefined) {
+      if (from === undefined) continue;
+      delete mapping[key];
+      delete proposed[key];
+      dropped.push({ key, from });
+      continue;
+    }
+    mapping[key] = [to];
+    proposed[key] = to;
+    if (from !== undefined && from !== to) replaced.push({ key, from, to });
+  }
+  return { mapping, proposed, replaced, dropped };
+}
+
+/**
+ * De vragensets die een model nog mag voorstellen voor een categorie zonder set.
+ *
+ * Alleen wat nog nergens geland is. Een vragenset die op naam al bij een eigen
+ * categorie hoort, is vergeven: hem ook voorstellen voor een ándere categorie
+ * ging mis op de eerste echte catalogus. "Decoratiestoffen" heeft in de bank geen
+ * eigen vragen, het model zocht de dichtstbijzijnde en koos "Tafelkleedstoffen" —
+ * de set van haar eigen subcategorie. Daarmee kreeg elke decoratiestof de
+ * tafelkleedvragen, en verdween de regel van Tafelkleedstoffen zelf, want die mat
+ * nu hetzelfde als haar bovenliggende categorie.
+ *
+ * Een categorie waar geen set voor overblijft, houdt alleen de algemene vragen.
+ * Dat is een geldig antwoord; de merchant kan in de keuzelijst nog elke set
+ * kiezen, ook een vergeven.
+ */
+export function overlaysToPropose(state: Pick<QuestionSetState, 'overlays' | 'sets'>): QuestionSetState['overlays'] {
+  const landed = new Set(state.sets.map((set) => set.overlayId).filter((id): id is string => id !== undefined));
+  return state.overlays.filter((overlay) => !landed.has(overlay.id));
+}
+
 export function toMapping(pairs: MappingPair[]): Mapping {
   const out: Mapping = {};
   for (const pair of pairs) out[pair.key] = pair.columns;
