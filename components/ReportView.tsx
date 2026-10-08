@@ -10,7 +10,7 @@
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
 import { ArrowUpRight, Download } from 'lucide-react';
-import { adviceKey } from '../src/report/derive';
+import { adviceKey, categoryLabel } from '../src/report/derive';
 import { modelFromReport, type ModelQuestion, type ReportModel } from '../src/report/model';
 import { toSnapshot, toSnapshotDetail } from '../src/engine/snapshot';
 import { DetailNotSaved, snapshotStoreFor } from '../src/storage/snapshots';
@@ -316,7 +316,7 @@ function QuestionCoverageCard({ s, model, locale, onReviewQuestion }: {
   const categories = model.categories;
 
   // Toon de categorienaam van de merchant, niet onze interne set-id.
-  const categoryName = new Map(categories.map((c) => [c.setId, c.category]));
+  const categoryName = new Map(categories.map((c) => [c.setId, categoryLabel(c)]));
 
   // Beste eerst. Een merchant leest dan van boven naar beneden af waar hij al
   // ver is en waar het werk begint, in plaats van meteen tegen het slechtste
@@ -349,7 +349,7 @@ function QuestionCoverageCard({ s, model, locale, onReviewQuestion }: {
             onChange={setSetId}
             options={[
               { value: 'all', label: s.report.allCategories },
-              ...categories.map((c) => ({ value: c.setId, label: `${c.category} (${n(c.total)})` })),
+              ...categories.map((c) => ({ value: c.setId, label: `${categoryLabel(c)} (${n(c.total)})` })),
             ]}
           />
         </div>
