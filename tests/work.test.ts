@@ -127,3 +127,18 @@ test('werk bijwerken vanuit een bewaarde analyse laat andere categorieën staan'
   assert.deepEqual(merged.sets.Meubelstoffen, { disabled: ['M1'], edited: [], added: [] });
   assert.equal(merged.sets.Gordijnstoffen, undefined);
 });
+
+test('een uitgezette vraag blijft alleen uit zolang het id dezelfde vraag aanwijst', () => {
+  const pristine = samenstellen();
+  const gedaan = extractWork(werk(pristine), pristine);
+  assert.deepEqual(gedaan.sets.Meubelstoffen.disabledFrom, { M2: 'Hoe reinig ik hem?' });
+
+  // Een nieuwe bank geeft M2 aan een andere vraag: die heeft de merchant nooit
+  // gezien, dus die staat aan.
+  const nieuweBank = samenstellen(lijst().replace('M2;Hoe reinig ik hem?', 'M2;Gaat hij pluizen?'));
+  assert.equal(meubel(applyWork(nieuweBank, gedaan).state).questions.find((q) => q.id === 'M2')?.disabled, undefined);
+
+  // Werk van vóór deze wijziging draagt geen tekst en geldt nog op id alleen.
+  const oud = { ...gedaan, sets: { Meubelstoffen: { ...gedaan.sets.Meubelstoffen, disabledFrom: undefined } } };
+  assert.equal(meubel(applyWork(nieuweBank, oud).state).questions.find((q) => q.id === 'M2')?.disabled, true);
+});

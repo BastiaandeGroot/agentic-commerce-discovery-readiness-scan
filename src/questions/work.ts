@@ -26,6 +26,16 @@ export interface SetWork {
   validated?: { fingerprint: string };
   /** Id's van uitgezette vragen. */
   disabled: string[];
+  /**
+   * Per uitgezette vraag de tekst uit de bank waarop dat gold.
+   *
+   * Een id wijst alleen binnen één bank dezelfde vraag aan. Woontextiel v5 gaf
+   * MEU-02 aan een andere vraag dan v4, en wat de merchant onder v4 uitzette
+   * stond onder v5 uit bij een vraag die hij nooit zag. Met de tekst erbij vervalt
+   * zo'n keuze als de bank de vraag herschreef, net als een aangepaste tekst.
+   * Ontbreekt bij werk van vóór 8 oktober; dat geldt nog op id alleen.
+   */
+  disabledFrom?: Record<string, string>;
   /** Aangepaste teksten, met de tekst uit de bank waarop de aanpassing gold. */
   edited: { questionId: string; from: string; label: Bilingual }[];
   /** Eigen vragen, in hun geheel. */
@@ -100,9 +110,17 @@ export function extractWork(current: QuestionSetState, pristine: QuestionSetStat
       }
     }
 
+    const off = set.questions.filter((question) => question.disabled);
+    // De tekst uit de bank, niet de aangepaste: daaraan is later te zien of het
+    // nog dezelfde vraag is.
+    const disabledFrom = Object.fromEntries(off.flatMap((question) => {
+      const from = original?.questions.find((candidate) => candidate.id === question.id);
+      return from ? [[question.id, from.label.nl]] : [];
+    }));
     const work: SetWork = {
       validated: set.validated && original ? { fingerprint: setFingerprint(original) } : undefined,
-      disabled: set.questions.filter((question) => question.disabled).map((question) => question.id),
+      disabled: off.map((question) => question.id),
+      ...(Object.keys(disabledFrom).length > 0 ? { disabledFrom } : {}),
       edited,
       added: set.questions.filter((question) => question.custom),
     };
@@ -144,7 +162,12 @@ export function applyWork(pristine: QuestionSetState, work: QuestionWork | undef
 
     const questions = set.questions.map((question) => {
       let next = question;
-      if (done.disabled.includes(question.id)) next = { ...next, disabled: true };
+      // Uitgezet blijft uitgezet zolang het dezelfde vraag is. Kreeg het id in
+      // een nieuwe bank een andere vraag, dan staat die gewoon aan.
+      const offFor = done.disabledFrom?.[question.id];
+      if (done.disabled.includes(question.id) && (offFor === undefined || offFor === question.label.nl)) {
+        next = { ...next, disabled: true };
+      }
       const edit = done.edited.find((entry) => entry.questionId === question.id);
       if (edit) {
         if (edit.from === question.label.nl) next = { ...next, label: edit.label };

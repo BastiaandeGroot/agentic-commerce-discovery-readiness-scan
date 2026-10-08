@@ -867,22 +867,34 @@ Niet opnieuw voorstellen zonder dat er iets veranderd is.
 
 ## Open
 
-**Woontextiel v5 is gegenereerd, nog niet in de app** — 6 oktober. De reeks is in
-de sessie doorlopen (geen API-kosten) met `scripts/generate-local.ts`; de run staat
-in `~/Documents/Vragenbank/run-woontextiel-v5/`, de tabel in
-`~/Documents/Vragenbank/woontextiel-v5.csv`: 32 algemene vragen, 12 vragensets, 89
-vragen, vijf kritiek. Met de boomregel en zonder koppelscherm: 1.850 van 3.746
-basisgeschikt. Nog te doen vóór uploaden:
+**Woontextiel v5 is opnieuw geschreven** — 8 oktober. De eerste versie (6 oktober)
+was zuiniger dan de opdracht vroeg: twaalf sets in één keer geschreven, geen vraag
+zonder samengevoegd onderwerp, en geoogste vragen die bij het samenvoegen wegvielen
+bleven weg. Panel, oogst en indeling zijn gebleven; overgedaan zijn het nalopen van
+het samenvoegen (achttien onderwerpen erbij) en de algemene vragen plus de twaalf
+sets. De run staat in `~/Documents/Vragenbank/run-woontextiel-v5/` (`opnieuw.py`
+draagt de hele tweede ronde), de tabel in `~/Documents/Vragenbank/woontextiel-v5.csv`,
+de eerste versie ernaast als `woontextiel-v5-eerste-versie.csv`.
 
-- Hersteld op 6 oktober, na de reeks en met de hand in `run.json` (elk als bevinding
-  in de bank): Paneel is bij De Groot een gordijnsoort en staat nu als toepassing
-  bij Gordijnstoffen; Windschermen kreeg de vraag naar winddoorlatendheid (WIN-03)
-  en inkijk (WIN-04); Naaigarens en Onderhoudsproducten dragen nu ook de
-  categorienamen uit de lijst van de aanvrager als alias, zodat ze in zijn boom
-  landen. Headless nagemeten: 16 sets, alle onder hun eigen naam.
+- 106 vragen: 34 algemeen, 72 in twaalf sets; 39 advies, 10 uit vakkennis
+  (dekking 0), zes kritiek. Headless op De Groot: 16 sets onder hun eigen naam,
+  1.850 van 3.746 basisgeschikt zonder koppelscherm.
+- **De nummers beginnen bij 101.** v4 gebruikte dezelfde voorvoegsels (BAS, MEU,
+  GOR) voor andere vragen, en het werk van een merchant hangt aan markt en nummer:
+  wat hij onder v4 bij MEU-02 uitzette, stond onder v5 uit bij een vraag die hij
+  nooit zag. In de app gezien op 8 oktober.
+- De app zelf is daarop hersteld: een uitgezette vraag draagt nu de tekst waarop
+  dat gold (`SetWork.disabledFrom`) en blijft alleen uit zolang het nummer dezelfde
+  vraag aanwijst. Werk van daarvoor geldt nog op nummer alleen, vandaar de nieuwe
+  nummers.
+- Paneel is een gordijnsoort bij De Groot (toepassing onder Gordijnstoffen), de
+  garens en onderhoudsmiddelen dragen ook de categorienamen uit de catalogus als
+  alias. Drie garencategorieën geven nu drie rijen met dezelfde set; dat is één
+  meting en hoort één rij te zijn.
 - De garens en onderhoudsmiddelen (168 producten) zijn meteen basisgeschikt: hun
-  sets hebben geen kritieke vraag. Dat is hoe de trechter werkt, maar het is een
-  cijfer om bij stil te staan.
+  sets hebben geen kritieke vraag.
+- `looplengte_m` valt automatisch op `roll_length`; dat is de rollengte van stof en
+  niet de looplengte van garen. Nakijken op het koppelscherm.
 - `keurmerken` viel automatisch op `product_label` (Bestseller, Op=Op); dat is fout
   en moet op het koppelscherm weg.
 - De kritieke vragen zijn nog langs vier criteria gelegd; de twee-criteria-definitie
