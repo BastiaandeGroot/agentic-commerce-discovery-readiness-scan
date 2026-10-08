@@ -119,6 +119,15 @@ export function scoreRows(report: ScanReport, allLabel: string): ScoreRow[] {
  * en waar het werk begint, in plaats van meteen tegen het slechtste nieuws aan
  * te kijken.
  */
+/**
+ * Hoe een rij van het rapport heet: de categorie, en de subcategorie erbij als de
+ * vragenset daaraan hangt. Zonder de subcategorie heten Tassenstoffen,
+ * Tafelkleedstoffen en Kussenpanelen alle drie "Decoratiestoffen".
+ */
+export function categoryLabel(row: { category: string; subcategory?: string }): string {
+  return row.subcategory ? `${row.category} › ${row.subcategory}` : row.category;
+}
+
 export function unansweredQuestions(report: ScanReport, setId = 'all'): Coverage[] {
   return report.questionCoverage
     // Ook een vraag die alleen dankzij de categorieboom beantwoord is: dat is

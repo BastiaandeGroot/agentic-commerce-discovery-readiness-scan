@@ -17,7 +17,7 @@ import { jsPDF } from 'jspdf';
 import type { Locale, ScanReport } from '../src/domain/types';
 import type { Strings } from '../src/i18n/strings';
 import {
-  adviceKey, advisoryItems, mergedGaps, scoreRows, topBlockers, unansweredQuestions,
+  adviceKey, advisoryItems, categoryLabel, mergedGaps, scoreRows, topBlockers, unansweredQuestions,
   type AdviceKey, type Average,
 } from '../src/report/derive';
 
@@ -354,7 +354,7 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
   }
 
   // Welke vragen blijven onbeantwoord
-  const categoryName = new Map(report.categories.map((row) => [row.setId, row.category]));
+  const categoryName = new Map(report.categories.map((row) => [row.setId, categoryLabel(row)]));
   const open = unansweredQuestions(report);
   w.heading(s.report.questionsHeading, `${s.report.questionsIntro} ${s.report.pdfAllUnanswered}`);
   if (open.length === 0) {
