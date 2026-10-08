@@ -893,8 +893,9 @@ de eerste versie ernaast als `woontextiel-v5-eerste-versie.csv`.
   meting en hoort één rij te zijn.
 - De garens en onderhoudsmiddelen (168 producten) zijn meteen basisgeschikt: hun
   sets hebben geen kritieke vraag.
-- `looplengte_m` valt automatisch op `roll_length`; dat is de rollengte van stof en
-  niet de looplengte van garen. Nakijken op het koppelscherm.
+- Twee foute automatische koppelingen zijn bij de bron weggehaald: `label` stond als
+  keurmerk in de woordenlijst (`keurmerken` viel op `product_label`), en het synoniem
+  "lengte" legde de looplengte van garen op de rollengte van stof.
 - `keurmerken` viel automatisch op `product_label` (Bestseller, Op=Op); dat is fout
   en moet op het koppelscherm weg.
 - De kritieke vragen zijn nog langs vier criteria gelegd; de twee-criteria-definitie
