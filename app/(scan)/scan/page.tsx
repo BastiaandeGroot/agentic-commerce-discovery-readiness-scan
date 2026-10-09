@@ -21,7 +21,8 @@ import { inheritMapping } from '../../../src/questions/mapping';
 import { bankStore, LOCAL_ACCOUNT, type StoredBank } from '../../../src/storage/banks';
 import { snapshotStoreFor } from '../../../src/storage/snapshots';
 import { isScored } from '../../../src/questions/compose';
-import { isStockQuestion, reusableSiteCheck } from '../../../src/collect/answers';
+import { isStockQuestion, reusableSiteCheck, siteKey } from '../../../src/collect/answers';
+import { requestShopMappings } from '../../../src/shopmapping/remote';
 import { SiteCheckRefused, requestSiteCheck } from '../../../src/sitecheck/remote';
 import { LocalSettingsStore, SupabaseSettingsStore, type SettingsStore } from '../../../src/storage/settings';
 import { applyWork, mergeWork, setKey, type QuestionWork } from '../../../src/questions/work';
@@ -390,6 +391,9 @@ export default function Home() {
         work: latest.current.work,
         proposed: nextProposed,
         proposalVersion: nextVersion,
+        // Het adres van de webshop erbij: een ander account van dezelfde webshop
+        // vindt de koppelingen daarmee terug.
+        site: siteKey(shopUrl ?? knownSite ?? '') || undefined,
       }).then((ok) => setSaveFailed(!ok));
     }
   }
@@ -493,7 +497,10 @@ export default function Home() {
     const entry = banks[0];
     if (!entry || !catalog) return;
     const who = accountId ?? LOCAL_ACCOUNT;
-    const key = `${who}:${entry.bank.meta.vertical}:${entry.bank.meta.version}:${catalog.filename}:${catalog.columns.length}`;
+    // Met de webshop erbij: zodra het adres bekend is, komen ook de koppelingen
+    // mee die een ander account van dezelfde webshop maakte.
+    const shop = siteKey(shopUrl ?? knownSite ?? '');
+    const key = `${who}:${entry.bank.meta.vertical}:${entry.bank.meta.version}:${catalog.filename}:${catalog.columns.length}:${shop}`;
     if (inheritedFor.current === key) return;
     inheritedFor.current = key;
     let alive = true;
@@ -506,6 +513,10 @@ export default function Home() {
         ...recent.filter((one) => one.vertical === entry.bank.meta.vertical),
         ...recent.filter((one) => one.vertical !== entry.bank.meta.vertical),
       ].map((one) => one.mapping);
+      // Daarna wat andere accounts van dezelfde webshop koppelden. Eigen werk
+      // gaat voor; dit vult alleen aan wat hier nog open staat.
+      if (user && shop !== '') earlier.push(...await requestShopMappings(shop, catalog.columns));
+      if (!alive) return;
       const attributes = [
         ...entry.bank.attributes,
         ...entry.bank.overlays.flatMap((overlay) => overlay.attributes ?? []),
@@ -522,7 +533,7 @@ export default function Home() {
     })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountId, banks, catalog, settingsStore]);
+  }, [accountId, banks, catalog, settingsStore, shopUrl, knownSite, user]);
 
   /**
    * Een gewijzigde koppeling, mét haar herkomst. Een functie, en dat is voor wie

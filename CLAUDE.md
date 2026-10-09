@@ -79,7 +79,7 @@ browsermodel, met dat verschil in beeld.
 | `src/semantic/` | de modellen die koppelingen vóórstellen; nooit importeren vanuit de motor |
 | `src/generation/` | de vragenbankgeneratie als vaste reeks fasen; puur, het modelantwoord komt binnen als argument |
 | `src/collect/` | winkel doormeten: productgegevens uit html halen en productadressen uit sitemaps; en de sitetoets (`answers.ts`): een pagina lezen zoals een agent en citaten nalopen. Puur, de html en het modelantwoord komen binnen als argument |
-| `app/api/` | de serverroutes: `/api/mapping`, `/api/site`, `/api/bank-request`, `/api/bank-queue`, `/api/bank-run`, `/api/bank-result`, `/api/banks` (vrijgegeven banken voor de merchant), `/api/public-scan` (winkel doormeten, alleen beheerder), `/api/site-answers` (sitetoets, elke ingelogde retailer, met een rem per account), `/api/admin/queue` en `/api/admin/attribute-types` (kenmerken van een bank typeren) |
+| `app/api/` | de serverroutes: `/api/mapping`, `/api/site`, `/api/bank-request`, `/api/bank-queue`, `/api/bank-run`, `/api/bank-result`, `/api/banks` (vrijgegeven banken voor de merchant), `/api/public-scan` (winkel doormeten, alleen beheerder), `/api/site-answers` (sitetoets, elke ingelogde retailer, met een rem per account), `/api/shop-mapping` (koppelingen van dezelfde webshop, over accounts heen), `/api/admin/queue` en `/api/admin/attribute-types` (kenmerken van een bank typeren) |
 | `src/server/` | wat alleen serverzijdig mag draaien: de uitvoerderssleutel, de servicecliënt, de modelaanroep van de generatie (direct en via de batch-API), het aannemen van een bank en het ophalen van een winkel. Nooit importeren vanuit een component. |
 | `src/questions/` | vragenbanken, composer, generator, import (tabel én YAML), aanvraag en beoordeling |
 | `src/engine/` | plaatsing van een product in de boom, evaluatie, rapportaggregatie, vergelijken |
@@ -292,6 +292,15 @@ tweede kopie van.
 
 Elke tabel die merchant-data raakt krijgt een `account_id`, ook nu er nog geen
 login is. Achteraf toevoegen betekent een migratie op data die er al staat.
+
+De **koppeling van kenmerken aan kolommen wordt per webshop hergebruikt**, over
+accounts heen: een collega met een eigen account die dezelfde webshop scant,
+begint niet opnieuw. Elk account houdt zijn eigen rij (`merchant_bank_settings`,
+met het adres in `site`); lezen over accounts heen doet alleen de server
+(`/api/shop-mapping`), en die geeft van een ander account alleen koppelingen
+terug naar kolommen die de vrager zelf noemt (`visibleMapping`). Een adres kan
+iedereen intikken; een kolomnaam is informatie over iemands catalogus. Houd die
+zeef erin, en deel nooit iets anders dan de koppeling langs deze weg.
 
 ## Werken in deze repo
 

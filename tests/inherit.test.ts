@@ -7,7 +7,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { inheritMapping } from '../src/questions/mapping';
+import { inheritMapping, visibleMapping } from '../src/questions/mapping';
+import { siteKey } from '../src/collect/answers';
 import { spellingKey } from '../src/spec/lexicon';
 
 test('dezelfde naam op schrijfwijze en eenheid na, en niet meer dan dat', () => {
@@ -56,4 +57,26 @@ test('een andere markt van hetzelfde account telt mee, de meest recente eerst', 
   assert.deepEqual(mapping.pilling, ['pilling_new']);
   assert.deepEqual(mapping.lichtechtheid, ['lightfastness']);
   assert.deepEqual(inherited.sort(), ['lichtechtheid', 'pilling']);
+});
+
+test('een ander account van dezelfde webshop ziet alleen koppelingen naar kolommen die het zelf noemt', () => {
+  const vanDeEigenaar = { martindale: ['martindale'], samenstelling: ['composition_info', 'interne_notitie'], dikte: [], prijsgroep: ['geheime_kolom'] };
+  // Een collega met dezelfde catalogus noemt dezelfde kolommen.
+  assert.deepEqual(visibleMapping(vanDeEigenaar, ['martindale', 'composition_info', 'weight']), {
+    martindale: ['martindale'],
+    samenstelling: ['composition_info'],
+    dikte: [],
+  });
+  // Wie alleen het adres intikt en een andere catalogus heeft, leert geen kolomnaam.
+  const vreemde = visibleMapping(vanDeEigenaar, ['titel', 'prijs']);
+  assert.deepEqual(vreemde, { dikte: [] });
+  assert.ok(!JSON.stringify(vreemde).includes('geheime_kolom'));
+});
+
+test('het adres van een webshop is één sleutel, hoe het ook getypt is', () => {
+  for (const typed of ['https://www.degrootstoffen.nl/', 'www.degrootstoffen.nl', 'DeGrootStoffen.nl/meubelstoffen?x=1', 'http://degrootstoffen.nl']) {
+    assert.equal(siteKey(typed), 'degrootstoffen.nl', typed);
+  }
+  assert.equal(siteKey('geen adres'), '');
+  assert.equal(siteKey(''), '');
 });
