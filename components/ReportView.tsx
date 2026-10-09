@@ -18,6 +18,7 @@ import { supabase } from '../src/auth/client';
 import { useAuth } from './auth/AuthProvider';
 import type { Locale, QuestionSetState, ScanReport } from '../src/domain/types';
 import { requirementLabel } from '../src/spec/fields';
+import { PLACEMENT_FIELD, isPlacementAttribute } from '../src/spec/placement';
 import type { Strings } from '../src/i18n/strings';
 import { Badge, Bar, Button, Card, CardTitle, ErrorState, InfoButton, InfoPanel, Select, TrafficLight, statusOf } from './ui';
 import { Explorer } from './Explorer';
@@ -522,10 +523,18 @@ const ANSWERED_LISTED = 12;
  */
 function AnsweredPanel({ s, locale, row }: { s: Strings; locale: Locale; row: ModelQuestion }) {
   const counts = new Map((row.answeredBy ?? []).map((entry) => [entry.field, entry.products]));
+  // Elk attribuut waar de vraag op leunt, ook als het er meer zijn, met al zijn
+  // kolommen: een vraag is pas beantwoord als ze er allemaal staan, dus wie wil
+  // nakijken waarmee, moet ze allemaal zien. Een kolom die bij geen product het
+  // antwoord droeg staat er met een nul bij.
   const grouped = (row.evidence ?? []).map((group) => ({
     ...group,
-    carried: group.fields.filter((field) => counts.has(field)),
-  })).filter((group) => group.carried.length > 0);
+    carried: [
+      ...group.fields,
+      // Waar een product voor bedoeld is, kan ook uit de categorieboom komen.
+      ...(isPlacementAttribute(group.attributeKey) && counts.has(PLACEMENT_FIELD) ? [PLACEMENT_FIELD] : []),
+    ],
+  }));
   const listed = new Set(grouped.flatMap((group) => group.carried));
   const loose = [...counts.keys()].filter((field) => !listed.has(field));
   const products = row.answeredProducts;
@@ -542,6 +551,7 @@ function AnsweredPanel({ s, locale, row }: { s: Strings; locale: Locale; row: Mo
               <span className="font-medium">{group.label[locale]}</span>
               <span aria-hidden className="text-muted">→</span>
               <span className="text-muted">
+                {group.carried.length === 0 ? <span className="text-warn">{s.report.qNoColumn}</span> : null}
                 {group.carried.map((field, index) => (
                   <span key={field}>
                     {index > 0 ? ', ' : ''}
