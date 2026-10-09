@@ -569,10 +569,18 @@ export function siteCheckTotals(check: SiteCheck): Record<SiteAnswerStatus, numb
 /** Hoe lang een uitkomst geldt voordat de site opnieuw gelezen wordt. */
 export const SITE_CHECK_DAYS = 30;
 
+/**
+ * Het adres van een webshop als sleutel: de hostnaam, zonder protocol, `www.` of
+ * pad, in kleine letters. Leeg als er geen hostnaam in staat.
+ */
+export function siteKey(value: string): string {
+  const host = value.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[/?#].*$/, '');
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) ? host : '';
+}
+
 /** Dezelfde winkel, met of zonder protocol, `www.` of een schuine streep erachter. */
 export function sameSite(a: string, b: string): boolean {
-  const host = (value: string) => value.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '');
-  return host(a) !== '' && host(a) === host(b);
+  return siteKey(a) !== '' && siteKey(a) === siteKey(b);
 }
 
 /**

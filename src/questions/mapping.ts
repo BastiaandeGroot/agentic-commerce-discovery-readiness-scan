@@ -383,3 +383,23 @@ export function inheritMapping(
   }
   return { mapping: next, inherited };
 }
+
+/**
+ * Wat een ander account van dezelfde webshop van een koppeling mag zien.
+ *
+ * Alleen koppelingen naar kolommen die de vrager zelf al noemt, en "geen kolom".
+ * Wie de catalogus van die webshop heeft, noemt dezelfde kolommen en krijgt de
+ * koppelingen terug. Wie alleen het adres intikt, heeft die kolommen niet en
+ * leert er geen kolomnaam uit — een kolomnaam is informatie over iemands
+ * catalogus, en die hoort niet bij een adres dat iedereen kan invullen.
+ */
+export function visibleMapping(mapping: Mapping, columns: string[]): Mapping {
+  const known = new Set(columns);
+  const out: Mapping = {};
+  for (const [key, linked] of Object.entries(mapping)) {
+    if (!Array.isArray(linked)) continue;
+    const shared = linked.filter((column) => known.has(column));
+    if (linked.length === 0 || shared.length > 0) out[key] = shared;
+  }
+  return out;
+}

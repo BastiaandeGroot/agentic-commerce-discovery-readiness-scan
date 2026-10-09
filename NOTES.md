@@ -921,6 +921,29 @@ Het overnemen levert op zijn data weinig op: 1 van de 26 (`bestelstap_cm`, uit
 kenmerk overnemen omdat het hetzelfde betékent — is bewust niet gebouwd: dat is
 de gok die het koppelscherm aan de merchant voorlegt.
 
+**Koppelingen worden per webshop hergebruikt** — 9 oktober, op verzoek van de
+eigenaar. Een koppeling hing aan het account, en elke gebruiker die zich
+registreert krijgt een eigen account: een collega die dezelfde webshop scande,
+begon opnieuw. Voorgesteld was meerdere gebruikers in één account (de database
+kent `account_members` al); de eigenaar koos voor delen per webshop.
+
+- `merchant_bank_settings` draagt het adres van de webshop (`site`, migratie
+  0015, als `siteKey`). Elk account houdt zijn eigen rij; niemand overschrijft
+  een ander.
+- `/api/shop-mapping` leest over accounts heen met de servicecliënt, alleen voor
+  wie is ingelogd, en geeft per account alleen terug wat wijst naar een kolom die
+  de vrager zelf noemt (`visibleMapping`), plus "geen kolom". Wie alleen het adres
+  intikt, leert er geen kolomnaam uit.
+- De scan legt die koppelingen als laatste bron onder `inheritMapping`: eigen werk
+  gaat voor, dan de eigen andere markten, dan andere accounts van dezelfde webshop.
+
+Wat hiermee niet gedeeld wordt: de keuzes op het vragensetscherm, de oordelen over
+categorie of kenmerk, de bewaarde analyses en de sitetoets. Alleen de koppeling.
+
+**Nog te doen:** migratie 0015 draaien. Zonder blijft alles werken, maar wordt er
+niets gedeeld. Rijen van vóór de migratie dragen nog geen adres; dat komt erbij
+zodra dat account zijn koppeling weer bewaart. Niet met twee accounts geprobeerd.
+
 ## Bewust afgevallen
 
 Niet opnieuw voorstellen zonder dat er iets veranderd is.

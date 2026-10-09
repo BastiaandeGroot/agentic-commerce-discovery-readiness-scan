@@ -27,6 +27,8 @@ export interface BankSettings {
   proposalVersion?: string;
   /** Wanneer dit voor het laatst bewaard is; voor "de meest recente eerst". */
   updatedAt?: string;
+  /** De webshop waar dit werk bij hoort, als `siteKey`; zie migratie 0015. */
+  site?: string;
 }
 
 export interface SettingsStore {
@@ -123,11 +125,15 @@ export class SupabaseSettingsStore implements SettingsStore {
     const upsert = (values: Record<string, unknown>) => this.client
       .from('merchant_bank_settings')
       .upsert(values, { onConflict: 'account_id,vertical' });
-    const withProposals = await upsert({
-      ...row,
-      proposed: settings.proposed ?? {},
-      proposal_version: settings.proposalVersion ?? null,
-    });
+    const proposals = { proposed: settings.proposed ?? {}, proposal_version: settings.proposalVersion ?? null };
+    // Met het adres van de webshop, zodat een ander account van dezelfde webshop
+    // de koppelingen terugvindt. Zonder migratie 0015 bestaat de kolom niet; dan
+    // hoort het werk zelf gewoon bewaard te blijven.
+    if (settings.site) {
+      const withSite = await upsert({ ...row, ...proposals, site: settings.site });
+      if (!withSite.error) return true;
+    }
+    const withProposals = await upsert({ ...row, ...proposals });
     if (!withProposals.error) return true;
     // Zonder migratie 0014: het werk zelf hoort bewaard te blijven. Alleen de
     // herkomst van de voorstellen gaat dan niet mee.
