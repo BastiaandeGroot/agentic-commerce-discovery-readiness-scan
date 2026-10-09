@@ -40,6 +40,8 @@ interface Props {
   proposed: Proposed;
   /** Onder welke `PROPOSAL_VERSION` die voorstellen gedaan zijn. */
   proposalVersion?: string;
+  /** Kenmerken waarvan de keuze uit een eerdere scan is overgenomen. */
+  inherited?: string[];
   /**
    * Een functie in plaats van een waarde werkt op de koppeling van nú. Dat is
    * nodig voor alles wat asynchroon terugkomt: een voorstel dat na een minuut
@@ -83,7 +85,7 @@ const MAX_COLUMNS = 300;
 const CATEGORIES_SHOWN = 3;
 
 export function MappingStep({
-  s, locale, catalog, state, mapping, proposed, proposalVersion, onChange, onRun, running, error, onBack,
+  s, locale, catalog, state, mapping, proposed, proposalVersion, inherited = [], onChange, onRun, running, error, onBack,
 }: Props) {
   const ready = allValidated(state);
   const [busy, setBusy] = useState<LoadProgress | 'remote'>();
@@ -183,6 +185,29 @@ export function MappingStep({
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
+
+  /**
+   * De scan starten, en vastleggen wat open bleef.
+   *
+   * Wie het scherm zag en doorgaat, zegt daarmee: voor deze kenmerken heb ik
+   * geen kolom. Dat is een keuze, en ze werd niet bewaard: bij de volgende scan
+   * stonden dezelfde kenmerken weer open, gingen ze opnieuw naar het model en
+   * liep de merchant dezelfde lijst nog eens na. Nu ligt het vast als "geen
+   * kolom", net alsof hij het zelf koos.
+   *
+   * Niet als de voorstelronde mislukte: dan is er niet gekeken, en een storing
+   * vastleggen als bevinding laat een gat staan dat er misschien niet is.
+   */
+  function runScan() {
+    if (open.length > 0 && !failed) {
+      const keys = open.map((row) => row.key);
+      onChange((current) => ({
+        ...current,
+        mapping: { ...current.mapping, ...Object.fromEntries(keys.filter((key) => !Array.isArray(current.mapping[key])).map((key) => [key, []])) },
+      }));
+    }
+    onRun();
+  }
 
   /**
    * Wat de knop zegt terwijl hij bezig is.
@@ -581,10 +606,22 @@ export function MappingStep({
         </div>
       ) : null}
 
+      {/* Wat uit een eerdere scan komt, hoort hij te weten: het is zijn eigen
+          keuze van toen, en hij kan haar hier wijzigen. */}
+      {inherited.length > 0 ? (
+        <p className="text-xs leading-relaxed text-muted">
+          {s.mapping.inherited.replace('{aantal}', String(inherited.length))}
+        </p>
+      ) : null}
       <p className="text-xs leading-relaxed text-muted">{s.mapping.noColumnIsFine}</p>
+      {open.length > 0 && !failed ? (
+        <p className="text-xs leading-relaxed text-muted">
+          {s.mapping.openSettles.replace('{aantal}', String(open.length))}
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={onRun} disabled={!ready} loading={running}>{s.questions.runScan}</Button>
+        <Button onClick={runScan} disabled={!ready || busy !== undefined} loading={running}>{s.questions.runScan}</Button>
         {ready ? <span className="text-sm text-muted">{s.questions.allValidated}</span> : null}
         {error ? (
           <div className="mt-3 w-full">

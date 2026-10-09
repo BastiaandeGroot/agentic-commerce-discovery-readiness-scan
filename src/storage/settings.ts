@@ -25,6 +25,8 @@ export interface BankSettings {
   proposed?: Record<string, string>;
   /** Onder welke `PROPOSAL_VERSION` die voorstellen gedaan zijn. */
   proposalVersion?: string;
+  /** Wanneer dit voor het laatst bewaard is; voor "de meest recente eerst". */
+  updatedAt?: string;
 }
 
 export interface SettingsStore {
@@ -134,7 +136,7 @@ export class SupabaseSettingsStore implements SettingsStore {
   }
 }
 
-const COLUMNS = 'vertical, bank_version, mapping, categories, question_work';
+const COLUMNS = 'vertical, bank_version, mapping, categories, question_work, updated_at';
 const PROPOSAL_COLUMNS = 'proposed, proposal_version';
 
 interface Row {
@@ -145,6 +147,7 @@ interface Row {
   question_work: QuestionWork | null;
   proposed?: Record<string, string> | null;
   proposal_version?: string | null;
+  updated_at?: string | null;
 }
 
 function fromRow(row: Row): BankSettings {
@@ -156,5 +159,6 @@ function fromRow(row: Row): BankSettings {
     work: row.question_work ?? undefined,
     proposed: row.proposed ?? undefined,
     proposalVersion: row.proposal_version ?? undefined,
+    updatedAt: row.updated_at ?? undefined,
   };
 }

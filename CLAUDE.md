@@ -21,7 +21,7 @@ De scan is **volledig deterministisch**. Vragen worden beantwoord uit
 gestructureerde attributen, niet uit lopende tekst, en er komt geen model aan te
 pas. Dezelfde catalogus geeft altijd hetzelfde rapport en een scan kost niets.
 
-Er zijn **twee plekken waar een model wél mag komen**, en op allebei gelden
+Er zijn **drie plekken waar een model wél mag komen**, en op alle drie gelden
 dezelfde drie voorwaarden: het model raakt geen SKU, het draait één keer per
 catalogus of per markt en niet per product, en de uitkomst is een tabel die een
 mens ziet en bevestigt — geen oordeel dat stilzwijgend doorwerkt.
@@ -41,6 +41,17 @@ mens ziet en bevestigt — geen oordeel dat stilzwijgend doorwerkt.
    productrijen, geen prijzen. Het gebeurt één keer per markt en niet per
    merchant, en wat eruit komt gaat door dezelfde poorten als een bank van
    buiten: de app gelooft haar eigen pijplijn net zomin op haar woord.
+
+3. De **sitetoets** (`src/collect/answers.ts`, met `src/server/siteAnswers.ts` en
+   `app/api/site-answers/`). Die toetst of de website de vragen *buiten de score*
+   beantwoordt: beleid en advies dat een catalogus niet kan dragen. De site wordt
+   gelezen zoals een AI-agent leest (kale html, platte tekst), en een model wijst
+   per vraag de zin aan. Een antwoord telt alleen als dat citaat letterlijk op een
+   gelezen pagina staat (`readSiteAnswers`). Er gaan vraagteksten en de tekst van
+   openbare pagina's de deur uit, geen catalogus. Het rapport start hem zelf, op de
+   achtergrond vanaf het koppelscherm, voor elke ingelogde retailer; een eerdere
+   uitkomst van dezelfde winkel wordt dertig dagen hergebruikt (`reusableSiteCheck`)
+   en de route kent een rem per account. De uitkomst blijft buiten de score.
 
 Daarna draait de scan er deterministisch op. **Zet nooit een model in de scan
 zelf** — zie de afgevallen richtingen in `NOTES.md`.
@@ -67,8 +78,8 @@ browsermodel, met dat verschil in beeld.
 | `src/spec/` | veldenregister, plus de woordenlijst en de matcher die bankattributen op catalogus­kolommen leggen |
 | `src/semantic/` | de modellen die koppelingen vóórstellen; nooit importeren vanuit de motor |
 | `src/generation/` | de vragenbankgeneratie als vaste reeks fasen; puur, het modelantwoord komt binnen als argument |
-| `src/collect/` | winkel doormeten: productgegevens uit html halen en productadressen uit sitemaps; puur, de html komt binnen als argument |
-| `app/api/` | de serverroutes: `/api/mapping`, `/api/site`, `/api/bank-request`, `/api/bank-queue`, `/api/bank-run`, `/api/bank-result`, `/api/banks` (vrijgegeven banken voor de merchant), `/api/public-scan` (winkel doormeten, alleen beheerder), `/api/admin/queue` en `/api/admin/attribute-types` (kenmerken van een bank typeren) |
+| `src/collect/` | winkel doormeten: productgegevens uit html halen en productadressen uit sitemaps; en de sitetoets (`answers.ts`): een pagina lezen zoals een agent en citaten nalopen. Puur, de html en het modelantwoord komen binnen als argument |
+| `app/api/` | de serverroutes: `/api/mapping`, `/api/site`, `/api/bank-request`, `/api/bank-queue`, `/api/bank-run`, `/api/bank-result`, `/api/banks` (vrijgegeven banken voor de merchant), `/api/public-scan` (winkel doormeten, alleen beheerder), `/api/site-answers` (sitetoets, elke ingelogde retailer, met een rem per account), `/api/admin/queue` en `/api/admin/attribute-types` (kenmerken van een bank typeren) |
 | `src/server/` | wat alleen serverzijdig mag draaien: de uitvoerderssleutel, de servicecliënt, de modelaanroep van de generatie (direct en via de batch-API), het aannemen van een bank en het ophalen van een winkel. Nooit importeren vanuit een component. |
 | `src/questions/` | vragenbanken, composer, generator, import (tabel én YAML), aanvraag en beoordeling |
 | `src/engine/` | plaatsing van een product in de boom, evaluatie, rapportaggregatie, vergelijken |

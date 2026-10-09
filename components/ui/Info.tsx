@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 /**
  * Het "i"-knopje. De uitleg zelf zet de aanroeper eronder, niet als zwevend
@@ -12,6 +12,10 @@ import type { ReactNode } from 'react';
  * telefoon en met een toetsenbord onbereikbaar maken; alleen klik vraagt een
  * handeling voor iets wat je even wilt nalezen. Alle drie kost niets en sluit
  * niemand uit.
+ *
+ * Een klik zet de uitleg vast. Zonder dat sloot een klik wat het aanwijzen net
+ * had geopend: wie op het knopje klikte, zag de uitleg alleen even knipperen.
+ * Vastgezet blijft hij staan tot de volgende klik, ook als de muis weggaat.
  */
 export function InfoButton({ label, open, onToggle, onOpen, onClose }: {
   label: string;
@@ -21,14 +25,28 @@ export function InfoButton({ label, open, onToggle, onOpen, onClose }: {
   onOpen?: () => void;
   onClose?: () => void;
 }) {
+  const [pinned, setPinned] = useState(false);
+  // Opent de aanroeper een andere uitleg, dan is deze dicht en dus ook los.
+  const held = pinned && open;
+  const click = () => {
+    if (held) {
+      setPinned(false);
+      onToggle();
+      return;
+    }
+    setPinned(true);
+    if (!open) onToggle();
+  };
+  const leave = () => { if (!held) onClose?.(); };
+
   return (
     <button
       type="button"
-      onClick={onToggle}
+      onClick={click}
       onMouseEnter={onOpen}
-      onMouseLeave={onClose}
+      onMouseLeave={leave}
       onFocus={onOpen}
-      onBlur={onClose}
+      onBlur={leave}
       aria-expanded={open}
       aria-label={label}
       title={label}

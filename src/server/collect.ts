@@ -52,7 +52,7 @@ export class CollectError extends Error {}
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const AI_BOTS = /gptbot|claudebot|perplexity|google-extended|applebot|ccbot|bytespider|amazonbot|meta-external|oai-search/i;
+export const AI_BOTS = /gptbot|claudebot|perplexity|google-extended|applebot|ccbot|bytespider|amazonbot|meta-external|oai-search/i;
 
 /**
  * Mogen wij hier rondkijken?
@@ -77,7 +77,7 @@ export function allowed(robots: string): boolean {
 }
 
 /** Wat we zijn, voor wie zijn logboek leest. */
-const AGENT = 'readiness-scan/0.1 (openbare meting)';
+export const AGENT = 'readiness-scan/0.1 (openbare meting)';
 
 export async function collectShop(target: string, options: CollectOptions = DEFAULTS): Promise<Collected> {
   let base: URL;

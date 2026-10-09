@@ -17,7 +17,12 @@ import { importQuestionList } from '../../../src/questions/list';
 import { applyAttributeShapes, applyOverlaySettings, excludeFromScore } from '../../../src/questions/bank';
 import { applyImportanceCorrections } from '../../../src/questions/critical';
 import type { Linked, Mapping, Proposed } from '../../../src/questions/mapping';
+import { inheritMapping } from '../../../src/questions/mapping';
 import { bankStore, LOCAL_ACCOUNT, type StoredBank } from '../../../src/storage/banks';
+import { snapshotStoreFor } from '../../../src/storage/snapshots';
+import { isScored } from '../../../src/questions/compose';
+import { isStockQuestion, reusableSiteCheck } from '../../../src/collect/answers';
+import { SiteCheckRefused, requestSiteCheck } from '../../../src/sitecheck/remote';
 import { LocalSettingsStore, SupabaseSettingsStore, type SettingsStore } from '../../../src/storage/settings';
 import { applyWork, mergeWork, setKey, type QuestionWork } from '../../../src/questions/work';
 import type { ScanClient } from '../../../src/worker/client';
@@ -38,7 +43,7 @@ import { useAuth } from '../../../components/auth/AuthProvider';
 import { MappingStep } from '../../../components/MappingStep';
 import { CategorySetsCard } from '../../../components/CategorySetsCard';
 import { QuestionSetStep } from '../../../components/QuestionSetStep';
-import { ReportView } from '../../../components/ReportView';
+import { ReportView, type SiteCheckProgress } from '../../../components/ReportView';
 
 type Step = 'upload' | 'segments' | 'bank' | 'mapping' | 'questions' | 'report';
 
@@ -121,6 +126,23 @@ export default function Home() {
     const client = supabase();
     return client ? new SupabaseVerdictStore(client) : new NoVerdictStore();
   }, []);
+
+  /**
+   * Het adres van de winkel uit zijn meest recente analyse, zodat hij het bij
+   * een volgende scan niet opnieuw hoeft te typen.
+   */
+  const [knownSite, setKnownSite] = useState<string>();
+  useEffect(() => {
+    let alive = true;
+    const target = snapshotStoreFor(supabase(), accountId);
+    void target.store.list(target.accountId)
+      .then((list) => {
+        const recent = list.find((one) => one.siteUrl ?? one.siteCheck?.site);
+        if (alive && recent) setKnownSite(recent.siteUrl ?? recent.siteCheck?.site);
+      })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, [accountId]);
 
   /**
    * Waar koppeling, categoriekeuze en het werk op de vragensets blijven staan.
@@ -409,6 +431,100 @@ export default function Home() {
   }, [accountId, banks, settingsStore]);
 
   /**
+   * De sitetoets op de achtergrond starten, zodat het rapport ermee laadt.
+   *
+   * Zodra de retailer bij het koppelen is: dan staan zijn vragensets vast en is
+   * er nog een minuut of twee werk voor hem, ongeveer zo lang als de toets
+   * duurt. Eerst kijken of er een bruikbare eerdere uitkomst in zijn analyses
+   * staat; alleen anders wordt de site opnieuw gelezen. Eén keer per winkel en
+   * per vragenlijst in deze sessie.
+   */
+  const [siteProgress, setSiteProgress] = useState<SiteCheckProgress>({ status: 'idle' });
+  const siteStartedFor = useRef<string>(undefined);
+  useEffect(() => {
+    if (step !== 'mapping' && step !== 'report') return;
+    if (!user || !shopUrl || !questionState) return;
+    const seen = new Set<string>();
+    const questions = questionState.sets
+      .flatMap((set) => set.questions)
+      .filter((question) => !question.disabled && !isScored(question) && !isStockQuestion(question.label[locale]))
+      .filter((question) => (seen.has(question.id) ? false : (seen.add(question.id), true)))
+      .map((question) => ({ id: question.id, label: question.label[locale] }));
+    if (questions.length === 0) return;
+    const key = `${shopUrl}|${questions.map((question) => question.id).sort().join(',')}`;
+    if (siteStartedFor.current === key) return;
+    siteStartedFor.current = key;
+
+    // Geen opruimfunctie die het antwoord weggooit: de vragensets worden bij elke
+    // koppeling opnieuw samengesteld, dit effect loopt dan opnieuw, en een toets
+    // die al een minuut liep zou zijn uitkomst nergens meer kwijt kunnen. Het
+    // antwoord telt zolang het bij de toets hoort die nu gevraagd is.
+    const current = () => siteStartedFor.current === key;
+    setSiteProgress({ status: 'busy' });
+    void (async () => {
+      try {
+        const target = snapshotStoreFor(supabase(), accountId);
+        const earlier = (await target.store.list(target.accountId).catch(() => []))
+          .flatMap((one) => (one.siteCheck ? [one.siteCheck] : []));
+        const reuse = reusableSiteCheck(earlier, shopUrl, questions.map((question) => question.id), new Date().toISOString());
+        const check = reuse ?? await requestSiteCheck(
+          shopUrl,
+          questions,
+          // Alleen de namen van zijn categorieën, om te kiezen welke pagina's gelezen worden.
+          [...new Set(questionState.sets.flatMap((set) => [set.parent ?? '', set.category ?? '']).filter(Boolean))],
+        );
+        if (current()) setSiteProgress({ status: 'done', check });
+      } catch (caught) {
+        if (current()) setSiteProgress({ status: 'failed', reason: caught instanceof SiteCheckRefused ? caught.reason : 'failed' });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, user, shopUrl, questionState, locale]);
+
+  /**
+   * Eerdere keuzes overnemen voor kenmerken die onder een andere naam terugkomen.
+   *
+   * Pas als de catalogus er is: een kolom die niet meer bestaat komt niet mee.
+   * Eén keer per account, markt, bankversie en catalogus. Zie `inheritMapping`.
+   */
+  const [inherited, setInherited] = useState<string[]>([]);
+  const inheritedFor = useRef<string>(undefined);
+  useEffect(() => {
+    const entry = banks[0];
+    if (!entry || !catalog) return;
+    const who = accountId ?? LOCAL_ACCOUNT;
+    const key = `${who}:${entry.bank.meta.vertical}:${entry.bank.meta.version}:${catalog.filename}:${catalog.columns.length}`;
+    if (inheritedFor.current === key) return;
+    inheritedFor.current = key;
+    let alive = true;
+    void (async () => {
+      const all = await settingsStore.list(who).catch(() => []);
+      if (!alive) return;
+      // De markt van nu eerst, daarna de rest, telkens de meest recente voorop.
+      const recent = [...all].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
+      const earlier = [
+        ...recent.filter((one) => one.vertical === entry.bank.meta.vertical),
+        ...recent.filter((one) => one.vertical !== entry.bank.meta.vertical),
+      ].map((one) => one.mapping);
+      const attributes = [
+        ...entry.bank.attributes,
+        ...entry.bank.overlays.flatMap((overlay) => overlay.attributes ?? []),
+      ].map((attribute) => attribute.key);
+      // Op de koppeling van nu, met wat er voor deze markt bewaard stond eronder.
+      const own = recent.find((one) => one.vertical === entry.bank.meta.vertical)?.mapping ?? {};
+      const base = { ...own, ...latest.current.mapping };
+      const result = inheritMapping(base, [...new Set(attributes)], earlier, catalog.columns);
+      if (result.inherited.length === 0) return;
+      storeMapping(result.mapping);
+      setInherited(result.inherited);
+      compose(banks, catalog, result.mapping, latest.current.categories);
+      remember(result.mapping, latest.current.categories);
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountId, banks, catalog, settingsStore]);
+
+  /**
    * Een gewijzigde koppeling, mét haar herkomst. Een functie, en dat is voor wie
    * laat terugkomt: die werkt dan op de koppeling van nu en niet op die van toen
    * hij begon. `version` is het stempel waaronder de voorstellen gedaan zijn.
@@ -653,6 +769,7 @@ export default function Home() {
         {step === 'segments' && catalog ? (
           <SegmentStep
             s={s}
+            defaultSite={shopUrl ?? knownSite}
             paths={paths}
             verdicts={verdicts}
             onDecide={decideCategory}
@@ -739,6 +856,7 @@ export default function Home() {
             mapping={mapping}
             proposed={proposed}
             proposalVersion={proposalVersion}
+            inherited={inherited}
             onChange={handleMapping}
             onRun={() => void handleRun()}
             running={scanning}
@@ -754,6 +872,8 @@ export default function Home() {
             report={report}
             onRestart={restart}
             pristine={reportPristine}
+            siteUrl={shopUrl}
+            siteProgress={siteProgress}
             onReviewQuestion={(question) => { setFocusQuestion(question); setStep('questions'); }}
           />
         ) : null}

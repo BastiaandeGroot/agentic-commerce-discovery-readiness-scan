@@ -130,8 +130,13 @@ export default function ScansPage() {
             snapshot={opened}
             detail={openedDetail?.detail}
             work={openedDetail?.work}
-            onRescan={() => router.push('/scan')}
             onRemove={() => remove(opened.id)}
+            // De sitetoets hoort bij deze analyse en gaat in dezelfde rij mee.
+            onSiteCheck={async (check) => {
+              const next = { ...opened, siteCheck: check };
+              await target.store.save(next);
+              setSnapshots((list) => list?.map((one) => (one.id === next.id ? next : one)));
+            }}
             // Met bewaarde vragensets meteen naar die vraag; anders eerst de catalogus opnieuw in.
             onEditQuestions={openedDetail?.detail
               ? () => router.push(`/dashboard/scans/vragen?analyse=${encodeURIComponent(opened.id)}`)

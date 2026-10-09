@@ -6,7 +6,9 @@
 // zegt waar het zit, en pas het product zegt wat er precies mist — en dat is het
 // niveau waarop iemand er maandagochtend iets aan kan doen.
 
+import { categoryLabel } from '../src/report/derive';
 import { useMemo, useState } from 'react';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import type { Locale, ProductResult, ScanReport } from '../src/domain/types';
 import type { Strings } from '../src/i18n/strings';
 import { Badge, Button, Card, CardTitle, Select, TrafficLight, statusOf } from './ui';
@@ -19,31 +21,82 @@ function n(value: number): string {
   return value.toLocaleString('nl-NL');
 }
 
+type CategorySort = 'category' | 'total' | 'answered' | 'qualified' | 'gaps';
+
 function CategoryTable({ s, report, locale }: {
   s: Strings; report: ScanReport; locale: Locale;
 }) {
-  const rows = report.categories;
+  // Standaard de volgorde van het rapport: hoofdcategorieën met hun
+  // subcategorieën eronder. Een klik op een kop ordent; een tweede klik keert om.
+  const [sort, setSort] = useState<{ by: CategorySort; dir: 'asc' | 'desc' }>();
+  const rows = useMemo(() => {
+    if (!sort) return report.categories;
+    const ratio = (row: ScanReport['categories'][number]) => (row.avgApplicable > 0 ? row.avgAnswered / row.avgApplicable : 0);
+    const value = (row: ScanReport['categories'][number]): number | string => (
+      sort.by === 'category' ? categoryLabel(row)
+        : sort.by === 'total' ? row.total
+          : sort.by === 'answered' ? ratio(row)
+            : sort.by === 'qualified' ? row.qualified
+              : row.topGaps[0]?.label[locale] ?? ''
+    );
+    return [...report.categories].sort((a, b) => {
+      const left = value(a);
+      const right = value(b);
+      const first = typeof left === 'number' && typeof right === 'number'
+        ? left - right
+        : String(left).localeCompare(String(right));
+      return (sort.dir === 'asc' ? first : -first) || categoryLabel(a).localeCompare(categoryLabel(b));
+    });
+  }, [report.categories, sort, locale]);
   if (rows.length === 0) return null;
+
+  // Namen beginnen bij A, aantallen bij de grootste.
+  const startDir: Record<CategorySort, 'asc' | 'desc'> = { category: 'asc', total: 'desc', answered: 'desc', qualified: 'desc', gaps: 'asc' };
+  const toggle = (by: CategorySort) => setSort((current) => (
+    current?.by === by ? { by, dir: current.dir === 'asc' ? 'desc' : 'asc' } : { by, dir: startDir[by] }
+  ));
+  const columns: { id: CategorySort; label: string; align?: string }[] = [
+    { id: 'category', label: s.explorer.category },
+    { id: 'total', label: s.explorer.products, align: 'text-right' },
+    { id: 'answered', label: s.explorer.avgAnswered },
+    { id: 'qualified', label: s.explorer.qualifiedCol, align: 'text-right' },
+    { id: 'gaps', label: s.explorer.topGaps },
+  ];
 
   return (
     <Card>
       <CardTitle>{s.explorer.categoryHeading}</CardTitle>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[46rem] text-left text-sm">
+        <table className="w-full min-w-[42rem] text-left text-sm">
           <thead className="text-xs text-muted">
             <tr className="border-b border-line">
-              <th className="py-2 pr-3 font-medium">{s.explorer.category}</th>
-              <th className="py-2 pr-3 text-right font-medium">{s.explorer.products}</th>
-              <th className="py-2 pr-3 font-medium">{s.explorer.avgAnswered}</th>
-              <th className="py-2 pr-3 text-right font-medium">{s.explorer.qualifiedCol}</th>
-              <th className="py-2 pr-3 text-right font-medium">{s.explorer.findableCol}</th>
-              <th className="py-2 font-medium">{s.explorer.topGaps}</th>
+              {columns.map((column) => (
+                <th
+                  key={column.id}
+                  aria-sort={sort?.by !== column.id ? undefined : sort.dir === 'asc' ? 'ascending' : 'descending'}
+                  className={`py-2 pr-3 font-medium ${column.align ?? ''}`}
+                >
+                  <button
+                    type="button"
+                    title={`${s.report.sortBy} ${column.label.toLowerCase()}`}
+                    onClick={() => toggle(column.id)}
+                    className={`inline-flex items-center gap-1 hover:text-ink ${sort?.by === column.id ? 'text-ink' : ''}`}
+                  >
+                    {column.label}
+                    {sort?.by !== column.id
+                      ? <ArrowUpDown className="size-3" aria-hidden />
+                      : sort.dir === 'asc'
+                        ? <ArrowUp className="size-3" aria-hidden />
+                        : <ArrowDown className="size-3" aria-hidden />}
+                  </button>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.setId} className="border-b border-line/60 align-top">
-                <td className="py-2.5 pr-3 font-medium">{row.category}</td>
+              <tr key={`${row.setId}|${row.subcategory ?? ''}`} className="border-b border-line/60 align-top">
+                <td className="py-2.5 pr-3 font-medium">{categoryLabel(row)}</td>
                 <td className="tnum py-2.5 pr-3 text-right">{n(row.total)}</td>
                 <td className="py-2.5 pr-3">
                   <div className="flex items-center gap-2">
@@ -54,14 +107,13 @@ function CategoryTable({ s, report, locale }: {
                   </div>
                 </td>
                 <td className="tnum py-2.5 pr-3 text-right">{n(row.qualified)}</td>
-                <td className="tnum py-2.5 pr-3 text-right">{n(row.findable)}</td>
                 <td className="py-2.5">
                   <div className="flex flex-wrap gap-1">
                     {row.topGaps.map((gap) => (
                       <Badge
                         key={gap.field}
                         tone={gap.cause === 'unfilled' ? 'ok' : gap.cause === 'no-source' ? 'danger' : 'warn'}
-                    title={`${s.report.causeMeaning[gap.cause]} · ${s.report.causeEffort[gap.cause]}`}
+                        title={s.report.causeMeaning[gap.cause]}
                       >
                         {gap.label[locale]}
                       </Badge>
@@ -182,7 +234,7 @@ function ProductRow({ s, product, locale }: {
                 <li key={`${gap.field}-${gap.cause}`} className="flex flex-wrap items-baseline gap-1.5">
                   <Badge
                     tone={gap.cause === 'unfilled' ? 'ok' : gap.cause === 'no-source' ? 'danger' : 'warn'}
-                    title={`${s.report.causeMeaning[gap.cause]} · ${s.report.causeEffort[gap.cause]}`}
+                    title={s.report.causeMeaning[gap.cause]}
                   >
                     {s.report.causes[gap.cause]}
                   </Badge>
@@ -239,10 +291,6 @@ export function Explorer({ s, locale, report }: {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardTitle sub={s.explorer.intro}>{s.explorer.heading}</CardTitle>
-      </Card>
-
       <CategoryTable s={s} report={report} locale={locale} />
 
       <Card>
@@ -262,7 +310,7 @@ export function Explorer({ s, locale, report }: {
               onChange={(value) => { setCategory(value); setPage(0); }}
               options={[
                 { value: 'all', label: s.explorer.allCategories },
-                ...categories.map((c) => ({ value: c.setId, label: `${c.category} (${n(c.total)})` })),
+                ...categories.map((c) => ({ value: c.setId, label: `${categoryLabel(c)} (${n(c.total)})` })),
               ]}
             />
           ) : null}

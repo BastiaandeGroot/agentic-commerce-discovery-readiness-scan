@@ -172,16 +172,19 @@ export interface AdvisoryItem {
   label: string;
   importance: string;
   categories: string[];
+  /** De sets waar de vraag speelt, voor het categoriefilter. */
+  setIds: string[];
 }
 
 /** Buiten de score: elke vraag één keer, met de categorieën waar hij speelt. */
 export function advisoryItems(report: ScanReport, locale: Locale): AdvisoryItem[] {
   const names = new Map(report.categories.map((row) => [row.setId, row.category]));
-  const seen = new Map<string, { label: string; importance: string; categories: Set<string> }>();
+  const seen = new Map<string, { label: string; importance: string; categories: Set<string>; setIds: Set<string> }>();
   for (const row of report.advisory) {
     const entry = seen.get(row.questionId)
-      ?? { label: row.label[locale], importance: row.importance, categories: new Set<string>() };
+      ?? { label: row.label[locale], importance: row.importance, categories: new Set<string>(), setIds: new Set<string>() };
     entry.categories.add(names.get(row.setId) ?? row.setId);
+    entry.setIds.add(row.setId);
     seen.set(row.questionId, entry);
   }
   return [...seen.entries()].map(([id, entry]) => ({
@@ -189,5 +192,6 @@ export function advisoryItems(report: ScanReport, locale: Locale): AdvisoryItem[
     label: entry.label,
     importance: entry.importance,
     categories: [...entry.categories],
+    setIds: [...entry.setIds],
   }));
 }

@@ -8,8 +8,8 @@
 // een koper in deze markt stelt.
 
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, type ReactNode } from 'react';
-import { ArrowUpRight, Download } from 'lucide-react';
+import { useRef, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ArrowUpRight, Download } from 'lucide-react';
 import { adviceKey, categoryLabel } from '../src/report/derive';
 import { modelFromReport, type ModelQuestion, type ReportModel } from '../src/report/model';
 import { toSnapshot, toSnapshotDetail } from '../src/engine/snapshot';
@@ -18,9 +18,21 @@ import { supabase } from '../src/auth/client';
 import { useAuth } from './auth/AuthProvider';
 import type { Locale, QuestionSetState, ScanReport } from '../src/domain/types';
 import { requirementLabel } from '../src/spec/fields';
+import { PLACEMENT_FIELD, isPlacementAttribute } from '../src/spec/placement';
 import type { Strings } from '../src/i18n/strings';
 import { Badge, Bar, Button, Card, CardTitle, ErrorState, InfoButton, InfoPanel, Select, TrafficLight, statusOf } from './ui';
 import { Explorer } from './Explorer';
+import { AdvisoryCard } from './AdvisoryCard';
+import type { SiteCheck } from '../src/collect/answers';
+
+/** Waarom de toets op de achtergrond niet liep; zie `SiteCheckRefused`. */
+export type SiteCheckFailure = 'forbidden' | 'not-configured' | 'too-many' | 'failed';
+/** Waar de toets staat die de scanpagina zelf startte. */
+export type SiteCheckProgress =
+  | { status: 'idle' }
+  | { status: 'busy' }
+  | { status: 'done'; check: SiteCheck }
+  | { status: 'failed'; reason: SiteCheckFailure };
 
 function n(value: number): string {
   return value.toLocaleString('nl-NL');
@@ -240,66 +252,65 @@ function CategoryScores({ s, model }: { s: Strings; model: ReportModel }) {
   );
 }
 
-function NextStep({ s, model }: { s: Strings; model: ReportModel }) {
-  const { funnel } = model;
-  // Welke vragen de meeste producten tegenhouden, en wat het oplevert als juist
-  // die beantwoord worden. Afgeleid in `src/report/derive.ts`.
-  const { top, wouldBecome, nearest } = model.blockers;
+/** De volgorde waarin een retailer zijn vragen leest: wat het zwaarst weegt eerst. */
+const IMPORTANCE_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
-  if (top.length === 0) return null;
+/**
+ * De vragen van de bank, per categorie.
+ *
+ * Alleen wat een retailer nodig heeft om de lijst te beoordelen: de vraag, hoe
+ * zwaar hij weegt, welk kenmerk hem beantwoordt en bij hoeveel producten dat
+ * lukt. Dekking, herkomst en weging staan op het vragensetscherm; hier zou het
+ * de vraag zelf wegdrukken.
+ */
+function BankQuestions({ s, locale, model, rows }: {
+  s: Strings; locale: Locale; model: ReportModel; rows: NonNullable<ReportModel['bankQuestions']>;
+}) {
+  const [setId, setSetId] = useState(model.categories[0]?.setId ?? '');
+  const shown = useMemo(() => rows
+    .filter((row) => row.setId === setId)
+    .sort((a, b) => Number(!a.scored) - Number(!b.scored)
+      || (IMPORTANCE_ORDER[a.importance] ?? 9) - (IMPORTANCE_ORDER[b.importance] ?? 9)
+      || a.label[locale].localeCompare(b.label[locale])), [rows, setId, locale]);
 
   return (
     <Card>
-      <CardTitle sub={s.report.startIntro}>{s.report.startHeading}</CardTitle>
-
-      <p className="text-sm leading-relaxed">
-        {funnel.findable === 0 ? (
-          s.report.startNoneFindable
-        ) : (
-          <><span className="tnum font-semibold">{n(funnel.findable)}</span> {s.report.startSomeFindable}</>
-        )}
-        {nearest ? (
-          <>
-            {' '}{s.report.startNearest}{' '}
-            <span className="tnum font-semibold">{n(nearest.products)}</span>{' '}
-            {s.report.startNearestProducts}{' '}
-            <span className="tnum font-semibold">{nearest.open}</span>{' '}
-            {s.report.startNearestQuestions}
-          </>
-        ) : null}
-      </p>
-
-      <div className="mt-4">
-        <h3 className="text-xs font-medium text-muted">{s.report.startBlockersHeading}</h3>
-        <ul className="mt-1.5 space-y-1.5">
-          {top.map((entry) => (
-            <li key={entry.label} className="text-sm">
-              <span className="font-medium">{entry.label}</span>
-              <span className="tnum ml-2 text-xs text-muted">
-                {n(entry.open)} {s.report.startBlockerOpen}
-                {entry.empty > 0
-                  ? <>, <span className="text-warn">{n(entry.empty)}</span> {s.report.startBlockerPim}</>
-                  : <>, {s.report.startBlockerNowhere}</>}
+      <CardTitle sub={s.report.bankQuestionsIntro}>{s.report.bankQuestionsHeading}</CardTitle>
+      {model.categories.length > 1 ? (
+        <div className="mb-3">
+          <Select
+            label={s.report.filterCategory}
+            value={setId}
+            onChange={setSetId}
+            options={model.categories.map((c) => ({ value: c.setId, label: `${categoryLabel(c)} (${n(c.total)})` }))}
+          />
+        </div>
+      ) : null}
+      {shown.length === 0 ? (
+        <p className="text-sm text-muted">{s.report.bankQuestionsNone}</p>
+      ) : (
+        <ul>
+          {shown.map((row) => (
+            <li key={row.questionId} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line py-2 first:border-t-0">
+              <Badge tone={row.importance === 'critical' ? 'danger' : 'neutral'}>
+                {s.questions.importance[row.importance as keyof typeof s.questions.importance] ?? row.importance}
+              </Badge>
+              <span className="min-w-0 flex-1 text-sm">
+                {row.label[locale]}
+                {row.needs.length > 0 ? (
+                  <span className="mt-0.5 block text-xs text-muted">
+                    {s.report.bankQuestionsNeeds} {row.needs.map((need) => need[locale]).join(', ')}
+                  </span>
+                ) : null}
+              </span>
+              <span className="tnum shrink-0 text-xs text-muted">
+                {row.scored
+                  ? <>{n(row.answered)}/{n(row.applicable)} {s.report.fromFeed}</>
+                  : s.questions.notScored}
               </span>
             </li>
           ))}
         </ul>
-      </div>
-
-      {/* Een oudere bewaarde analyse weet dit niet: het vraagt de producten. */}
-      {wouldBecome === undefined ? null : (
-      <div className="mt-4 rounded-md bg-surface-2 px-3 py-2.5">
-        <h3 className="text-xs font-medium text-muted">{s.report.startWinHeading}</h3>
-        {wouldBecome > 0 ? (
-          <p className="mt-1 text-sm leading-relaxed">
-            {s.report.startWinBody}{' '}
-            <span className="tnum font-semibold text-ok">{n(wouldBecome)}</span>{' '}
-            {s.report.startWinProducts}
-          </p>
-        ) : (
-          <p className="mt-1 text-sm leading-relaxed text-muted">{s.report.startWinNone}</p>
-        )}
-      </div>
       )}
     </Card>
   );
@@ -376,9 +387,25 @@ function QuestionCoverageCard({ s, model, locale, onReviewQuestion }: {
                   ) : null}
                   <span className="min-w-0">{row.label[locale]}</span>
                 </span>
-                <span className="tnum text-xs text-muted">
-                  {n(row.answered)}/{n(row.applicable)} {s.report.ofProducts}
-                </span>
+                {/* Het ene getal dat zegt hoe het staat, en meteen de ingang naar
+                    waarmee beantwoord is: een vinkje zonder herkomst is een oordeel
+                    dat de merchant moet geloven, met de kolommen erbij kan hij het
+                    nakijken. Eronder staat alleen nog wat werk is. */}
+                {row.answered > 0 && row.answeredBy ? (
+                  <button
+                    type="button"
+                    title={s.report.qAnsweredVia}
+                    aria-expanded={openAnswered === rowKey}
+                    onClick={() => setOpenAnswered(openAnswered === rowKey ? undefined : rowKey)}
+                    className="tnum text-xs text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+                  >
+                    {n(row.answered)}/{n(row.applicable)} {s.report.ofProducts}
+                  </button>
+                ) : (
+                  <span className="tnum text-xs text-muted">
+                    {n(row.answered)}/{n(row.applicable)} {s.report.ofProducts}
+                  </span>
+                )}
               </div>
               {/* Vier lagen: beantwoord, veld leeg, gevuld maar te mager, en
                   geen veld. Elke laag wijst naar ander werk — invullen,
@@ -405,23 +432,6 @@ function QuestionCoverageCard({ s, model, locale, onReviewQuestion }: {
               </div>
               <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted">
                 <span>{categoryName.get(row.setId) ?? row.setId}</span>
-                {/* Klikbaar zodra bekend is waarmee beantwoord is. Een vinkje zonder
-                    herkomst is een oordeel dat de merchant moet geloven; met de
-                    kolommen erbij kan hij het nakijken. */}
-                {row.answered > 0 && row.answeredBy ? (
-                  <button
-                    type="button"
-                    aria-expanded={openAnswered === rowKey}
-                    onClick={() => setOpenAnswered(openAnswered === rowKey ? undefined : rowKey)}
-                    className="tnum underline decoration-dotted underline-offset-2 hover:text-ink"
-                  >
-                    <span className="text-ok">{n(row.answered)}</span> {s.report.fromFeed}
-                  </button>
-                ) : (
-                  <span className="tnum">
-                    <span className="text-ok">{n(row.answered)}</span> {s.report.fromFeed}
-                  </span>
-                )}
                 {/* Beantwoord, maar alleen dankzij de plek in de boom: geen gat, wel
                     werk. Los geteld, anders verdwijnt het in het groene getal. */}
                 {(row.fromTree ?? 0) > 0 ? (
@@ -447,16 +457,20 @@ function QuestionCoverageCard({ s, model, locale, onReviewQuestion }: {
                     {n(row.incomplete)} {s.report.states.incomplete.toLowerCase()}
                   </span>
                 ) : null}
-                <span className="tnum" title={s.report.statesExplain.absent}>
-                  {n(row.absent)} {s.report.neither}
-                </span>
-                {row.evidence ? (
+                {row.absent > 0 ? (
+                  <span className="tnum" title={s.report.statesExplain.absent}>
+                    {n(row.absent)} {s.report.neither}
+                  </span>
+                ) : null}
+                {/* Alleen waar er iets te doen valt: bij een vraag die overal uit
+                    een kolom beantwoord is, valt er niets uit te leggen. */}
+                {row.evidence && (row.answered < row.applicable || (row.fromTree ?? 0) > 0) ? (
                   <button
                     type="button"
                     onClick={() => setOpenRow(rowKey === openRow ? undefined : rowKey)}
                     className="underline decoration-dotted underline-offset-2 hover:text-ink"
                   >
-                    {rowKey === openRow ? s.report.qDetailClose : s.report.qDetail}
+                    {rowKey === openRow ? s.report.qDetailClose : row.answered < row.applicable ? s.report.qDetail : s.report.qNext}
                   </button>
                 ) : null}
                 {/* Een vraag die hier niet klopt, meteen kunnen uitzetten: naar
@@ -502,7 +516,13 @@ function QuestionCoverageCard({ s, model, locale, onReviewQuestion }: {
                     ))}
                   </ul>
                   <p className="mt-2 font-medium text-muted">{s.report.qNext}</p>
-                  <p className="mt-0.5 leading-relaxed">{s.report[adviceKey(row)]}</p>
+                  {/* Eén attribuut in het lijstje erboven is "het attribuut", niet
+                      "de attributen": de zin hoort te kloppen met wat er staat. */}
+                  <p className="mt-0.5 leading-relaxed">
+                    {adviceKey(row) === 'qNextEmpty' && (row.evidence ?? []).flatMap((group) => group.fields).length === 1
+                      ? s.report.qNextEmptyOne
+                      : s.report[adviceKey(row)]}
+                  </p>
                 </div>
               ) : null}
             </li>
@@ -523,10 +543,18 @@ const ANSWERED_LISTED = 12;
  */
 function AnsweredPanel({ s, locale, row }: { s: Strings; locale: Locale; row: ModelQuestion }) {
   const counts = new Map((row.answeredBy ?? []).map((entry) => [entry.field, entry.products]));
+  // Elk attribuut waar de vraag op leunt, ook als het er meer zijn, met al zijn
+  // kolommen: een vraag is pas beantwoord als ze er allemaal staan, dus wie wil
+  // nakijken waarmee, moet ze allemaal zien. Een kolom die bij geen product het
+  // antwoord droeg staat er met een nul bij.
   const grouped = (row.evidence ?? []).map((group) => ({
     ...group,
-    carried: group.fields.filter((field) => counts.has(field)),
-  })).filter((group) => group.carried.length > 0);
+    carried: [
+      ...group.fields,
+      // Waar een product voor bedoeld is, kan ook uit de categorieboom komen.
+      ...(isPlacementAttribute(group.attributeKey) && counts.has(PLACEMENT_FIELD) ? [PLACEMENT_FIELD] : []),
+    ],
+  }));
   const listed = new Set(grouped.flatMap((group) => group.carried));
   const loose = [...counts.keys()].filter((field) => !listed.has(field));
   const products = row.answeredProducts;
@@ -543,6 +571,7 @@ function AnsweredPanel({ s, locale, row }: { s: Strings; locale: Locale; row: Mo
               <span className="font-medium">{group.label[locale]}</span>
               <span aria-hidden className="text-muted">→</span>
               <span className="text-muted">
+                {group.carried.length === 0 ? <span className="text-warn">{s.report.qNoColumn}</span> : null}
                 {group.carried.map((field, index) => (
                   <span key={field}>
                     {index > 0 ? ', ' : ''}
@@ -585,12 +614,40 @@ function AnsweredPanel({ s, locale, row }: { s: Strings; locale: Locale; row: Mo
   );
 }
 
+/** Hoeveel vragen er onder een attribuut staan voordat je moet klikken. */
+const BLOCKED_SHOWN = 2;
+
 function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale: Locale }) {
   // Eén kolomuitleg tegelijk; twee open panelen boven een tabel is onleesbaar.
   const [openInfo, setOpenInfo] = useState<string>();
 
-  const rows = model.gaps;
-  if (rows.length === 0) return null;
+  const [setId, setSetId] = useState('all');
+  /** Het attribuut waarvan alle vragen uitgeklapt staan; één tegelijk. */
+  const [openBlocked, setOpenBlocked] = useState<string>();
+  if (model.gaps.length === 0) return null;
+  // Standaard de meeste producten eerst. Op oorzaak loopt van goedkoop naar duur
+  // werk: invullen, modelleren, geen bron.
+  type SortKey = 'field' | 'questions' | 'cause' | 'affected';
+  const [sort, setSort] = useState<{ by: SortKey; dir: 'asc' | 'desc' }>({ by: 'affected', dir: 'desc' });
+  const causeOrder: Record<string, number> = { unfilled: 0, unmodelled: 1, 'no-source': 2 };
+  const unsorted = setId === 'all' ? model.gaps : model.gapsBySet?.[setId] ?? [];
+  const rows = [...unsorted].sort((a, b) => {
+    const byAffected = a.affected - b.affected;
+    const byName = a.label[locale].localeCompare(b.label[locale]);
+    const first = sort.by === 'cause' ? (causeOrder[a.cause] ?? 9) - (causeOrder[b.cause] ?? 9)
+      : sort.by === 'questions' ? (a.questions ?? 0) - (b.questions ?? 0)
+        : sort.by === 'field' ? byName
+          : byAffected;
+    // Bij gelijke stand de meeste producten eerst, en dan op naam: dezelfde
+    // gegevens geven altijd dezelfde volgorde.
+    return (sort.dir === 'asc' ? first : -first) || -byAffected || byName;
+  });
+  // Waar een kolom begint: namen van A naar Z, oorzaak bij het goedkoopste
+  // werk, aantallen bij de grootste.
+  const startDir: Record<SortKey, 'asc' | 'desc'> = { field: 'asc', questions: 'desc', cause: 'asc', affected: 'desc' };
+  const toggleSort = (by: SortKey) => setSort((current) => (
+    current.by === by ? { by, dir: current.dir === 'asc' ? 'desc' : 'asc' } : { by, dir: startDir[by] }
+  ));
 
   // Op inspanning en niet op ernst: invulwerk is de goedkoopste winst die er is,
   // modelwerk vraagt eerst een beslissing over je datamodel, en geen bron vraagt
@@ -607,32 +664,75 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
 
   return (
     <Card>
-      <CardTitle sub={s.report.gapsIntro}>{s.report.gapsHeading}</CardTitle>
+      <CardTitle>{s.report.gapsHeading}</CardTitle>
 
       {/* Waarom deze tabel er staat, en wat de drie uitkomsten aan werk betekenen.
           Zonder die uitleg is "verrijkingsgat" een woord en geen keuze. */}
-      <p className="rounded-md bg-surface-2 px-3 py-2 text-sm leading-relaxed text-muted">
-        {s.report.gapsWhy}
-      </p>
+      <ul className="rounded-md bg-surface-2 px-3 py-2 text-sm leading-relaxed text-muted">
+        {/* "Geen bron" alleen als het in deze resultaten voorkomt: uitleg bij
+            iets wat er niet staat is ruis. */}
+        {['unfilled', 'unmodelled', 'no-source']
+          .filter((cause) => cause !== 'no-source' || model.gaps.some((gap) => gap.cause === 'no-source'))
+          .map((cause) => <li key={cause}>{s.report.gapsWhy[cause]}</li>)}
+      </ul>
+
+      {/* Hetzelfde filter als boven de vragenlijst: een merchant werkt per
+          categorie, en dan wil hij de gaten van die categorie zien. */}
+      {model.gapsBySet && model.categories.length > 1 ? (
+        <div className="mt-3">
+          <Select
+            label={s.report.filterCategory}
+            value={setId}
+            onChange={setSetId}
+            options={[
+              { value: 'all', label: s.report.allCategories },
+              ...model.categories.map((c) => ({ value: c.setId, label: `${categoryLabel(c)} (${n(c.total)})` })),
+            ]}
+          />
+        </div>
+      ) : null}
 
       {/* De uitleg staat boven de tabel en niet in de cel: een paneel binnen een
           scrollende tabel verdwijnt half achter de rand. */}
       {openInfo ? <InfoPanel>{s.report.gapColumnInfo[openInfo]}</InfoPanel> : null}
 
-      <div className="mt-3 overflow-x-auto">
+      {rows.length === 0 ? (
+        <p className="mt-3 text-sm text-muted">{s.report.gapsNone}</p>
+      ) : null}
+
+      <div className={`mt-3 overflow-x-auto ${rows.length === 0 ? 'hidden' : ''}`}>
         <table className="w-full min-w-[34rem] text-left text-sm">
           <thead className="text-xs text-muted">
             <tr className="border-b border-line">
               {columns.map((column) => (
-                <th key={column.id} className={`py-2 pr-3 font-medium ${column.align ?? ''}`}>
+                <th
+                  key={column.id}
+                  aria-sort={sort.by !== column.id ? undefined : sort.dir === 'asc' ? 'ascending' : 'descending'}
+                  className={`py-2 pr-3 font-medium ${column.align ?? ''}`}
+                >
                   <span className={`inline-flex items-center gap-1.5 ${column.align ? 'justify-end' : ''}`}>
-                    {column.label}
+                    {(
+                      <button
+                        type="button"
+                        title={`${s.report.sortBy} ${column.label.toLowerCase()}`}
+                        onClick={() => toggleSort(column.id as SortKey)}
+                        className={`inline-flex items-center gap-1 hover:text-ink ${sort.by === column.id ? 'text-ink' : ''}`}
+                      >
+                        {column.label}
+                        {sort.by !== column.id
+                          ? <ArrowUpDown className="size-3" aria-hidden />
+                          : sort.dir === 'asc'
+                            ? <ArrowUp className="size-3" aria-hidden />
+                            : <ArrowDown className="size-3" aria-hidden />}
+                      </button>
+                    )}
+                    {/* Alleen op klik. De uitleg staat bóven de tabel en duwt de kop
+                        omlaag: opende hij op aanwijzen, dan schoof het knopje onder
+                        de muis vandaan, sloot de uitleg, en begon het opnieuw. */}
                     <InfoButton
                       label={s.report.infoLabel}
                       open={openInfo === column.id}
                       onToggle={() => setOpenInfo(openInfo === column.id ? undefined : column.id)}
-                      onOpen={() => setOpenInfo(column.id)}
-                      onClose={() => setOpenInfo(undefined)}
                     />
                   </span>
                 </th>
@@ -641,8 +741,45 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={`${row.field}-${row.cause}`} className="border-b border-line/60">
-                <td className="py-2 pr-3">{row.label[locale]}</td>
+              <tr key={`${row.field}-${row.cause}`} className="border-b border-line/60 align-top">
+                <td className="py-2 pr-3">
+                  {row.label[locale]}
+                  {/* De vragen zelf onder het attribuut: een naam als "bestelstap
+                      cm" zegt pas iets met de vraag van de koper erbij. De eerste
+                      twee staan er altijd, de rest achter een klik, anders wordt
+                      een attribuut waar tien vragen op leunen de hele tabel. */}
+                  {row.blocked && row.blocked.length > 0 ? (() => {
+                    const key = `${row.field}-${row.cause}`;
+                    const all = openBlocked === key;
+                    const shown = all ? row.blocked : row.blocked.slice(0, BLOCKED_SHOWN);
+                    return (
+                      <ul className="mt-1 space-y-0.5 text-xs text-muted" aria-label={s.report.gapBlockedHeading}>
+                        {shown.map((question) => (
+                          <li key={question.questionId}>
+                            {question.importance === 'critical' ? (
+                              <span className="mr-1 font-medium text-danger">{s.questions.importance.critical}</span>
+                            ) : null}
+                            {question.label[locale]}
+                          </li>
+                        ))}
+                        {row.blocked.length > BLOCKED_SHOWN ? (
+                          <li>
+                            <button
+                              type="button"
+                              aria-expanded={all}
+                              onClick={() => setOpenBlocked(all ? undefined : key)}
+                              className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                            >
+                              {all ? s.report.gapBlockedLess
+                                : row.blocked.length - BLOCKED_SHOWN === 1 ? s.report.gapBlockedMoreOne
+                                  : s.report.gapBlockedMore.replace('{aantal}', String(row.blocked.length - BLOCKED_SHOWN))}
+                            </button>
+                          </li>
+                        ) : null}
+                      </ul>
+                    );
+                  })() : null}
+                </td>
                 <td className="py-2 pr-3">
                   {/* Welke vragen hierdoor blijven liggen. Een gat zonder vraag
                       bestaat niet: dat is het verschil met een lege-veldenlijst. */}
@@ -656,7 +793,7 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
                       ons woord. De betekenis en de inspanning eronder maken er
                       een klus van die hij kan inplannen. */}
                   <span className="mt-0.5 block text-xs text-muted">
-                    {s.report.causeMeaning[row.cause]} · {s.report.causeEffort[row.cause]}
+                    {s.report.causeMeaning[row.cause]}
                   </span>
                 </td>
                 <td className="tnum py-2 text-right">{n(row.affected)}</td>
@@ -679,28 +816,6 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
  * het rapport halen — juist hier ligt het antwoord bij de website of de
  * klantenservice, en niet bij de catalogus.
  */
-function Advisory({ s, model }: { s: Strings; model: ReportModel }) {
-  // Ontdubbeld op vraag, met de categorieën erachter: dezelfde procesvraag komt
-  // in meerdere categorieën terug en hoeft maar één keer als advies te staan.
-  const items = model.advisory;
-  if (items.length === 0) return null;
-
-  return (
-    <Card>
-      <CardTitle sub={s.report.advisoryIntro}>{s.report.advisoryHeading}</CardTitle>
-      <ul className="space-y-2">
-        {items.map((entry) => (
-          <li key={entry.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line pt-2">
-            <Badge tone="neutral">{s.questions.importance[entry.importance as keyof typeof s.questions.importance] ?? entry.importance}</Badge>
-            <span className="min-w-0 flex-1 text-sm">{entry.label}</span>
-            <span className="text-xs text-muted">{entry.categories.join(', ')}</span>
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
-}
-
 /**
  * Het rapport zelf, getekend uit het model.
  *
@@ -708,7 +823,7 @@ function Advisory({ s, model }: { s: Strings; model: ReportModel }) {
  * hetzelfde uitzien. Wat alleen met de producten kan — de verkenner, bewaren en
  * de pdf — komt van buiten binnen.
  */
-export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestion }: {
+export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestion, siteCheck, onSiteCheck, defaultSite, siteSaveHint, sitePending, siteFailed }: {
   s: Strings;
   locale: Locale;
   model: ReportModel;
@@ -717,40 +832,53 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
   /** Per product kijken, of de uitleg waarom dat hier niet kan. */
   explorer?: ReactNode;
   footer?: ReactNode;
+  /** De sitetoets bij dit rapport, en hoe een nieuwe bewaard wordt; zie `AdvisoryCard`. */
+  siteCheck?: SiteCheck;
+  onSiteCheck?: (check: SiteCheck) => void | Promise<void>;
+  defaultSite?: string;
+  siteSaveHint?: boolean;
+  /** De toets die het rapport zelf startte: loopt hij nog, of mislukte hij. */
+  sitePending?: boolean;
+  siteFailed?: SiteCheckFailure;
 }) {
-  // Niet-bevroren banken dragen allebei een voorbehoud, maar niet hetzelfde.
-  // Een voorlopige bank is ónze terugval uit vakkennis; een ingelezen lijst zonder
-  // sitepanel is de lijst van de merchant zelf. Die over één kam scheren vertelt
-  // hem dat zijn eigen vragen uit onze vakkennis komen, en dat klopt niet.
-  const unfrozen = model.stamp.banks.filter((bank) => bank.status !== 'frozen');
-  const anyProvisional = unfrozen.some((bank) => bank.status === 'provisional');
+  // De status staat als label naast de zin en niet in de zin zelf: een cijfer
+  // langs een voorlopige lat mag er niet hetzelfde uitzien als een cijfer langs
+  // een bevroren lat, maar de merchant hoeft er geen alinea over te lezen.
+  const banks = model.stamp.banks;
+  const unfrozen = banks.filter((bank) => bank.status !== 'frozen');
+  const [showQuestions, setShowQuestions] = useState(false);
 
   return (
     <div className="space-y-4">
-      {/* Bovenaan en niet in het stempel onderaan: wie een cijfer leest hoort
-          meteen te weten dat de lat beredeneerd is en niet onderzocht. */}
-      {unfrozen.length > 0 ? (
-        <div className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3">
-          <p className="font-medium text-warn">
-            {s.report.bankHeading}: {unfrozen.map((bank) => bank.label?.[locale] ?? bank.id).join(', ')}
+      {banks.length > 0 ? (
+        <div className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 ${unfrozen.length > 0 ? 'border-warn/40 bg-warn-soft' : 'border-line bg-surface'}`}>
+          <p className="flex flex-wrap items-center gap-2 text-sm text-ink">
+            <span>
+              {s.report.bankMeasured.replace('{naam}', banks.map((bank) => bank.label?.[locale] ?? bank.id).join(', '))}
+            </span>
+            {/* Eén label per status: vier voorlopige banken zeggen samen één keer "Voorlopig". */}
+            {[...new Set(unfrozen.map((bank) => bank.status))].map((status) => (
+              <Badge key={status} tone="warn">{s.bank.status[status as keyof typeof s.bank.status] ?? status}</Badge>
+            ))}
           </p>
-          <p className="mt-1 text-sm leading-relaxed text-ink">
-            {anyProvisional ? s.report.bankProvisional : s.report.bankInReview}
-          </p>
+          {model.bankQuestions ? (
+            <Button variant="secondary" onClick={() => setShowQuestions(!showQuestions)}>
+              {showQuestions ? s.report.bankQuestionsHide : s.report.bankQuestionsShow}
+            </Button>
+          ) : null}
         </div>
+      ) : null}
+
+      {showQuestions && model.bankQuestions ? (
+        <BankQuestions s={s} locale={locale} model={model} rows={model.bankQuestions} />
       ) : null}
 
       {model.stamp.blindAttributes.length > 0 ? (
         <div className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3">
-          <p className="font-medium text-warn">
-            {s.report.blindHeading} —{' '}
-            <span className="tnum">{model.stamp.blindAttributes.length}</span>{' '}
-            {s.report.blindCount}
-          </p>
+          <p className="font-medium text-warn">{s.report.blindHeading}</p>
           <p className="mt-1 text-sm leading-relaxed text-ink">{s.report.blindBody}</p>
-          <p className="mt-2 text-sm leading-relaxed text-ink">{s.report.blindNext}</p>
           <ul className="mt-2 flex flex-wrap gap-1.5">
-            {model.stamp.blindAttributes.slice(0, 16).map((attribute) => (
+            {model.stamp.blindAttributes.map((attribute) => (
               <li key={attribute.key}>
                 <Badge tone="neutral">{attribute.key}</Badge>
               </li>
@@ -761,17 +889,21 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
 
       <div className="grid gap-4 lg:grid-cols-2">
         <FunnelCard s={s} model={model} />
-        <NextStep s={s} model={model} />
         <CategoryScores s={s} model={model} />
       </div>
 
+      {/* Dezelfde vorm als de melding over ontbrekende attributen bovenaan: een
+          bevinding naast de meting, geen onderdeel ervan. */}
       {model.unmatchedCount > 0 ? (
-        <div className="rounded-md bg-warn-soft px-3 py-2">
-          <p className="text-sm">
+        <div className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3">
+          <p className="font-medium text-warn">{s.report.otherFindingsHeading}</p>
+          <p className="mt-1 text-sm leading-relaxed text-ink">
             <span className="tnum font-semibold">{n(model.unmatchedCount)}</span>{' '}
-            {s.report.unmatched}
+            {model.unmatchedCount === 1 ? s.report.unmatchedOne : s.report.unmatched}
           </p>
-          <p className="mt-0.5 text-xs leading-relaxed text-muted">{s.report.unmatchedExplain}</p>
+          <p className="mt-1 text-sm leading-relaxed text-ink">
+            {model.unmatchedCount === 1 ? s.report.unmatchedExplainOne : s.report.unmatchedExplain}
+          </p>
         </div>
       ) : null}
 
@@ -784,7 +916,17 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
       {/* Vragen die geen enkel attribuut kan dragen. Ze staan ná de meting: het
           is advies over je website en je dienstverlening, geen bevinding over je
           catalogus. */}
-      <Advisory s={s} model={model} />
+      <AdvisoryCard
+        s={s}
+        locale={locale}
+        model={model}
+        siteCheck={siteCheck}
+        onSiteCheck={onSiteCheck}
+        defaultSite={defaultSite}
+        saveHint={siteSaveHint}
+        pending={sitePending}
+        pendingFailed={siteFailed}
+      />
 
       <Card>
         <CardTitle sub={s.report.stampExplain}>{s.report.stampHeading}</CardTitle>
@@ -834,7 +976,7 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
   );
 }
 
-export function ReportView({ s, locale, report, onRestart, restartLabel, canSave = true, onReviewQuestion, pristine }: {
+export function ReportView({ s, locale, report, onRestart, restartLabel, canSave = true, onReviewQuestion, pristine, siteUrl, siteProgress }: {
   s: Strings;
   locale: Locale;
   report: ScanReport;
@@ -846,6 +988,10 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
   restartLabel?: string;
   /** Een voorbeeldrapport hoort niet tussen je eigen scans te belanden. */
   canSave?: boolean;
+  /** Het adres van de winkel, als de merchant dat eerder opgaf. */
+  siteUrl?: string;
+  /** De sitetoets die de scanpagina op de achtergrond startte. */
+  siteProgress?: SiteCheckProgress;
 }) {
   const { accountId } = useAuth();
   const router = useRouter();
@@ -869,24 +1015,50 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
     setPdf('busy');
     try {
       const { saveReportPdf } = await import('./reportPdf');
-      await saveReportPdf(report, s, locale);
+      await saveReportPdf(report, s, locale, siteCheck);
       setPdf('idle');
     } catch {
       setPdf('failed');
     }
   }
 
+  /** De sitetoets van dit rapport; gaat mee de opslag in. */
+  const [siteCheck, setSiteCheck] = useState<SiteCheck>();
+
+  const snapshotNow = (check: SiteCheck | undefined) => ({
+    ...toSnapshot(report, {
+      id: `${report.stamp.scannedAt}-${report.sources.catalog.filename}`,
+      accountId: target.accountId,
+      savedAt: new Date().toISOString(),
+      label: report.sources.catalog.filename,
+    }),
+    ...(check ? { siteCheck: check } : {}),
+    ...(siteUrl ? { siteUrl } : {}),
+  });
+
+  /** Een nieuwe sitetoets: tonen, en bijschrijven als de analyse al bewaard is. */
+  async function keepSiteCheck(check: SiteCheck) {
+    setSiteCheck(check);
+    if (saveState === 'saved') await target.store.save(snapshotNow(check));
+  }
+
+  // De toets die op de achtergrond liep, komt binnen wanneer hij klaar is: soms
+  // vóór het rapport er staat, soms een minuut erna. Eén keer overnemen; wat de
+  // retailer daarna zelf opnieuw laat toetsen, gaat voor.
+  const taken = useRef<SiteCheck>(undefined);
+  useEffect(() => {
+    if (siteProgress?.status !== 'done' || taken.current === siteProgress.check) return;
+    taken.current = siteProgress.check;
+    void keepSiteCheck(siteProgress.check).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siteProgress]);
+
   async function save() {
     setSaveState('busy');
     try {
       // Alleen de uitkomst gaat de opslag in, niet de producten of het bronbestand.
       await target.store.save(
-        toSnapshot(report, {
-          id: `${report.stamp.scannedAt}-${report.sources.catalog.filename}`,
-          accountId: target.accountId,
-          savedAt: new Date().toISOString(),
-          label: report.sources.catalog.filename,
-        }),
+        snapshotNow(siteCheck),
         pristine ? toSnapshotDetail(report, pristine) : undefined,
       );
       setSaveState('saved');
@@ -910,6 +1082,12 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
       model={model}
       onReviewQuestion={onReviewQuestion}
       explorer={<Explorer s={s} locale={locale} report={report} />}
+      siteCheck={siteCheck}
+      onSiteCheck={canSave ? keepSiteCheck : undefined}
+      defaultSite={siteUrl}
+      siteSaveHint={siteCheck !== undefined && saveState !== 'saved'}
+      sitePending={siteProgress?.status === 'busy'}
+      siteFailed={siteProgress?.status === 'failed' ? siteProgress.reason : undefined}
       // Bewaren zonder dat er data weggaat: de pdf wordt in de browser gemaakt
       // en rechtstreeks gedownload.
       footer={

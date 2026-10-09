@@ -84,7 +84,7 @@ test('gaten één keer per veld en oorzaak, de meeste producten eerst', () => {
 
 test('een adviesvraag staat één keer, met al zijn categorieën', () => {
   assert.deepEqual(advisoryItems(rapport(), 'nl'), [
-    { id: 'S1', label: 'Kan ik een staal krijgen?', importance: 'medium', categories: ['Meubelstoffen', 'Gordijnstoffen'] },
+    { id: 'S1', label: 'Kan ik een staal krijgen?', importance: 'medium', categories: ['Meubelstoffen', 'Gordijnstoffen'], setIds: ['meubel', 'gordijn'] },
   ]);
 });
 

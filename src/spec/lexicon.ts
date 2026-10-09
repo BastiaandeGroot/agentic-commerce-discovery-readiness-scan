@@ -143,6 +143,19 @@ export function meaningfulWords(name: string): string[] {
  * Nederlands soms aan elkaar en soms los geschreven, en dat verschil zegt niets
  * over het kenmerk.
  */
+/**
+ * Dezelfde naam op schrijfwijze, eenheid en vulwoorden na.
+ *
+ * `bestelstap` en `bestelstap_cm`, `gewicht_gm2` en `gewicht_g_per_m2`: hetzelfde
+ * kenmerk onder een andere naam, en dat gebeurt telkens als een vragenbank
+ * vernieuwt. Zonder de woordenlijst: `materiaal` en `samenstelling` zijn hier
+ * níet hetzelfde. Dit is voor het overnemen van een eerdere keuze, en daar mag
+ * geen gok in zitten.
+ */
+export function spellingKey(name: string): string {
+  return split(name).filter((word) => !UNITS.has(word) && !FILLER.has(word) && !/^\d+$/.test(word)).join('');
+}
+
 export function glued(name: string): string {
   return split(name).filter((word) => !UNITS.has(word)).join('');
 }

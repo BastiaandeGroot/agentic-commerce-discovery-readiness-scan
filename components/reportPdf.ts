@@ -16,8 +16,9 @@
 import { jsPDF } from 'jspdf';
 import type { Locale, ScanReport } from '../src/domain/types';
 import type { Strings } from '../src/i18n/strings';
+import { isStockQuestion, siteCheckTotals, type SiteCheck } from '../src/collect/answers';
 import {
-  adviceKey, advisoryItems, categoryLabel, mergedGaps, scoreRows, topBlockers, unansweredQuestions,
+  adviceKey, advisoryItems, categoryLabel, mergedGaps, scoreRows, unansweredQuestions,
   type AdviceKey, type Average,
 } from '../src/report/derive';
 
@@ -243,7 +244,7 @@ class Writer {
  * een uitklapper zit, staat hier voluit: een bestand kun je niet aanklikken.
  * De productverkenner staat er niet in; dat is een zoekscherm, geen verslag.
  */
-export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, palette: PdfPalette): jsPDF {
+export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, palette: PdfPalette, siteCheck?: SiteCheck): jsPDF {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const w = new Writer(doc, palette);
   const tag = locale === 'nl' ? 'nl-NL' : 'en-GB';
@@ -258,19 +259,18 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
     { size: 9, color: 'muted', after: 4 },
   );
 
-  // Voorbehouden bovenaan, zoals op het scherm.
-  const unfrozen = report.stamp.banks.filter((bank) => bank.status !== 'frozen');
-  if (unfrozen.length > 0) {
-    const provisional = unfrozen.some((bank) => bank.status === 'provisional');
+  // Dezelfde twee mededelingen bovenaan als op het scherm.
+  if (report.stamp.banks.length > 0) {
+    const unfrozen = report.stamp.banks.filter((bank) => bank.status !== 'frozen');
     w.notice(
-      `${s.report.bankHeading}: ${unfrozen.map((bank) => bank.label[locale]).join(', ')}`,
-      [provisional ? s.report.bankProvisional : s.report.bankInReview],
+      s.report.bankMeasured.replace('{naam}', report.stamp.banks.map((bank) => bank.label[locale]).join(', ')),
+      unfrozen.map((bank) => `${bank.label[locale]}: ${s.bank.status[bank.status as keyof typeof s.bank.status] ?? bank.status}`),
     );
   }
   if (report.stamp.blindAttributes.length > 0) {
     w.notice(
-      `${s.report.blindHeading}: ${report.stamp.blindAttributes.length} ${s.report.blindCount}`,
-      [s.report.blindBody, report.stamp.blindAttributes.slice(0, 24).map((attribute) => attribute.key).join(', ')],
+      s.report.blindHeading,
+      [s.report.blindBody, report.stamp.blindAttributes.map((attribute) => attribute.key).join(', ')],
     );
   }
 
@@ -299,32 +299,6 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
   );
   w.text(s.report.statusExplain[status], { size: 9, after: 2 });
 
-  // Waar begin je?
-  const start = topBlockers(report, locale);
-  if (start.top.length > 0) {
-    w.heading(s.report.startHeading, s.report.startIntro);
-    let sentence = funnel.findable === 0 ? s.report.startNoneFindable : `${n(funnel.findable)} ${s.report.startSomeFindable}`;
-    if (start.nearest) {
-      sentence += ` ${s.report.startNearest} ${n(start.nearest.products)} ${s.report.startNearestProducts} ${start.nearest.open} ${s.report.startNearestQuestions}`;
-    }
-    w.text(sentence, { after: 2 });
-    w.text(s.report.startBlockersHeading, { size: 9, bold: true, color: 'muted', after: 0.5 });
-    for (const entry of start.top) {
-      const detail = entry.empty > 0
-        ? `${n(entry.open)} ${s.report.startBlockerOpen}, ${n(entry.empty)} ${s.report.startBlockerPim}`
-        : `${n(entry.open)} ${s.report.startBlockerOpen}, ${s.report.startBlockerNowhere}`;
-      w.text(`• ${entry.label}`, { size: 10, bold: true, after: 0 });
-      w.text(detail, { size: 9, color: 'muted', indent: 3, after: 1 });
-    }
-    w.text(s.report.startWinHeading, { size: 9, bold: true, color: 'muted', after: 0.5 });
-    w.text(
-      start.wouldBecome > 0
-        ? `${s.report.startWinBody} ${n(start.wouldBecome)} ${s.report.startWinProducts}`
-        : s.report.startWinNone,
-      { after: 2 },
-    );
-  }
-
   // Waar sta je per categorie
   if (report.categories.length > 0) {
     w.heading(s.report.scoreHeading, s.report.scoreIntro);
@@ -350,7 +324,12 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
   }
 
   if (report.unmatchedCount > 0) {
-    w.notice(`${n(report.unmatchedCount)} ${s.report.unmatched}`, [s.report.unmatchedExplain]);
+    const one = report.unmatchedCount === 1;
+    w.heading(s.report.otherFindingsHeading);
+    w.notice(
+      `${n(report.unmatchedCount)} ${one ? s.report.unmatchedOne : s.report.unmatched}`,
+      [one ? s.report.unmatchedExplainOne : s.report.unmatchedExplain],
+    );
   }
 
   // Welke vragen blijven onbeantwoord
@@ -396,8 +375,12 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
   // Waar komt elk gat vandaan
   const gaps = mergedGaps(report);
   if (gaps.length > 0) {
-    w.heading(s.report.gapsHeading, s.report.gapsIntro);
-    w.text(s.report.gapsWhy, { size: 8.5, color: 'muted', after: 2 });
+    w.heading(s.report.gapsHeading);
+    const why = ['unfilled', 'unmodelled', 'no-source']
+      .filter((cause) => cause !== 'no-source' || report.gaps.some((gap) => gap.cause === 'no-source'));
+    why.forEach((cause, at) => {
+      w.text(s.report.gapsWhy[cause], { size: 8.5, color: 'muted', after: at === why.length - 1 ? 2 : 0.5 });
+    });
     w.table(
       [
         { label: s.report.gapField, width: 0.34 },
@@ -408,21 +391,57 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
       gaps.map((gap) => [
         gap.label[locale],
         n(gap.questions.length),
-        `${s.report.causes[gap.cause]}: ${s.report.causeMeaning[gap.cause]} · ${s.report.causeEffort[gap.cause]}`,
+        `${s.report.causes[gap.cause]}: ${s.report.causeMeaning[gap.cause]}`,
         n(gap.affected),
       ]),
     );
   }
 
   // Buiten de score
-  const advisory = advisoryItems(report, locale);
+  // Zonder de voorraadvragen, zoals op het scherm.
+  const advisory = advisoryItems(report, locale).filter((item) => !isStockQuestion(item.label));
   if (advisory.length > 0) {
     w.heading(s.report.advisoryHeading, s.report.advisoryIntro);
+    // De sitetoets, als die gedaan is: dezelfde uitkomst en dezelfde uitleg als
+    // op het scherm.
+    const answerOf = new Map((siteCheck?.answers ?? []).map((answer) => [answer.questionId, answer]));
+    if (siteCheck) {
+      const totals = siteCheckTotals({ ...siteCheck, answers: siteCheck.answers.filter((answer) => answer.skipped !== 'stock') });
+      w.text(
+        s.report.siteSummary
+          .replace('{datum}', new Date(siteCheck.checkedAt).toLocaleDateString(tag, { dateStyle: 'long' }))
+          .replace('{site}', siteCheck.site.replace(/^https?:\/\//, ''))
+          .replace('{paginas}', n(siteCheck.pages.length)),
+        { size: 9.5, bold: true, after: 0.5 },
+      );
+      w.text(
+        (['answered', 'partial', 'not-found', 'not-checked'] as const)
+          .filter((status) => totals[status] > 0)
+          .map((status) => `${n(totals[status])} ${s.report.siteCount[status]}`)
+          .join(' · '),
+        { size: 9, color: 'muted', after: 1.5 },
+      );
+      for (const line of s.report.siteHow) w.text(line, { size: 8.5, color: 'muted', after: 0.8 });
+    }
     for (const item of advisory) {
+      const answer = answerOf.get(item.id);
       w.text(`• ${item.label}`, { size: 9.5, after: 0 });
-      w.text(`${s.questions.importance[item.importance] ?? item.importance} · ${item.categories.join(', ')}`, {
-        size: 8.5, color: 'muted', indent: 3, after: 1,
-      });
+      w.text(
+        answer
+          ? `${s.report.siteStatus[answer.status]} · ${s.questions.importance[item.importance] ?? item.importance}`
+          : `${s.questions.importance[item.importance] ?? item.importance}`,
+        { size: 8.5, color: 'muted', indent: 3, after: answer?.quote ? 0 : 1 },
+      );
+      if (answer?.quote) {
+        w.text(`"${answer.quote}"`, { size: 8.5, indent: 3, after: 0 });
+        const where = [
+          answer.url,
+          answer.position !== undefined ? s.report.sitePosition.replace('{pct}', String(answer.position)) : '',
+          answer.opener === undefined ? '' : answer.opener === '' ? s.report.siteCollapsedUnknown : s.report.siteCollapsed.replace('{regel}', answer.opener),
+          answer.note ?? '',
+        ].filter(Boolean).join(' · ');
+        w.text(where, { size: 8, color: 'muted', indent: 3, after: 1 });
+      }
     }
   }
 
@@ -466,7 +485,7 @@ export function pdfFilename(report: ScanReport): string {
 }
 
 /** Het rapport opbouwen en als bestand downloaden. */
-export async function saveReportPdf(report: ScanReport, s: Strings, locale: Locale): Promise<void> {
-  const doc = buildReportPdf(report, s, locale, lightPalette());
+export async function saveReportPdf(report: ScanReport, s: Strings, locale: Locale, siteCheck?: SiteCheck): Promise<void> {
+  const doc = buildReportPdf(report, s, locale, lightPalette(), siteCheck);
   doc.save(pdfFilename(report));
 }

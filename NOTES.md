@@ -846,6 +846,81 @@ poort rust op de kritieke vraag van de set zelf.
 Niet in een browser gezien: de regel "alleen uit de categorieboom" op het
 rapportscherm en in de pdf is gebouwd en getypecheckt, de telling staat onder test.
 
+**De sitetoets: beantwoordt de website de vragen buiten de score?** — 9 oktober.
+De vragen die geen attribuut kan dragen (retour, een staal, hoeveel stof voor een
+gordijn) stonden in het rapport als lijst zonder oordeel. Nu toetst de app of de
+site ze beantwoordt op een plek waar een AI-agent bij kan.
+
+- **Gelezen wordt zoals een agent leest** (`agentText`): de kale html zonder
+  script, als platte tekst. Wat dichtgeklapt in de pagina staat, telt mee; het
+  rapport zegt erbij op welke regel een bezoeker moet klikken. Per citaat staat
+  hoe ver in de paginatekst het begint.
+- **Een model koppelt, een zeef beslist.** Claude Opus 5.5 wijst per vraag een
+  citaat aan; het telt alleen als het letterlijk op een gelezen pagina staat
+  (`readSiteAnswers`). Verzonnen citaat of zwijgen is "niet gevonden".
+- **Breed lezen, begrensd** (`choosePages`): tot 8 servicepagina's, 16
+  categoriepagina's (die naar de categorieën van de merchant heten eerst), 6 blogs
+  en 2 productpagina's, uit de sitemaps die de winkel aanwijst. `robots.txt` geldt
+  per pad.
+- **Voorraad wordt niet getoetst** (`isStockQuestion`): wisselt per dag en komt
+  uit een ander systeem.
+- **Buiten de score, alleen door de beheerder te starten**, en de uitkomst hangt
+  aan de analyse (`ScanSnapshot.siteCheck`): geen migratie.
+
+De aanpak is eerst met de hand gemeten op De Groot: 22 van 39 beantwoord, 4
+deels, 11 niet gevonden, 2 niet getoetst; 13 van de 22 antwoorden stonden alleen
+in een blog, onder een categoriepagina of op een productpagina, en de retourpagina
+en de FAQ spreken elkaar tegen over annuleren. De eigenaar heeft een deel
+nagelopen en akkoord gegeven. De tabel staat lokaal in `meting/` (niet in git).
+
+**De toets start vanzelf** — 9 oktober, na de eerste echte toets. De eigenaar
+vond een knop in het rapport de verkeerde plek: het rapport hoort compleet te
+laden. Nu start de scanpagina de toets op de achtergrond zodra de retailer bij
+het koppelen is (`siteProgress` in `app/(scan)/scan/page.tsx`); het rapport neemt
+de uitkomst over wanneer hij klaar is en toont tot dan "wordt gelezen". Daarvoor:
+
+- het adres van de webshop is verplicht op het categoriescherm, en komt bij een
+  volgende scan uit de meest recente analyse;
+- een eerdere toets van dezelfde winkel wordt dertig dagen hergebruikt als hij
+  elke vraag van nu kent (`reusableSiteCheck`), zonder tabel: de uitkomst hangt
+  aan de bewaarde analyse;
+- de route is open voor elke ingelogde retailer, met vier toetsen per uur per
+  account in het geheugen van het proces. Wie niet is ingelogd krijgt geen toets;
+- vragen over voorraad staan niet meer in de lijst.
+
+De eerste echte toets op De Groot gaf 21 beantwoord, 5 deels, 12 niet gevonden op
+28 pagina's; de handmeting 22, 4 en 11 op 22 pagina's. Liep binnen de tijd.
+
+**Niet gezien in de browser:** de automatische start in de scan zelf. Dat vraagt
+een catalogus aanleveren en de stappen doorlopen; de onderdelen staan onder test.
+
+**Oorspronkelijk niet gedaan (inmiddels wel, door de eigenaar):** de route is niet met een echte modelaanroep gedraaid — dat kost
+API-tegoed en schrijft in een account. De pure kant staat onder test en is op de
+opgehaalde pagina's van De Groot geprobeerd; het scherm is bekeken zonder
+uitkomst. Of één aanroep binnen de tijd van Render blijft (ophalen plus model,
+geschat een à twee minuten) is niet gemeten.
+
+**Het koppelscherm vraagt niet telkens hetzelfde** — 9 oktober. De eigenaar
+merkte dat hij bij elke scan dezelfde kenmerken opnieuw naliep. Nagemeten in zijn
+account: van de 60 kenmerken van woontextiel v5 hadden er 34 een bewaarde keuze en
+26 niet. Die 26 had hij laten staan op "— geen kolom —", maar dat is de stand van
+een open kenmerk en geen keuze: het werd niet bewaard, ging bij elke scan opnieuw
+naar het model en stond weer in de lijst.
+
+- **Wie de scan start, legt vast wat open bleef** (`runScan` in `MappingStep`):
+  elk kenmerk zonder kolom wordt "geen kolom", net alsof hij het zelf koos. Niet
+  als de voorstelronde mislukte — een storing is geen bevinding — en de knop
+  wacht tot de voorstellen binnen zijn.
+- **Een hernoemd kenmerk neemt de eerdere keuze over** (`inheritMapping`): dezelfde
+  naam op schrijfwijze, eenheid en vulwoorden na (`spellingKey`), eerst uit deze
+  markt en dan uit de andere markten van het account, de meest recente eerst. Geen
+  woordenlijst, dus geen gok; een kolom die niet meer bestaat komt niet mee.
+
+Het overnemen levert op zijn data weinig op: 1 van de 26 (`bestelstap_cm`, uit
+`bestelstap`). De winst zit in het eerste punt. Verder gaan dan de naam — een
+kenmerk overnemen omdat het hetzelfde betékent — is bewust niet gebouwd: dat is
+de gok die het koppelscherm aan de merchant voorlegt.
+
 ## Bewust afgevallen
 
 Niet opnieuw voorstellen zonder dat er iets veranderd is.

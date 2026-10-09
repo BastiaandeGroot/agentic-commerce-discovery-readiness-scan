@@ -13,13 +13,14 @@
 // zonder nieuwe scan hoort niemand zelf te moeten verklaren. Een oudere analyse
 // toont wat er bewaard is.
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { Locale, Strings } from '../src/i18n/strings';
 import type { ScanSnapshot, SnapshotDetail } from '../src/engine/snapshot';
 import type { QuestionWork } from '../src/questions/work';
 import { modelFromReport, modelFromSnapshot } from '../src/report/model';
 import { savedAnalysis } from '../src/report/saved';
 import { ReportBody } from './ReportView';
+import type { SiteCheck } from '../src/collect/answers';
 import { RemoveSnapshotButton } from './ScanList';
 import { Button, Card, CardTitle } from './ui';
 
@@ -27,7 +28,7 @@ function datum(iso: string, locale: Locale): string {
   return new Date(iso).toLocaleString(locale === 'nl' ? 'nl-NL' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-export function SnapshotReport({ s, locale, snapshot, detail, work, onRescan, onReviewQuestion, onEditQuestions, onRemove }: {
+export function SnapshotReport({ s, locale, snapshot, detail, work, onReviewQuestion, onEditQuestions, onRemove, onSiteCheck }: {
   s: Strings;
   locale: Locale;
   snapshot: ScanSnapshot;
@@ -35,13 +36,17 @@ export function SnapshotReport({ s, locale, snapshot, detail, work, onRescan, on
   detail?: SnapshotDetail;
   /** Het werk van nu op de vragensets van deze markt. */
   work?: QuestionWork;
-  onRescan: () => void;
   onReviewQuestion?: (question: { setId: string; questionId: string; base: boolean }) => void;
   /** Naar de vragensets van deze analyse; alleen als die bewaard zijn. */
   onEditQuestions?: () => void;
   /** Deze analyse verwijderen, na bevestiging; gooit bij een fout. */
   onRemove?: () => Promise<void>;
+  /** Een nieuwe sitetoets bij deze analyse bewaren; gooit bij een fout. */
+  onSiteCheck?: (check: SiteCheck) => Promise<void>;
 }) {
+  // De toets van zojuist staat er meteen, ook als het bijschrijven mislukte.
+  // Met het id erbij: wie een andere analyse opent, ziet niet de toets van de vorige.
+  const [fresh, setFresh] = useState<{ id: string; check: SiteCheck }>();
   const saved = useMemo(() => (detail ? savedAnalysis(snapshot, detail, work) : undefined), [snapshot, detail, work]);
   const model = useMemo(
     () => (saved
@@ -92,15 +97,9 @@ export function SnapshotReport({ s, locale, snapshot, detail, work, onRescan, on
         locale={locale}
         model={model}
         onReviewQuestion={onReviewQuestion}
-        explorer={
-          <Card>
-            <p className="text-sm leading-relaxed text-muted">{s.pages.dashboard.snapshotNoProducts}</p>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button variant="secondary" onClick={onRescan}>{s.pages.dashboard.rescan}</Button>
-              <span className="text-xs leading-relaxed text-muted">{s.pages.dashboard.rescanNote}</span>
-            </div>
-          </Card>
-        }
+        siteCheck={fresh?.id === snapshot.id ? fresh.check : snapshot.siteCheck}
+        defaultSite={snapshot.siteUrl}
+        onSiteCheck={onSiteCheck ? async (check) => { setFresh({ id: snapshot.id, check }); await onSiteCheck(check); } : undefined}
       />
     </div>
   );

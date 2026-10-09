@@ -20,7 +20,7 @@ import { SCAN_VERSION } from './version';
 import { PLACEMENT_FIELD } from '../spec/placement';
 
 /** Tel gaps samen over een verzameling producten, op veld en oorzaak. */
-function aggregateGaps(results: ProductResult[]): Gap[] {
+export function aggregateGaps(results: ProductResult[]): Gap[] {
   const totals = new Map<string, Gap>();
   for (const result of results) {
     for (const gap of result.gaps) {

@@ -14,6 +14,7 @@
 //
 // Puur: geen klok, geen opslag, geen DOM.
 
+import { spellingKey } from '../spec/lexicon';
 import type { AttributeShape, Bilingual, Dataset, QuestionSetState } from '../domain/types';
 import type { AttributeDef, QuestionBank } from './bank';
 import type { MappingPair } from '../spec/mapping';
@@ -329,4 +330,56 @@ export function attributeInventory(
     const linked = Number(a.fields.length > 0) - Number(b.fields.length > 0);
     return linked || b.weight - a.weight || a.key.localeCompare(b.key);
   });
+}
+
+/**
+ * Neem over wat de merchant eerder al besliste.
+ *
+ * Een koppeling hangt aan de naam van het kenmerk, en een vragenbank die
+ * vernieuwt hernoemt kenmerken: `bestelstap` wordt `bestelstap_cm`. Zonder dit
+ * staat zo'n kenmerk bij elke nieuwe bank weer open, gaat het opnieuw naar het
+ * model en loopt de merchant dezelfde lijst nog eens na.
+ *
+ * Overgenomen wordt alleen wat geen gok is: dezelfde naam op schrijfwijze,
+ * eenheid en vulwoorden na (`spellingKey`). Eerst uit de koppeling van deze
+ * markt, dan uit die van zijn andere markten, de meest recente eerst. Een kolom
+ * die in deze catalogus niet meer bestaat komt niet mee — een koppeling naar een
+ * kolom die er niet is, is een fout en geen keuze. "Geen kolom" komt wél mee:
+ * dat het kenmerk niet in de catalogus staat was toen de bevinding, en dat is het
+ * nu nog.
+ *
+ * Wat de merchant in deze sessie al heeft staan, blijft staan.
+ */
+export function inheritMapping(
+  current: Mapping,
+  /** De kenmerken van de vragenbank van nu. */
+  attributes: string[],
+  /** Eerdere koppelingen, de meest recente eerst. */
+  earlier: Mapping[],
+  /** De kolommen van de catalogus van nu. */
+  columns: string[],
+): { mapping: Mapping; inherited: string[] } {
+  const known = new Set(columns);
+  const next: Mapping = { ...current };
+  const inherited: string[] = [];
+
+  for (const key of attributes) {
+    if (Array.isArray(current[key])) continue;
+    const spelled = spellingKey(key);
+    if (spelled === '') continue;
+    for (const source of [current, ...earlier]) {
+      const from = Object.keys(source).find((other) => (
+        Array.isArray(source[other]) && (other === key ? source !== current : spellingKey(other) === spelled)
+      ));
+      if (from === undefined) continue;
+      const before = source[from];
+      const still = before.filter((column) => known.has(column));
+      // Had het een kolom en bestaat die niet meer, dan is er niets over te nemen.
+      if (before.length > 0 && still.length === 0) continue;
+      next[key] = still;
+      inherited.push(key);
+      break;
+    }
+  }
+  return { mapping: next, inherited };
 }
