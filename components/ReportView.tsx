@@ -377,14 +377,6 @@ function QuestionCoverageCard({ s, model, locale, onReviewQuestion }: {
             <li key={rowKey}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-2 text-sm">
-                  {/* Het gewicht staat vóór de vraag: het bepaalt of dit de
-                      eerste trede van de trechter blokkeert of alleen de laatste. */}
-                  {row.importance === 'critical' ? (
-                    <Badge tone="danger">{s.questions.importance.critical}</Badge>
-                  ) : null}
-                  {row.layer === 'category' ? (
-                    <Badge tone="neutral">{s.questions.layerCategory}</Badge>
-                  ) : null}
                   <span className="min-w-0">{row.label[locale]}</span>
                 </span>
                 {/* Het ene getal dat zegt hoe het staat, en meteen de ingang naar
