@@ -578,11 +578,9 @@ export const STRINGS = {
       enrichable: 'veld leeg',
       neither: 'geen veld voor',
       ofProducts: 'van de producten',
-      gapsHeading: 'Waar komt elk gat vandaan',
+      gapsHeading: 'Op welke attributen als eerste focussen',
       gapsNone: 'In deze categorie blijft geen vraag liggen door een ontbrekend of leeg veld.',
       sortBy: 'Sorteer op',
-      gapsIntro:
-        'Per gat: wat voor werk het is, en welke vragen erdoor blijven liggen.',
       // Eén regel per soort werk: onder elkaar zijn ze te vergelijken, in één
       // alinea moet je ze uit de zin plukken.
       gapsWhy: {
@@ -1740,11 +1738,9 @@ export const STRINGS = {
       enrichable: 'field empty',
       neither: 'no field for it',
       ofProducts: 'of products',
-      gapsHeading: 'Where each gap comes from',
+      gapsHeading: 'Which attributes to focus on first',
       gapsNone: 'In this category no question is left open by a missing or empty field.',
       sortBy: 'Sort by',
-      gapsIntro:
-        'Per gap: what kind of work it is, and which questions it leaves unanswered.',
       gapsWhy: {
         unfilled: 'Data entry: the attribute exists but is empty.',
         unmodelled: 'Model work: the attribute has to be created and filled.',

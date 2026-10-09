@@ -648,7 +648,7 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
 
   return (
     <Card>
-      <CardTitle sub={s.report.gapsIntro}>{s.report.gapsHeading}</CardTitle>
+      <CardTitle>{s.report.gapsHeading}</CardTitle>
 
       {/* Waarom deze tabel er staat, en wat de drie uitkomsten aan werk betekenen.
           Zonder die uitleg is "verrijkingsgat" een woord en geen keuze. */}

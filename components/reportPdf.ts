@@ -374,7 +374,7 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
   // Waar komt elk gat vandaan
   const gaps = mergedGaps(report);
   if (gaps.length > 0) {
-    w.heading(s.report.gapsHeading, s.report.gapsIntro);
+    w.heading(s.report.gapsHeading);
     const why = ['unfilled', 'unmodelled', 'no-source']
       .filter((cause) => cause !== 'no-source' || report.gaps.some((gap) => gap.cause === 'no-source'));
     why.forEach((cause, at) => {
