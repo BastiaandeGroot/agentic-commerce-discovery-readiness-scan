@@ -8,7 +8,7 @@
 //
 // Puur: geen DOM, geen klok.
 
-import type { Average, Bilingual, Funnel, GapCause, Locale, ScanReport } from '../domain/types';
+import type { Average, Bilingual, EvidenceHint, Funnel, GapCause, Locale, ScanReport } from '../domain/types';
 import type { ScanSnapshot } from '../engine/snapshot';
 import { advisoryItems, mergedGaps, scoreRows, topBlockers, unansweredQuestions } from './derive';
 import { aggregateGaps } from '../engine/report';
@@ -34,7 +34,7 @@ export interface ModelQuestion {
   absent: number;
   /** Beantwoord uit de categorieboom en nergens als kenmerk vastgelegd. */
   fromTree?: number;
-  evidence?: { attributeKey: string; label: Bilingual; fields: string[] }[];
+  evidence?: EvidenceHint[];
   /**
    * Waarmee de beantwoorde producten beantwoord zijn: per kolom hoeveel. Onbekend
    * bij een bewaarde analyse zonder metingen of van vóór 16 september.
@@ -81,6 +81,16 @@ export interface ReportModel {
   };
   gaps: {
     field: string; label: Bilingual; cause: GapCause; affected: number; questions?: number;
+    /**
+     * Wat er in dit attribuut hoort te staan: het soort antwoord, en hoe het bij
+     * een onderzochte winkel gevuld staat. Uit de vragenbank.
+     */
+    expect?: Pick<EvidenceHint, 'shape' | 'answerType' | 'examples'>;
+    /**
+     * Hoe de retailer het bij zijn andere producten al invult. Alleen na een
+     * verse scan: waarden uit de catalogus gaan niet mee de opslag in.
+     */
+    ownExamples?: string[];
     /**
      * De vragen zelf die door dit gat blijven liggen, zwaarste eerst. Onbekend bij
      * een bewaarde analyse zonder metingen: die draagt alleen het aantal.
@@ -142,7 +152,17 @@ export function modelFromReport(report: ScanReport, locale: Locale, allLabel: st
       questionById.set(row.questionId, { questionId: row.questionId, label: row.label, importance: row.importance });
     }
   }
+  // Van veld naar het kenmerk dat erop leunt, voor het soort antwoord en het
+  // voorbeeld bij een gat.
+  const hintByField = new Map<string, EvidenceHint>();
+  for (const row of report.questionCoverage) {
+    for (const group of row.evidence ?? []) {
+      if (!group.shape && !group.answerType && !group.examples) continue;
+      for (const field of group.fields) if (!hintByField.has(field)) hintByField.set(field, group);
+    }
+  }
   const gapRow = (gap: ScanReport['gaps'][number]): ReportModel['gaps'][number] => {
+    const hint = hintByField.get(gap.field);
     // Op tekst ontdubbeld: dezelfde vraag staat soms in drie vragensets onder
     // drie nummers, en voor de merchant is dat één vraag. Het zwaarste belang
     // wint, want de lijst staat al op belang.
@@ -161,6 +181,8 @@ export function modelFromReport(report: ScanReport, locale: Locale, allLabel: st
       // Het aantal dat in de tabel staat hoort bij de lijst eronder.
       questions: blocked.length > 0 ? blocked.length : gap.questions.length,
       blocked,
+      ...(hint ? { expect: { shape: hint.shape, answerType: hint.answerType, examples: hint.examples } } : {}),
+      ...(report.ownExamples?.[gap.field] ? { ownExamples: report.ownExamples[gap.field] } : {}),
     };
   };
   const detail = answeredDetail(report);

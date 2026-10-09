@@ -944,6 +944,37 @@ categorie of kenmerk, de bewaarde analyses en de sitetoets. Alleen de koppeling.
 niets gedeeld. Rijen van vóór de migratie dragen nog geen adres; dat komt erbij
 zodra dat account zijn koppeling weer bewaart. Niet met twee accounts geprobeerd.
 
+**Bij een attribuut staat wat erin hoort, met een echt voorbeeld** — 9 oktober.
+De eigenaar wilde in "Op welke attributen als eerste focussen" zien hoe een
+attribuut gevuld moet zijn, en zeker weten dat het voorbeeld klopt. Drie lagen:
+
+- **Het soort antwoord**: uit de typering van de bank als die er is, anders uit
+  het antwoordtype van de vraag, mits die op één kenmerk leunt.
+- **De eigen invulling** bij invulwerk (`ownExamples` in `src/engine/report.ts`):
+  de drie meest voorkomende waarden uit de eigen catalogus. Het zekerste
+  voorbeeld dat er is. Alleen na een verse scan, nooit in de opslag.
+- **Een waarde van een onderzochte winkel** (`AttributeExample`): in de bank, met
+  het adres van de productpagina. `scripts/harvest-examples.ts` haalt ze op via
+  dezelfde weg als winkel doormeten en de matcher; een mens loopt de tabel na.
+
+Voor woontextiel v5 leverde dat zeven voorbeelden op, alle van één productpagina
+bij Dominikq en op de pagina zelf nagelezen: toepassing, rolbreedte,
+wasvoorschrift, lichtechtheid, vezelsamenstelling, Martindale en brandnorm. Van
+zestig kenmerken is dat weinig. Stoffen.net en Kvadrat gaven geen productpagina's
+terug, Stoffen Online publiceert geen specificatietabel, en de steekproef bij
+Textielstad viel in kledingstof en boeken.
+
+Bij het nalopen vielen af, en dat is waarom er een mens tussen zit: "gewicht 470
+g/m" (per strekkende meter, niet per m²), "brandvertragend: Ja" (de vraag wil de
+norm) en "wassen: 30 °C" dat de matcher op `voorwassen_nodig` legde.
+
+**Opgemerkt, niet uitgezocht:** `voorwassen_nodig` valt op een kolom `wassen`
+(de naam zit erin en haalt de 60%-regel van `match.ts`). En een kenmerk dat naar
+een kolom wijst die de intake als standaardveld plaatste (`samenstelling` →
+`material`) vindt zijn waarde niet via een `attr:`-patroon; in een proefje telde
+het bij elk product als leeg. Of dat in de echte keten ook zo loopt, is niet
+nagegaan.
+
 ## Bewust afgevallen
 
 Niet opnieuw voorstellen zonder dat er iets veranderd is.

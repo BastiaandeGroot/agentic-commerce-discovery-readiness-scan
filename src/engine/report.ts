@@ -18,6 +18,7 @@ import { isExcludedProduct, segmentLevel } from './join';
 import { FIELD_REGISTER_ID } from '../spec/snapshot';
 import { SCAN_VERSION } from './version';
 import { PLACEMENT_FIELD } from '../spec/placement';
+import { isPlaceholder } from '../intake/normalize';
 
 /** Tel gaps samen over een verzameling producten, op veld en oorzaak. */
 export function aggregateGaps(results: ProductResult[]): Gap[] {
@@ -176,7 +177,43 @@ export function runScan(
   const products = catalog.products
     .filter((product) => !isExcludedProduct(product, excluded))
     .map((product) => evaluateProduct(product, questionState.sets, catalog, level, facets, excluded));
-  return aggregateScan(products, questionState, catalog, options.scannedAt);
+  const report = aggregateScan(products, questionState, catalog, options.scannedAt);
+  return { ...report, ownExamples: ownExamples(catalog, report.gaps) };
+}
+
+const OWN_EXAMPLES = 3;
+const OWN_EXAMPLE_LENGTH = 60;
+
+/**
+ * Hoe een leeg veld bij de andere producten gevuld staat.
+ *
+ * Alleen voor invulwerk: daar bestaat de kolom en staat hij bij een deel leeg.
+ * De meest voorkomende waarden eerst, en bij gelijke stand op alfabet, zodat
+ * dezelfde catalogus dezelfde voorbeelden geeft.
+ */
+function ownExamples(catalog: Dataset, gaps: Gap[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const gap of gaps) {
+    if (gap.cause !== 'unfilled' || out[gap.field]) continue;
+    const counts = new Map<string, number>();
+    const pattern = gap.field.startsWith('attr:') ? new RegExp(gap.field.slice(5), 'i') : undefined;
+    for (const product of catalog.products) {
+      const values = pattern
+        ? Object.entries(product.unmapped).filter(([column]) => pattern.test(column)).map(([, value]) => value)
+        : [product.values[gap.field]];
+      for (const raw of values) {
+        const value = raw === undefined || raw === null ? '' : String(raw).trim();
+        if (value === '' || isPlaceholder(value)) continue;
+        counts.set(value, (counts.get(value) ?? 0) + 1);
+      }
+    }
+    const top = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, OWN_EXAMPLES)
+      .map(([value]) => (value.length > OWN_EXAMPLE_LENGTH ? `${value.slice(0, OWN_EXAMPLE_LENGTH)}…` : value));
+    if (top.length > 0) out[gap.field] = top;
+  }
+  return out;
 }
 
 /**

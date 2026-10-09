@@ -9,7 +9,7 @@
 // categorienamen en veldnamen; de productdata zelf blijft waar hij was. Wordt dit
 // later serverzijdig bewaard, dan gaat er dus geen catalogus mee de deur uit.
 
-import type { Bilingual, GapCause, QuestionSetState, ScanReport } from '../domain/types';
+import type { Bilingual, GapCause, QuestionSetState, ScanReport, EvidenceHint } from '../domain/types';
 import { topBlockers } from '../report/derive';
 import type { SiteCheck } from '../collect/answers';
 import { captureOutcomes, type ScanOutcomes } from './rescore';
@@ -68,7 +68,7 @@ export interface SnapshotQuestion {
   /** Beantwoord uit de categorieboom, nergens als kenmerk vastgelegd. Ontbreekt bij oudere snapshots. */
   fromTree?: number;
   /** Per kenmerk de kolommen waar het antwoord vandaan zou komen: veldnamen, geen waarden. */
-  evidence?: { attributeKey: string; label: Bilingual; fields: string[] }[];
+  evidence?: EvidenceHint[];
 }
 
 export interface ScanSnapshot {
@@ -219,7 +219,9 @@ export function toSnapshot(
         incomplete: row.incomplete,
         absent: row.absent,
         ...(row.fromTree ? { fromTree: row.fromTree } : {}),
-        evidence: row.evidence?.map((group) => ({ attributeKey: group.attributeKey, label: group.label, fields: [...group.fields] })),
+        // Met het soort antwoord en de voorbeelden van andere winkels erbij: dat
+        // zijn openbare waarden uit de vragenbank, geen waarden uit deze catalogus.
+        evidence: row.evidence?.map((group) => ({ ...group, fields: [...group.fields] })),
       })),
     advisory: [...report.advisory.reduce((byId, row) => {
       const entry = byId.get(row.questionId) ?? { questionId: row.questionId, label: row.label, importance: row.importance, setIds: [] as string[] };

@@ -151,6 +151,22 @@ export interface AttributeDef {
   mode?: 'any' | 'all';
   /** Welke waarde dit kenmerk verwacht; alleen na een bevestigde typering. */
   shape?: AttributeShape;
+  /** Hoe dit kenmerk bij een andere winkel ingevuld staat; zie `AttributeExample`. */
+  examples?: AttributeExample[];
+}
+
+/**
+ * Een voorbeeld van hoe een kenmerk gevuld hoort te zijn.
+ *
+ * Altijd een waarde die werkelijk op een productpagina van een onderzochte
+ * winkel staat, met het adres erbij. Geen verzonnen voorbeeld: een retailer die
+ * zijn kenmerk gaat vullen naar een voorbeeld dat nergens bestaat, vult het
+ * verkeerd — en dat is erger dan geen voorbeeld. Zonder bron geen voorbeeld.
+ */
+export interface AttributeExample {
+  value: string;
+  /** Het adres van de productpagina waar deze waarde staat. */
+  url: string;
 }
 
 // --- Beslisregels ----------------------------------------------------------
