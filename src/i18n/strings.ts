@@ -594,7 +594,7 @@ export const STRINGS = {
         questions:
           'Hoeveel vragen er door dit gat onbeantwoord blijven.',
         field:
-          'Het gegeven dat ontbreekt. Een rij met schuine strepen is een zoekpatroon over je eigen kolommen, geen veldnaam.',
+          'Het attribuut dat ontbreekt. Een rij met schuine strepen is een zoekpatroon over je eigen kolommen, geen veldnaam.',
         cause:
           'Waarom het ontbreekt, en daarmee wat voor werk het is.',
         affected:
