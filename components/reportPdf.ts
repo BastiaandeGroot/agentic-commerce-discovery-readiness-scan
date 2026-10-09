@@ -375,8 +375,10 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
   const gaps = mergedGaps(report);
   if (gaps.length > 0) {
     w.heading(s.report.gapsHeading, s.report.gapsIntro);
-    s.report.gapsWhy.forEach((line, at) => {
-      w.text(line, { size: 8.5, color: 'muted', after: at === s.report.gapsWhy.length - 1 ? 2 : 0.5 });
+    const why = ['unfilled', 'unmodelled', 'no-source']
+      .filter((cause) => cause !== 'no-source' || report.gaps.some((gap) => gap.cause === 'no-source'));
+    why.forEach((cause, at) => {
+      w.text(s.report.gapsWhy[cause], { size: 8.5, color: 'muted', after: at === why.length - 1 ? 2 : 0.5 });
     });
     w.table(
       [

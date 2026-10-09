@@ -653,7 +653,11 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
       {/* Waarom deze tabel er staat, en wat de drie uitkomsten aan werk betekenen.
           Zonder die uitleg is "verrijkingsgat" een woord en geen keuze. */}
       <ul className="rounded-md bg-surface-2 px-3 py-2 text-sm leading-relaxed text-muted">
-        {s.report.gapsWhy.map((line) => <li key={line}>{line}</li>)}
+        {/* "Geen bron" alleen als het in deze resultaten voorkomt: uitleg bij
+            iets wat er niet staat is ruis. */}
+        {['unfilled', 'unmodelled', 'no-source']
+          .filter((cause) => cause !== 'no-source' || model.gaps.some((gap) => gap.cause === 'no-source'))
+          .map((cause) => <li key={cause}>{s.report.gapsWhy[cause]}</li>)}
       </ul>
 
       {/* Hetzelfde filter als boven de vragenlijst: een merchant werkt per

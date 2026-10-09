@@ -585,11 +585,11 @@ export const STRINGS = {
         'Per gat: wat voor werk het is, en welke vragen erdoor blijven liggen.',
       // Eén regel per soort werk: onder elkaar zijn ze te vergelijken, in één
       // alinea moet je ze uit de zin plukken.
-      gapsWhy: [
-        'Invulwerk: de kolom bestaat en staat leeg — meestal de grootste winst.',
-        'Modelwerk: er moet eerst een veld bij.',
-        'Geen bron: het komt uit een systeem dat een catalogus niet draagt.',
-      ],
+      gapsWhy: {
+        unfilled: 'Invulwerk: het attribuut bestaat maar is leeg.',
+        unmodelled: 'Modelwerk: het attribuut moet aangemaakt en gevuld worden.',
+        'no-source': 'Geen bron: het komt uit een systeem dat een catalogus niet draagt.',
+      } as Record<string, string>,
       gapField: 'Veld',
       gapQuestions: 'Vragen',
       gapCause: 'Oorzaak',
@@ -1745,11 +1745,11 @@ export const STRINGS = {
       sortBy: 'Sort by',
       gapsIntro:
         'Per gap: what kind of work it is, and which questions it leaves unanswered.',
-      gapsWhy: [
-        'Data entry: the column exists and sits empty — usually the biggest win.',
-        'Model work: a field has to be added first.',
-        'No source: it comes from a system a catalogue does not carry.',
-      ],
+      gapsWhy: {
+        unfilled: 'Data entry: the attribute exists but is empty.',
+        unmodelled: 'Model work: the attribute has to be created and filled.',
+        'no-source': 'No source: it comes from a system a catalogue does not carry.',
+      } as Record<string, string>,
       gapField: 'Field',
       gapQuestions: 'Questions',
       gapCause: 'Cause',
