@@ -35,3 +35,4 @@ import './proposals.test';
 import './review.proposals.test';
 import './placement.test';
 import './siteanswers.test';
+import './inherit.test';

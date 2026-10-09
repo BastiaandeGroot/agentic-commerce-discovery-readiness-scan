@@ -879,6 +879,27 @@ opgehaalde pagina's van De Groot geprobeerd; het scherm is bekeken zonder
 uitkomst. Of één aanroep binnen de tijd van Render blijft (ophalen plus model,
 geschat een à twee minuten) is niet gemeten.
 
+**Het koppelscherm vraagt niet telkens hetzelfde** — 9 oktober. De eigenaar
+merkte dat hij bij elke scan dezelfde kenmerken opnieuw naliep. Nagemeten in zijn
+account: van de 60 kenmerken van woontextiel v5 hadden er 34 een bewaarde keuze en
+26 niet. Die 26 had hij laten staan op "— geen kolom —", maar dat is de stand van
+een open kenmerk en geen keuze: het werd niet bewaard, ging bij elke scan opnieuw
+naar het model en stond weer in de lijst.
+
+- **Wie de scan start, legt vast wat open bleef** (`runScan` in `MappingStep`):
+  elk kenmerk zonder kolom wordt "geen kolom", net alsof hij het zelf koos. Niet
+  als de voorstelronde mislukte — een storing is geen bevinding — en de knop
+  wacht tot de voorstellen binnen zijn.
+- **Een hernoemd kenmerk neemt de eerdere keuze over** (`inheritMapping`): dezelfde
+  naam op schrijfwijze, eenheid en vulwoorden na (`spellingKey`), eerst uit deze
+  markt en dan uit de andere markten van het account, de meest recente eerst. Geen
+  woordenlijst, dus geen gok; een kolom die niet meer bestaat komt niet mee.
+
+Het overnemen levert op zijn data weinig op: 1 van de 26 (`bestelstap_cm`, uit
+`bestelstap`). De winst zit in het eerste punt. Verder gaan dan de naam — een
+kenmerk overnemen omdat het hetzelfde betékent — is bewust niet gebouwd: dat is
+de gok die het koppelscherm aan de merchant voorlegt.
+
 ## Bewust afgevallen
 
 Niet opnieuw voorstellen zonder dat er iets veranderd is.

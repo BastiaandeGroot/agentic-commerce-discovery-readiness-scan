@@ -17,6 +17,7 @@ import { importQuestionList } from '../../../src/questions/list';
 import { applyAttributeShapes, applyOverlaySettings, excludeFromScore } from '../../../src/questions/bank';
 import { applyImportanceCorrections } from '../../../src/questions/critical';
 import type { Linked, Mapping, Proposed } from '../../../src/questions/mapping';
+import { inheritMapping } from '../../../src/questions/mapping';
 import { bankStore, LOCAL_ACCOUNT, type StoredBank } from '../../../src/storage/banks';
 import { LocalSettingsStore, SupabaseSettingsStore, type SettingsStore } from '../../../src/storage/settings';
 import { applyWork, mergeWork, setKey, type QuestionWork } from '../../../src/questions/work';
@@ -409,6 +410,49 @@ export default function Home() {
   }, [accountId, banks, settingsStore]);
 
   /**
+   * Eerdere keuzes overnemen voor kenmerken die onder een andere naam terugkomen.
+   *
+   * Pas als de catalogus er is: een kolom die niet meer bestaat komt niet mee.
+   * Eén keer per account, markt, bankversie en catalogus. Zie `inheritMapping`.
+   */
+  const [inherited, setInherited] = useState<string[]>([]);
+  const inheritedFor = useRef<string>(undefined);
+  useEffect(() => {
+    const entry = banks[0];
+    if (!entry || !catalog) return;
+    const who = accountId ?? LOCAL_ACCOUNT;
+    const key = `${who}:${entry.bank.meta.vertical}:${entry.bank.meta.version}:${catalog.filename}:${catalog.columns.length}`;
+    if (inheritedFor.current === key) return;
+    inheritedFor.current = key;
+    let alive = true;
+    void (async () => {
+      const all = await settingsStore.list(who).catch(() => []);
+      if (!alive) return;
+      // De markt van nu eerst, daarna de rest, telkens de meest recente voorop.
+      const recent = [...all].sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
+      const earlier = [
+        ...recent.filter((one) => one.vertical === entry.bank.meta.vertical),
+        ...recent.filter((one) => one.vertical !== entry.bank.meta.vertical),
+      ].map((one) => one.mapping);
+      const attributes = [
+        ...entry.bank.attributes,
+        ...entry.bank.overlays.flatMap((overlay) => overlay.attributes ?? []),
+      ].map((attribute) => attribute.key);
+      // Op de koppeling van nu, met wat er voor deze markt bewaard stond eronder.
+      const own = recent.find((one) => one.vertical === entry.bank.meta.vertical)?.mapping ?? {};
+      const base = { ...own, ...latest.current.mapping };
+      const result = inheritMapping(base, [...new Set(attributes)], earlier, catalog.columns);
+      if (result.inherited.length === 0) return;
+      storeMapping(result.mapping);
+      setInherited(result.inherited);
+      compose(banks, catalog, result.mapping, latest.current.categories);
+      remember(result.mapping, latest.current.categories);
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountId, banks, catalog, settingsStore]);
+
+  /**
    * Een gewijzigde koppeling, mét haar herkomst. Een functie, en dat is voor wie
    * laat terugkomt: die werkt dan op de koppeling van nu en niet op die van toen
    * hij begon. `version` is het stempel waaronder de voorstellen gedaan zijn.
@@ -739,6 +783,7 @@ export default function Home() {
             mapping={mapping}
             proposed={proposed}
             proposalVersion={proposalVersion}
+            inherited={inherited}
             onChange={handleMapping}
             onRun={() => void handleRun()}
             running={scanning}
