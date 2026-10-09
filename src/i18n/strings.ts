@@ -466,7 +466,7 @@ export const STRINGS = {
       coverageZero: 'Geen enkele webshop in jouw markt behandelt dit \u2014 wie het wél vastlegt, is de eerste.',
       ruleUnsourced: 'Er hoort een grenswaarde bij deze vraag, maar we hebben geen bron gevonden die hem publiceert.',
       ruleUnsourcedWhat: 'Wat je kunt doen: vraag je leverancier welke waarde hij aanhoudt, kijk of er een testnorm bestaat voor dit kenmerk, of kies zelf een grens en noteer erbij dat het je eigen keuze is. Zolang er geen bron is, meten we alleen of het kenmerk gevuld is en niet of de waarde hoog genoeg is.',
-      layerCategory: 'Categorie-eigen',
+      layerCategory: 'Categorie specifiek',
       layerExplain:
         'Algemene vragen gelden voor élk product in je catalogus. Categorie-eigen vragen komen daar bovenop en gaan over wat in déze categorie misgaat.',
       noOverlayHeading: 'De categorieën van je vragenlijst sluiten niet aan op je catalogus',
