@@ -611,23 +611,26 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
   if (model.gaps.length === 0) return null;
   // Standaard de meeste producten eerst. Op oorzaak loopt van goedkoop naar duur
   // werk: invullen, modelleren, geen bron.
-  const [sort, setSort] = useState<{ by: 'affected' | 'cause'; dir: 'asc' | 'desc' }>({ by: 'affected', dir: 'desc' });
+  type SortKey = 'field' | 'questions' | 'cause' | 'affected';
+  const [sort, setSort] = useState<{ by: SortKey; dir: 'asc' | 'desc' }>({ by: 'affected', dir: 'desc' });
   const causeOrder: Record<string, number> = { unfilled: 0, unmodelled: 1, 'no-source': 2 };
   const unsorted = setId === 'all' ? model.gaps : model.gapsBySet?.[setId] ?? [];
   const rows = [...unsorted].sort((a, b) => {
-    const byCause = (causeOrder[a.cause] ?? 9) - (causeOrder[b.cause] ?? 9);
     const byAffected = a.affected - b.affected;
-    const first = sort.by === 'cause' ? byCause : byAffected;
+    const byName = a.label[locale].localeCompare(b.label[locale]);
+    const first = sort.by === 'cause' ? (causeOrder[a.cause] ?? 9) - (causeOrder[b.cause] ?? 9)
+      : sort.by === 'questions' ? (a.questions ?? 0) - (b.questions ?? 0)
+        : sort.by === 'field' ? byName
+          : byAffected;
     // Bij gelijke stand de meeste producten eerst, en dan op naam: dezelfde
     // gegevens geven altijd dezelfde volgorde.
-    return (sort.dir === 'asc' ? first : -first) || -byAffected || a.field.localeCompare(b.field);
+    return (sort.dir === 'asc' ? first : -first) || -byAffected || byName;
   });
-  const sortable = new Set(['cause', 'affected']);
-  const toggleSort = (by: 'affected' | 'cause') => setSort((current) => (
-    current.by === by
-      ? { by, dir: current.dir === 'asc' ? 'desc' : 'asc' }
-      // Oorzaak begint bij het goedkoopste werk, producten bij de meeste.
-      : { by, dir: by === 'cause' ? 'asc' : 'desc' }
+  // Waar een kolom begint: namen van A naar Z, oorzaak bij het goedkoopste
+  // werk, aantallen bij de grootste.
+  const startDir: Record<SortKey, 'asc' | 'desc'> = { field: 'asc', questions: 'desc', cause: 'asc', affected: 'desc' };
+  const toggleSort = (by: SortKey) => setSort((current) => (
+    current.by === by ? { by, dir: current.dir === 'asc' ? 'desc' : 'asc' } : { by, dir: startDir[by] }
   ));
 
   // Op inspanning en niet op ernst: invulwerk is de goedkoopste winst die er is,
@@ -688,11 +691,11 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
                   className={`py-2 pr-3 font-medium ${column.align ?? ''}`}
                 >
                   <span className={`inline-flex items-center gap-1.5 ${column.align ? 'justify-end' : ''}`}>
-                    {sortable.has(column.id) ? (
+                    {(
                       <button
                         type="button"
                         title={`${s.report.sortBy} ${column.label.toLowerCase()}`}
-                        onClick={() => toggleSort(column.id as 'affected' | 'cause')}
+                        onClick={() => toggleSort(column.id as SortKey)}
                         className={`inline-flex items-center gap-1 hover:text-ink ${sort.by === column.id ? 'text-ink' : ''}`}
                       >
                         {column.label}
@@ -702,7 +705,7 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
                             ? <ArrowUp className="size-3" aria-hidden />
                             : <ArrowDown className="size-3" aria-hidden />}
                       </button>
-                    ) : column.label}
+                    )}
                     <InfoButton
                       label={s.report.infoLabel}
                       open={openInfo === column.id}
