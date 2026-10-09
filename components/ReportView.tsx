@@ -849,19 +849,19 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
         <CategoryScores s={s} model={model} />
       </div>
 
+      {/* Dezelfde vorm als de melding over ontbrekende attributen bovenaan: een
+          bevinding naast de meting, geen onderdeel ervan. */}
       {model.unmatchedCount > 0 ? (
-        <section>
-          <h2 className="mb-2 text-lg font-semibold tracking-tight">{s.report.otherFindingsHeading}</h2>
-          <div className="rounded-md bg-warn-soft px-3 py-2">
-            <p className="text-sm">
-              <span className="tnum font-semibold">{n(model.unmatchedCount)}</span>{' '}
-              {model.unmatchedCount === 1 ? s.report.unmatchedOne : s.report.unmatched}
-            </p>
-            <p className="mt-0.5 text-xs leading-relaxed text-muted">
-              {model.unmatchedCount === 1 ? s.report.unmatchedExplainOne : s.report.unmatchedExplain}
-            </p>
-          </div>
-        </section>
+        <div className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3">
+          <p className="font-medium text-warn">{s.report.otherFindingsHeading}</p>
+          <p className="mt-1 text-sm leading-relaxed text-ink">
+            <span className="tnum font-semibold">{n(model.unmatchedCount)}</span>{' '}
+            {model.unmatchedCount === 1 ? s.report.unmatchedOne : s.report.unmatched}
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-ink">
+            {model.unmatchedCount === 1 ? s.report.unmatchedExplainOne : s.report.unmatchedExplain}
+          </p>
+        </div>
       ) : null}
 
       <QuestionCoverageCard s={s} model={model} locale={locale} onReviewQuestion={onReviewQuestion} />
