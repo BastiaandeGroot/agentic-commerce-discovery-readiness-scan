@@ -505,7 +505,13 @@ function QuestionCoverageCard({ s, model, locale, onReviewQuestion }: {
                     ))}
                   </ul>
                   <p className="mt-2 font-medium text-muted">{s.report.qNext}</p>
-                  <p className="mt-0.5 leading-relaxed">{s.report[adviceKey(row)]}</p>
+                  {/* Eén attribuut in het lijstje erboven is "het attribuut", niet
+                      "de attributen": de zin hoort te kloppen met wat er staat. */}
+                  <p className="mt-0.5 leading-relaxed">
+                    {adviceKey(row) === 'qNextEmpty' && (row.evidence ?? []).flatMap((group) => group.fields).length === 1
+                      ? s.report.qNextEmptyOne
+                      : s.report[adviceKey(row)]}
+                  </p>
                 </div>
               ) : null}
             </li>
