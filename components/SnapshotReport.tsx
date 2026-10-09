@@ -92,7 +92,10 @@ export function SnapshotReport({ s, locale, snapshot, detail, work, onRescan, on
         locale={locale}
         model={model}
         onReviewQuestion={onReviewQuestion}
-        explorer={
+        // Helemaal onderaan en niet op de plek van de verkenner: het is een
+        // mededeling over wat hier niet kan, en die hoort het rapport niet te
+        // onderbreken.
+        footer={
           <Card>
             <p className="text-sm leading-relaxed text-muted">{s.pages.dashboard.snapshotNoProducts}</p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
