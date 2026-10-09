@@ -639,7 +639,7 @@ export const STRINGS = {
       qNextUnlinked: 'Dit kenmerk is aan geen enkele kolom gekoppeld. Ga terug naar "Kenmerken koppelen" en wijs de kolom aan — misschien staat het antwoord er gewoon.',
       qNextWeak: 'De velden zijn gevuld, maar te mager om een antwoord te heten. Hier helpt herschrijven, niet aanvullen.',
       qNextTree: 'Waar deze producten voor bedoeld zijn, volgt uit de categorie waar ze onder hangen en staat nergens als kenmerk. Dat telt als beantwoord. Maar een feed geeft per product meestal één categorie door: leg alle toepassingen vast als kenmerk, dan gaat het hele antwoord mee.',
-      fromTree: 'alleen uit de categorieboom',
+      fromTree: 'niet beantwoord met attribuut maar door categorieboom',
       causes: {
         unfilled: 'Invulwerk',
         unmodelled: 'Modelwerk',
@@ -1792,7 +1792,7 @@ export const STRINGS = {
       qNextUnlinked: 'This characteristic is linked to no column at all. Go back to "Link characteristics" and point at the column — the answer may simply be there.',
       qNextWeak: 'The fields are filled but too thin to count as an answer. Rewriting helps here, not adding.',
       qNextTree: 'What these products are intended for follows from the category they sit in and is not recorded as a characteristic anywhere. That counts as answered. But a feed usually passes on one category per product: record every application as a characteristic, and the whole answer travels along.',
-      fromTree: 'from the category tree only',
+      fromTree: 'not answered by an attribute but by the category tree',
       causes: {
         unfilled: 'Data entry',
         unmodelled: 'Model work',
