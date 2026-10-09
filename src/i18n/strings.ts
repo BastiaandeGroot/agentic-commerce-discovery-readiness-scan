@@ -583,8 +583,13 @@ export const STRINGS = {
       sortBy: 'Sorteer op',
       gapsIntro:
         'Per gat: wat voor werk het is, en welke vragen erdoor blijven liggen.',
-      gapsWhy:
-        'Invulwerk: de kolom bestaat en staat leeg — meestal de grootste winst. Modelwerk: er moet eerst een veld bij. Geen bron: het komt uit een systeem dat een catalogus niet draagt.',
+      // Eén regel per soort werk: onder elkaar zijn ze te vergelijken, in één
+      // alinea moet je ze uit de zin plukken.
+      gapsWhy: [
+        'Invulwerk: de kolom bestaat en staat leeg — meestal de grootste winst.',
+        'Modelwerk: er moet eerst een veld bij.',
+        'Geen bron: het komt uit een systeem dat een catalogus niet draagt.',
+      ],
       gapField: 'Veld',
       gapQuestions: 'Vragen',
       gapCause: 'Oorzaak',
@@ -1740,8 +1745,11 @@ export const STRINGS = {
       sortBy: 'Sort by',
       gapsIntro:
         'Per gap: what kind of work it is, and which questions it leaves unanswered.',
-      gapsWhy:
-        'Data entry: the column exists and sits empty — usually the biggest win. Model work: a field has to be added first. No source: it comes from a system a catalogue does not carry.',
+      gapsWhy: [
+        'Data entry: the column exists and sits empty — usually the biggest win.',
+        'Model work: a field has to be added first.',
+        'No source: it comes from a system a catalogue does not carry.',
+      ],
       gapField: 'Field',
       gapQuestions: 'Questions',
       gapCause: 'Cause',

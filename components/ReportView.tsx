@@ -652,9 +652,9 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
 
       {/* Waarom deze tabel er staat, en wat de drie uitkomsten aan werk betekenen.
           Zonder die uitleg is "verrijkingsgat" een woord en geen keuze. */}
-      <p className="rounded-md bg-surface-2 px-3 py-2 text-sm leading-relaxed text-muted">
-        {s.report.gapsWhy}
-      </p>
+      <ul className="rounded-md bg-surface-2 px-3 py-2 text-sm leading-relaxed text-muted">
+        {s.report.gapsWhy.map((line) => <li key={line}>{line}</li>)}
+      </ul>
 
       {/* Hetzelfde filter als boven de vragenlijst: een merchant werkt per
           categorie, en dan wil hij de gaten van die categorie zien. */}
