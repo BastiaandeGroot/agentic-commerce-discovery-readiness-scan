@@ -754,6 +754,7 @@ export default function Home() {
             report={report}
             onRestart={restart}
             pristine={reportPristine}
+            siteUrl={shopUrl}
             onReviewQuestion={(question) => { setFocusQuestion(question); setStep('questions'); }}
           />
         ) : null}

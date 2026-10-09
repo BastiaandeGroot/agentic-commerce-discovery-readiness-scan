@@ -11,6 +11,7 @@
 
 import type { Bilingual, GapCause, QuestionSetState, ScanReport } from '../domain/types';
 import { topBlockers } from '../report/derive';
+import type { SiteCheck } from '../collect/answers';
 import { captureOutcomes, type ScanOutcomes } from './rescore';
 
 export interface SnapshotGap {
@@ -71,6 +72,12 @@ export interface SnapshotQuestion {
 }
 
 export interface ScanSnapshot {
+  /**
+   * De sitetoets die bij deze analyse hoort, als die gedaan is: of de website de
+   * vragen buiten de score beantwoordt. Openbare paginatekst en adressen, geen
+   * productdata. Zie `src/collect/answers.ts`.
+   */
+  siteCheck?: SiteCheck;
   id: string;
   /** Elke rij met merchantdata draagt een account, ook nu er nog geen login is. */
   accountId: string;

@@ -846,6 +846,39 @@ poort rust op de kritieke vraag van de set zelf.
 Niet in een browser gezien: de regel "alleen uit de categorieboom" op het
 rapportscherm en in de pdf is gebouwd en getypecheckt, de telling staat onder test.
 
+**De sitetoets: beantwoordt de website de vragen buiten de score?** — 9 oktober.
+De vragen die geen attribuut kan dragen (retour, een staal, hoeveel stof voor een
+gordijn) stonden in het rapport als lijst zonder oordeel. Nu toetst de app of de
+site ze beantwoordt op een plek waar een AI-agent bij kan.
+
+- **Gelezen wordt zoals een agent leest** (`agentText`): de kale html zonder
+  script, als platte tekst. Wat dichtgeklapt in de pagina staat, telt mee; het
+  rapport zegt erbij op welke regel een bezoeker moet klikken. Per citaat staat
+  hoe ver in de paginatekst het begint.
+- **Een model koppelt, een zeef beslist.** Claude Opus 5.5 wijst per vraag een
+  citaat aan; het telt alleen als het letterlijk op een gelezen pagina staat
+  (`readSiteAnswers`). Verzonnen citaat of zwijgen is "niet gevonden".
+- **Breed lezen, begrensd** (`choosePages`): tot 8 servicepagina's, 16
+  categoriepagina's (die naar de categorieën van de merchant heten eerst), 6 blogs
+  en 2 productpagina's, uit de sitemaps die de winkel aanwijst. `robots.txt` geldt
+  per pad.
+- **Voorraad wordt niet getoetst** (`isStockQuestion`): wisselt per dag en komt
+  uit een ander systeem.
+- **Buiten de score, alleen door de beheerder te starten**, en de uitkomst hangt
+  aan de analyse (`ScanSnapshot.siteCheck`): geen migratie.
+
+De aanpak is eerst met de hand gemeten op De Groot: 22 van 39 beantwoord, 4
+deels, 11 niet gevonden, 2 niet getoetst; 13 van de 22 antwoorden stonden alleen
+in een blog, onder een categoriepagina of op een productpagina, en de retourpagina
+en de FAQ spreken elkaar tegen over annuleren. De eigenaar heeft een deel
+nagelopen en akkoord gegeven. De tabel staat lokaal in `meting/` (niet in git).
+
+**Niet gedaan:** de route is niet met een echte modelaanroep gedraaid — dat kost
+API-tegoed en schrijft in een account. De pure kant staat onder test en is op de
+opgehaalde pagina's van De Groot geprobeerd; het scherm is bekeken zonder
+uitkomst. Of één aanroep binnen de tijd van Render blijft (ophalen plus model,
+geschat een à twee minuten) is niet gemeten.
+
 ## Bewust afgevallen
 
 Niet opnieuw voorstellen zonder dat er iets veranderd is.

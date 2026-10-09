@@ -16,6 +16,7 @@
 import { jsPDF } from 'jspdf';
 import type { Locale, ScanReport } from '../src/domain/types';
 import type { Strings } from '../src/i18n/strings';
+import { siteCheckTotals, type SiteCheck } from '../src/collect/answers';
 import {
   adviceKey, advisoryItems, categoryLabel, mergedGaps, scoreRows, unansweredQuestions,
   type AdviceKey, type Average,
@@ -243,7 +244,7 @@ class Writer {
  * een uitklapper zit, staat hier voluit: een bestand kun je niet aanklikken.
  * De productverkenner staat er niet in; dat is een zoekscherm, geen verslag.
  */
-export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, palette: PdfPalette): jsPDF {
+export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, palette: PdfPalette, siteCheck?: SiteCheck): jsPDF {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const w = new Writer(doc, palette);
   const tag = locale === 'nl' ? 'nl-NL' : 'en-GB';
@@ -400,11 +401,46 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
   const advisory = advisoryItems(report, locale);
   if (advisory.length > 0) {
     w.heading(s.report.advisoryHeading, s.report.advisoryIntro);
+    // De sitetoets, als die gedaan is: dezelfde uitkomst en dezelfde uitleg als
+    // op het scherm.
+    const answerOf = new Map((siteCheck?.answers ?? []).map((answer) => [answer.questionId, answer]));
+    if (siteCheck) {
+      const totals = siteCheckTotals(siteCheck);
+      w.text(
+        s.report.siteSummary
+          .replace('{datum}', new Date(siteCheck.checkedAt).toLocaleDateString(tag, { dateStyle: 'long' }))
+          .replace('{site}', siteCheck.site.replace(/^https?:\/\//, ''))
+          .replace('{paginas}', n(siteCheck.pages.length)),
+        { size: 9.5, bold: true, after: 0.5 },
+      );
+      w.text(
+        (['answered', 'partial', 'not-found', 'not-checked'] as const)
+          .filter((status) => totals[status] > 0)
+          .map((status) => `${n(totals[status])} ${s.report.siteCount[status]}`)
+          .join(' · '),
+        { size: 9, color: 'muted', after: 1.5 },
+      );
+      for (const line of s.report.siteHow) w.text(line, { size: 8.5, color: 'muted', after: 0.8 });
+    }
     for (const item of advisory) {
+      const answer = answerOf.get(item.id);
       w.text(`• ${item.label}`, { size: 9.5, after: 0 });
-      w.text(`${s.questions.importance[item.importance] ?? item.importance} · ${item.categories.join(', ')}`, {
-        size: 8.5, color: 'muted', indent: 3, after: 1,
-      });
+      w.text(
+        answer
+          ? `${s.report.siteStatus[answer.status]} · ${s.questions.importance[item.importance] ?? item.importance}`
+          : `${s.questions.importance[item.importance] ?? item.importance} · ${item.categories.join(', ')}`,
+        { size: 8.5, color: 'muted', indent: 3, after: answer?.quote ? 0 : 1 },
+      );
+      if (answer?.quote) {
+        w.text(`"${answer.quote}"`, { size: 8.5, indent: 3, after: 0 });
+        const where = [
+          answer.url,
+          answer.position !== undefined ? s.report.sitePosition.replace('{pct}', String(answer.position)) : '',
+          answer.opener === undefined ? '' : answer.opener === '' ? s.report.siteCollapsedUnknown : s.report.siteCollapsed.replace('{regel}', answer.opener),
+          answer.note ?? '',
+        ].filter(Boolean).join(' · ');
+        w.text(where, { size: 8, color: 'muted', indent: 3, after: 1 });
+      }
     }
   }
 
@@ -448,7 +484,7 @@ export function pdfFilename(report: ScanReport): string {
 }
 
 /** Het rapport opbouwen en als bestand downloaden. */
-export async function saveReportPdf(report: ScanReport, s: Strings, locale: Locale): Promise<void> {
-  const doc = buildReportPdf(report, s, locale, lightPalette());
+export async function saveReportPdf(report: ScanReport, s: Strings, locale: Locale, siteCheck?: SiteCheck): Promise<void> {
+  const doc = buildReportPdf(report, s, locale, lightPalette(), siteCheck);
   doc.save(pdfFilename(report));
 }

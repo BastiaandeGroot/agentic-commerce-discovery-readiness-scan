@@ -22,6 +22,8 @@ import { PLACEMENT_FIELD, isPlacementAttribute } from '../src/spec/placement';
 import type { Strings } from '../src/i18n/strings';
 import { Badge, Bar, Button, Card, CardTitle, ErrorState, InfoButton, InfoPanel, Select, TrafficLight, statusOf } from './ui';
 import { Explorer } from './Explorer';
+import { AdvisoryCard } from './AdvisoryCard';
+import type { SiteCheck } from '../src/collect/answers';
 
 function n(value: number): string {
   return value.toLocaleString('nl-NL');
@@ -805,45 +807,6 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
  * het rapport halen — juist hier ligt het antwoord bij de website of de
  * klantenservice, en niet bij de catalogus.
  */
-function Advisory({ s, model }: { s: Strings; model: ReportModel }) {
-  // Ontdubbeld op vraag, met de categorieën erachter: dezelfde procesvraag komt
-  // in meerdere categorieën terug en hoeft maar één keer als advies te staan.
-  const [setId, setSetId] = useState('all');
-  if (model.advisory.length === 0) return null;
-  const items = setId === 'all' ? model.advisory : model.advisory.filter((entry) => entry.setIds.includes(setId));
-
-  return (
-    <Card>
-      <CardTitle sub={s.report.advisoryIntro}>{s.report.advisoryHeading}</CardTitle>
-      {/* Hetzelfde filter als boven de vragenlijst en de attributen. */}
-      {model.categories.length > 1 ? (
-        <div className="mb-3">
-          <Select
-            label={s.report.filterCategory}
-            value={setId}
-            onChange={setSetId}
-            options={[
-              { value: 'all', label: s.report.allCategories },
-              ...model.categories.map((c) => ({ value: c.setId, label: `${categoryLabel(c)} (${n(c.total)})` })),
-            ]}
-          />
-        </div>
-      ) : null}
-      {items.length === 0 ? <p className="text-sm text-muted">{s.report.advisoryNone}</p> : null}
-      <ul className="space-y-2">
-        {items.map((entry) => (
-          <li key={entry.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line pt-2">
-            <Badge tone="neutral">{s.questions.importance[entry.importance as keyof typeof s.questions.importance] ?? entry.importance}</Badge>
-            <span className="min-w-0 flex-1 text-sm">{entry.label}</span>
-            {/* Met één categorie gekozen zegt de lijst ernaast niets meer. */}
-            {setId === 'all' ? <span className="text-xs text-muted">{entry.categories.join(', ')}</span> : null}
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
-}
-
 /**
  * Het rapport zelf, getekend uit het model.
  *
@@ -851,7 +814,7 @@ function Advisory({ s, model }: { s: Strings; model: ReportModel }) {
  * hetzelfde uitzien. Wat alleen met de producten kan — de verkenner, bewaren en
  * de pdf — komt van buiten binnen.
  */
-export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestion }: {
+export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestion, siteCheck, onSiteCheck, defaultSite, siteSaveHint }: {
   s: Strings;
   locale: Locale;
   model: ReportModel;
@@ -860,6 +823,11 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
   /** Per product kijken, of de uitleg waarom dat hier niet kan. */
   explorer?: ReactNode;
   footer?: ReactNode;
+  /** De sitetoets bij dit rapport, en hoe een nieuwe bewaard wordt; zie `AdvisoryCard`. */
+  siteCheck?: SiteCheck;
+  onSiteCheck?: (check: SiteCheck) => void | Promise<void>;
+  defaultSite?: string;
+  siteSaveHint?: boolean;
 }) {
   // De status staat als label naast de zin en niet in de zin zelf: een cijfer
   // langs een voorlopige lat mag er niet hetzelfde uitzien als een cijfer langs
@@ -936,7 +904,15 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
       {/* Vragen die geen enkel attribuut kan dragen. Ze staan ná de meting: het
           is advies over je website en je dienstverlening, geen bevinding over je
           catalogus. */}
-      <Advisory s={s} model={model} />
+      <AdvisoryCard
+        s={s}
+        locale={locale}
+        model={model}
+        siteCheck={siteCheck}
+        onSiteCheck={onSiteCheck}
+        defaultSite={defaultSite}
+        saveHint={siteSaveHint}
+      />
 
       <Card>
         <CardTitle sub={s.report.stampExplain}>{s.report.stampHeading}</CardTitle>
@@ -986,7 +962,7 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
   );
 }
 
-export function ReportView({ s, locale, report, onRestart, restartLabel, canSave = true, onReviewQuestion, pristine }: {
+export function ReportView({ s, locale, report, onRestart, restartLabel, canSave = true, onReviewQuestion, pristine, siteUrl }: {
   s: Strings;
   locale: Locale;
   report: ScanReport;
@@ -998,6 +974,8 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
   restartLabel?: string;
   /** Een voorbeeldrapport hoort niet tussen je eigen scans te belanden. */
   canSave?: boolean;
+  /** Het adres van de winkel, als de merchant dat eerder opgaf. */
+  siteUrl?: string;
 }) {
   const { accountId } = useAuth();
   const router = useRouter();
@@ -1021,11 +999,30 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
     setPdf('busy');
     try {
       const { saveReportPdf } = await import('./reportPdf');
-      await saveReportPdf(report, s, locale);
+      await saveReportPdf(report, s, locale, siteCheck);
       setPdf('idle');
     } catch {
       setPdf('failed');
     }
+  }
+
+  /** De sitetoets van dit rapport; gaat mee de opslag in. */
+  const [siteCheck, setSiteCheck] = useState<SiteCheck>();
+
+  const snapshotNow = (check: SiteCheck | undefined) => ({
+    ...toSnapshot(report, {
+      id: `${report.stamp.scannedAt}-${report.sources.catalog.filename}`,
+      accountId: target.accountId,
+      savedAt: new Date().toISOString(),
+      label: report.sources.catalog.filename,
+    }),
+    ...(check ? { siteCheck: check } : {}),
+  });
+
+  /** Een nieuwe sitetoets: tonen, en bijschrijven als de analyse al bewaard is. */
+  async function keepSiteCheck(check: SiteCheck) {
+    setSiteCheck(check);
+    if (saveState === 'saved') await target.store.save(snapshotNow(check));
   }
 
   async function save() {
@@ -1033,12 +1030,7 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
     try {
       // Alleen de uitkomst gaat de opslag in, niet de producten of het bronbestand.
       await target.store.save(
-        toSnapshot(report, {
-          id: `${report.stamp.scannedAt}-${report.sources.catalog.filename}`,
-          accountId: target.accountId,
-          savedAt: new Date().toISOString(),
-          label: report.sources.catalog.filename,
-        }),
+        snapshotNow(siteCheck),
         pristine ? toSnapshotDetail(report, pristine) : undefined,
       );
       setSaveState('saved');
@@ -1062,6 +1054,10 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
       model={model}
       onReviewQuestion={onReviewQuestion}
       explorer={<Explorer s={s} locale={locale} report={report} />}
+      siteCheck={siteCheck}
+      onSiteCheck={canSave ? keepSiteCheck : undefined}
+      defaultSite={siteUrl}
+      siteSaveHint={siteCheck !== undefined && saveState !== 'saved'}
       // Bewaren zonder dat er data weggaat: de pdf wordt in de browser gemaakt
       // en rechtstreeks gedownload.
       footer={

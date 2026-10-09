@@ -13,13 +13,14 @@
 // zonder nieuwe scan hoort niemand zelf te moeten verklaren. Een oudere analyse
 // toont wat er bewaard is.
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { Locale, Strings } from '../src/i18n/strings';
 import type { ScanSnapshot, SnapshotDetail } from '../src/engine/snapshot';
 import type { QuestionWork } from '../src/questions/work';
 import { modelFromReport, modelFromSnapshot } from '../src/report/model';
 import { savedAnalysis } from '../src/report/saved';
 import { ReportBody } from './ReportView';
+import type { SiteCheck } from '../src/collect/answers';
 import { RemoveSnapshotButton } from './ScanList';
 import { Button, Card, CardTitle } from './ui';
 
@@ -27,7 +28,7 @@ function datum(iso: string, locale: Locale): string {
   return new Date(iso).toLocaleString(locale === 'nl' ? 'nl-NL' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-export function SnapshotReport({ s, locale, snapshot, detail, work, onReviewQuestion, onEditQuestions, onRemove }: {
+export function SnapshotReport({ s, locale, snapshot, detail, work, onReviewQuestion, onEditQuestions, onRemove, onSiteCheck }: {
   s: Strings;
   locale: Locale;
   snapshot: ScanSnapshot;
@@ -40,7 +41,12 @@ export function SnapshotReport({ s, locale, snapshot, detail, work, onReviewQues
   onEditQuestions?: () => void;
   /** Deze analyse verwijderen, na bevestiging; gooit bij een fout. */
   onRemove?: () => Promise<void>;
+  /** Een nieuwe sitetoets bij deze analyse bewaren; gooit bij een fout. */
+  onSiteCheck?: (check: SiteCheck) => Promise<void>;
 }) {
+  // De toets van zojuist staat er meteen, ook als het bijschrijven mislukte.
+  // Met het id erbij: wie een andere analyse opent, ziet niet de toets van de vorige.
+  const [fresh, setFresh] = useState<{ id: string; check: SiteCheck }>();
   const saved = useMemo(() => (detail ? savedAnalysis(snapshot, detail, work) : undefined), [snapshot, detail, work]);
   const model = useMemo(
     () => (saved
@@ -91,6 +97,8 @@ export function SnapshotReport({ s, locale, snapshot, detail, work, onReviewQues
         locale={locale}
         model={model}
         onReviewQuestion={onReviewQuestion}
+        siteCheck={fresh?.id === snapshot.id ? fresh.check : snapshot.siteCheck}
+        onSiteCheck={onSiteCheck ? async (check) => { setFresh({ id: snapshot.id, check }); await onSiteCheck(check); } : undefined}
       />
     </div>
   );
