@@ -764,14 +764,10 @@ export const STRINGS = {
     },
 
     explorer: {
-      heading: 'Per categorie en per product',
-      intro:
-        'Eén getal zegt dát er werk is. De categorie zegt waar, het product zegt wat.',
-      categoryHeading: 'Per categorie',
+      categoryHeading: 'Inzichten per categorie',
       category: 'Categorie',
       products: 'Producten',
       qualifiedCol: 'Basisgeschikt',
-      findableCol: 'Vindbaar',
       avgAnswered: 'Gem. beantwoord',
       topGaps: 'Grootste gaten',
       productHeading: 'Per product',
@@ -1979,14 +1975,10 @@ export const STRINGS = {
     },
 
     explorer: {
-      heading: 'By category and by product',
-      intro:
-        'One number across your whole catalogue says there is work. The category says where it sits, the product says what is missing.',
-      categoryHeading: 'By category',
+      categoryHeading: 'Insights per category',
       category: 'Category',
       products: 'Products',
       qualifiedCol: 'Baseline fit',
-      findableCol: 'Findable',
       avgAnswered: 'Avg. answered',
       topGaps: 'Largest gaps',
       productHeading: 'By product',
