@@ -6,6 +6,7 @@
 // zegt waar het zit, en pas het product zegt wat er precies mist — en dat is het
 // niveau waarop iemand er maandagochtend iets aan kan doen.
 
+import { categoryLabel } from '../src/report/derive';
 import { useMemo, useState } from 'react';
 import type { Locale, ProductResult, ScanReport } from '../src/domain/types';
 import type { Strings } from '../src/i18n/strings';
@@ -239,9 +240,12 @@ export function Explorer({ s, locale, report }: {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardTitle sub={s.explorer.intro}>{s.explorer.heading}</CardTitle>
-      </Card>
+      {/* Een kop boven de twee blokken eronder, geen eigen kaart: een kaart met
+          alleen een titel leest als een onderdeel dat leeg bleef. */}
+      <header className="px-1 pt-2">
+        <h2 className="text-lg font-semibold tracking-tight">{s.explorer.heading}</h2>
+        <p className="mt-1 text-sm leading-relaxed text-muted">{s.explorer.intro}</p>
+      </header>
 
       <CategoryTable s={s} report={report} locale={locale} />
 
@@ -262,7 +266,7 @@ export function Explorer({ s, locale, report }: {
               onChange={(value) => { setCategory(value); setPage(0); }}
               options={[
                 { value: 'all', label: s.explorer.allCategories },
-                ...categories.map((c) => ({ value: c.setId, label: `${c.category} (${n(c.total)})` })),
+                ...categories.map((c) => ({ value: c.setId, label: `${categoryLabel(c)} (${n(c.total)})` })),
               ]}
             />
           ) : null}
