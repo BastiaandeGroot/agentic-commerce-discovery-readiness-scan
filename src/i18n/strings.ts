@@ -581,6 +581,7 @@ export const STRINGS = {
       ofProducts: 'van de producten',
       gapsHeading: 'Waar komt elk gat vandaan',
       gapsNone: 'In deze categorie blijft geen vraag liggen door een ontbrekend of leeg veld.',
+      sortBy: 'Sorteer op',
       gapsIntro:
         'Per gat: wat voor werk het is, en welke vragen erdoor blijven liggen.',
       gapsWhy:
@@ -1738,6 +1739,7 @@ export const STRINGS = {
       ofProducts: 'of products',
       gapsHeading: 'Where each gap comes from',
       gapsNone: 'In this category no question is left open by a missing or empty field.',
+      sortBy: 'Sort by',
       gapsIntro:
         'Per gap: what kind of work it is, and which questions it leaves unanswered.',
       gapsWhy:

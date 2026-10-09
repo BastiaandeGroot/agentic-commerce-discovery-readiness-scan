@@ -9,7 +9,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, type ReactNode } from 'react';
-import { ArrowUpRight, Download } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ArrowUpRight, Download } from 'lucide-react';
 import { adviceKey, categoryLabel } from '../src/report/derive';
 import { modelFromReport, type ModelQuestion, type ReportModel } from '../src/report/model';
 import { toSnapshot, toSnapshotDetail } from '../src/engine/snapshot';
@@ -609,7 +609,26 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
 
   const [setId, setSetId] = useState('all');
   if (model.gaps.length === 0) return null;
-  const rows = setId === 'all' ? model.gaps : model.gapsBySet?.[setId] ?? [];
+  // Standaard de meeste producten eerst. Op oorzaak loopt van goedkoop naar duur
+  // werk: invullen, modelleren, geen bron.
+  const [sort, setSort] = useState<{ by: 'affected' | 'cause'; dir: 'asc' | 'desc' }>({ by: 'affected', dir: 'desc' });
+  const causeOrder: Record<string, number> = { unfilled: 0, unmodelled: 1, 'no-source': 2 };
+  const unsorted = setId === 'all' ? model.gaps : model.gapsBySet?.[setId] ?? [];
+  const rows = [...unsorted].sort((a, b) => {
+    const byCause = (causeOrder[a.cause] ?? 9) - (causeOrder[b.cause] ?? 9);
+    const byAffected = a.affected - b.affected;
+    const first = sort.by === 'cause' ? byCause : byAffected;
+    // Bij gelijke stand de meeste producten eerst, en dan op naam: dezelfde
+    // gegevens geven altijd dezelfde volgorde.
+    return (sort.dir === 'asc' ? first : -first) || -byAffected || a.field.localeCompare(b.field);
+  });
+  const sortable = new Set(['cause', 'affected']);
+  const toggleSort = (by: 'affected' | 'cause') => setSort((current) => (
+    current.by === by
+      ? { by, dir: current.dir === 'asc' ? 'desc' : 'asc' }
+      // Oorzaak begint bij het goedkoopste werk, producten bij de meeste.
+      : { by, dir: by === 'cause' ? 'asc' : 'desc' }
+  ));
 
   // Op inspanning en niet op ernst: invulwerk is de goedkoopste winst die er is,
   // modelwerk vraagt eerst een beslissing over je datamodel, en geen bron vraagt
@@ -663,9 +682,27 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
           <thead className="text-xs text-muted">
             <tr className="border-b border-line">
               {columns.map((column) => (
-                <th key={column.id} className={`py-2 pr-3 font-medium ${column.align ?? ''}`}>
+                <th
+                  key={column.id}
+                  aria-sort={sort.by !== column.id ? undefined : sort.dir === 'asc' ? 'ascending' : 'descending'}
+                  className={`py-2 pr-3 font-medium ${column.align ?? ''}`}
+                >
                   <span className={`inline-flex items-center gap-1.5 ${column.align ? 'justify-end' : ''}`}>
-                    {column.label}
+                    {sortable.has(column.id) ? (
+                      <button
+                        type="button"
+                        title={`${s.report.sortBy} ${column.label.toLowerCase()}`}
+                        onClick={() => toggleSort(column.id as 'affected' | 'cause')}
+                        className={`inline-flex items-center gap-1 hover:text-ink ${sort.by === column.id ? 'text-ink' : ''}`}
+                      >
+                        {column.label}
+                        {sort.by !== column.id
+                          ? <ArrowUpDown className="size-3" aria-hidden />
+                          : sort.dir === 'asc'
+                            ? <ArrowUp className="size-3" aria-hidden />
+                            : <ArrowDown className="size-3" aria-hidden />}
+                      </button>
+                    ) : column.label}
                     <InfoButton
                       label={s.report.infoLabel}
                       open={openInfo === column.id}
