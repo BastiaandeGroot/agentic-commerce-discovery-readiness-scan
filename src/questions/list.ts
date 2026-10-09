@@ -28,10 +28,7 @@
 
 import type { Bilingual } from '../domain/types';
 import { detectDelimiter, parseDelimited } from '../intake/parse';
-import type {
-  AnswerType, Answerability, ApplicationProfile, AttributeDef, BankQuestion, DecisionRule,
-  EvidenceSource, Importance, Intent, Overlay, QuestionBank,
-} from './bank';
+import type { AnswerType, Answerability, ApplicationProfile, AttributeDef, BankQuestion, DecisionRule, EvidenceSource, Importance, Intent, Overlay, QuestionBank, AttributeExample } from './bank';
 import { IMPORTANCE_WEIGHT } from './bank';
 import { enforceCriticalCriteria } from './critical';
 import {
@@ -122,6 +119,8 @@ const COLUMNS = {
   mistake: ['onomkeerbare_fout', 'irreversible_mistake', 'irreversible_error'],
   /** Per kritieke vraag de drie criteria van de toets; zie `src/questions/critical.ts`. */
   criticalTest: ['kritiek_toets', 'critical_test', 'kritiek_onderbouwing'],
+  examples: ['voorbeeld', 'voorbeelden', 'example', 'examples'],
+  exampleSources: ['voorbeeld_bron', 'voorbeeld_bronnen', 'example_source', 'example_sources'],
 } satisfies Record<string, string[]>;
 
 type Column = keyof typeof COLUMNS;
@@ -678,12 +677,17 @@ function toQuestion(row: Row, id: string, columns: ColumnMap, warnings: string[]
  */
 function collectAttributes(rows: Row[], columns: ColumnMap, warnings: string[]): AttributeDef[] {
   const out = new Map<string, AttributeDef>();
+  const unsourced = new Set<string>();
   for (const row of rows) {
     const legal = YES.test(cell(row, columns, 'legal'));
-    for (const key of splitList(cell(row, columns, 'evidence'))) {
+    const needed = splitList(cell(row, columns, 'evidence'));
+    const examples = readExamples(cell(row, columns, 'examples'), cell(row, columns, 'exampleSources'));
+    for (const dropped of examples.unsourced) unsourced.add(dropped);
+    for (const key of needed) {
       const existing = out.get(key);
       if (existing) {
         if (legal && !existing.legal) existing.legal = legalNote(row, columns);
+        if (!existing.examples && examples.byKey.has(key)) existing.examples = examples.byKey.get(key);
         continue;
       }
       const readable = capitalize(key.replace(/_/g, ' '));
@@ -695,16 +699,57 @@ function collectAttributes(rows: Row[], columns: ColumnMap, warnings: string[]):
       out.set(key, {
         key,
         label: same(readable),
-        type: 'text',
+        // Het antwoordtype van de vraag zegt wat dit kenmerk hoort te bevatten,
+        // maar alleen als de vraag op dit ene kenmerk leunt: bij twee kenmerken
+        // is niet te zeggen welk van de twee het getal is.
+        type: needed.length === 1 ? attributeType(cell(row, columns, 'answerType')) : 'text',
         level: 'product',
         legal: legal ? legalNote(row, columns) : undefined,
         namedAs: namedAs.length > 0 ? namedAs : undefined,
         evidence: patternFor([key]),
         mode: 'any',
+        examples: examples.byKey.get(key),
       });
     }
   }
+  if (unsourced.size > 0) {
+    warnings.push(`${unsourced.size} voorbeeld${unsourced.size === 1 ? '' : 'en'} zonder bron ${unsourced.size === 1 ? 'is' : 'zijn'} niet overgenomen (${[...unsourced].slice(0, 6).join(', ')}). Een voorbeeld telt alleen met het adres van de productpagina waar het staat, in de kolom \`voorbeeld_bron\`.`);
+  }
   return [...out.values()];
+}
+
+/** Wat een kenmerk hoort te bevatten, afgeleid uit het antwoordtype van zijn vraag. */
+function attributeType(raw: string): AnswerType {
+  const type = answerType(raw);
+  return type === 'number' || type === 'boolean' || type === 'enum' ? type : 'text';
+}
+
+/**
+ * De voorbeelden van één rij: `kenmerk: waarde` in de ene kolom, `kenmerk: adres`
+ * in de andere, gescheiden door puntkomma's.
+ *
+ * Niet met `splitList`: een waarde als "0,8 mm" bevat een komma. Een voorbeeld
+ * zonder adres vervalt — herkomst staat bij elk getal, en bij elk voorbeeld.
+ */
+function readExamples(values: string, sources: string): { byKey: Map<string, AttributeExample[]>; unsourced: string[] } {
+  const pairs = (cellText: string) => cellText.split(/[;\n]+/).flatMap((part): [string, string][] => {
+    const at = part.indexOf(':');
+    const key = at === -1 ? '' : part.slice(0, at).trim();
+    const value = at === -1 ? '' : part.slice(at + 1).trim();
+    return key !== '' && value !== '' ? [[key, value]] : [];
+  });
+  const urls = new Map(pairs(sources));
+  const byKey = new Map<string, AttributeExample[]>();
+  const unsourced: string[] = [];
+  for (const [key, value] of pairs(values)) {
+    const url = urls.get(key);
+    if (!url || !/^https?:\/\//i.test(url)) {
+      unsourced.push(key);
+      continue;
+    }
+    byKey.set(key, [...(byKey.get(key) ?? []), { value, url }]);
+  }
+  return { byKey, unsourced };
 }
 
 function legalNote(row: Row, columns: ColumnMap): Bilingual {

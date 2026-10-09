@@ -12,9 +12,7 @@
 // Magento of Shopify. Daar staat wat hij wéét van zijn producten, en dat is wat
 // hier gemeten wordt.
 
-import type {
-  Answerability, BankStatus, Importance, Intent,
-} from '../questions/bank';
+import type { Answerability, BankStatus, Importance, Intent, AnswerType, AttributeExample } from '../questions/bank';
 
 export type Locale = 'nl' | 'en';
 
@@ -132,6 +130,10 @@ export interface RequirementGroup {
   mode: 'any' | 'all';
   /** Wat de bank in dit kenmerk verwacht, als dat getypeerd en bevestigd is. */
   shape?: AttributeShape;
+  /** Het soort antwoord volgens de vragenlijst, als de typering ontbreekt. */
+  answerType?: AnswerType;
+  /** Hoe het kenmerk bij een onderzochte winkel gevuld staat, met bron. */
+  examples?: AttributeExample[];
 }
 
 export interface Question {
@@ -366,13 +368,26 @@ export interface Gap {
  */
 export type AnswerState = 'answered' | 'unusable' | 'incomplete' | 'empty' | 'absent';
 
+/**
+ * Waar een vraag zijn antwoord vandaan haalt, met wat het rapport erbij kan
+ * zeggen: het soort antwoord, en hoe het bij een andere winkel gevuld staat.
+ */
+export interface EvidenceHint {
+  attributeKey: string;
+  label: Bilingual;
+  fields: string[];
+  shape?: AttributeShape;
+  answerType?: AnswerType;
+  examples?: AttributeExample[];
+}
+
 export interface QuestionOutcome {
   questionId: string;
   label: Bilingual;
   /** Algemene vraag of categorie-eigen; zie `Question.layer`. */
   layer?: 'base' | 'category';
   /** Waar deze vraag zijn antwoord vandaan zou halen; zie `QuestionCoverage`. */
-  evidence?: { attributeKey: string; label: Bilingual; fields: string[] }[];
+  evidence?: EvidenceHint[];
   state: AnswerState;
   /** De catalogus beantwoordt de vraag. `state === 'answered'`. */
   answered: boolean;
@@ -545,7 +560,7 @@ export interface QuestionCoverage {
    * hangt — dan is het invulwerk in een kolom die hij kent, in plaats van een
    * cijfer dat te laag is.
    */
-  evidence?: { attributeKey: string; label: Bilingual; fields: string[] }[];
+  evidence?: EvidenceHint[];
   /** Het gewicht dat hier per product op het spel staat. */
   weight: number;
   /** Telt niet mee in de trechter; staat in het adviesblok. */
@@ -589,6 +604,13 @@ export interface ScanReport {
    */
   advisory: { setId: string; questionId: string; label: Bilingual; importance: Importance }[];
   gaps: Gap[];
+  /**
+   * Per veld dat bij een deel van de producten leeg staat: hoe het bij de andere
+   * gevuld is, de meest voorkomende waarden eerst. Het zekerste voorbeeld dat er
+   * is, want het is zijn eigen invulling. Alleen in het geheugen van een verse
+   * scan: waarden uit de catalogus gaan nooit mee de opslag in.
+   */
+  ownExamples?: Record<string, string[]>;
   categories: CategoryReport[];
   products: ProductResult[];
 }

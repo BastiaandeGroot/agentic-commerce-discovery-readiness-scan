@@ -61,6 +61,9 @@ function groupFor(attribute: AttributeDef): RequirementGroup {
     label: attribute.label,
     fields: attribute.evidence,
     mode: attribute.mode ?? 'any',
+    // Wat het rapport bij een gat laat zien: het soort antwoord en een voorbeeld.
+    ...(attribute.type !== 'text' ? { answerType: attribute.type } : {}),
+    ...(attribute.examples && attribute.examples.length > 0 ? { examples: attribute.examples } : {}),
   };
 }
 

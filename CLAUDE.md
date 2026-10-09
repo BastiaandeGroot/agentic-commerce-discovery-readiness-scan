@@ -131,6 +131,13 @@ vragenlijst en niet om een bestandsformaat. Vier regels die altijd gelden:
   een beredeneerde zijn onderbouwing, en `dekking: 0` (niemand behandelt dit)
   is iets anders dan niet-onderzochte dekking (`null`). Verzin nooit een
   drempel, een certificering of een normnummer.
+- **Een voorbeeld is altijd een echte waarde.** Bij een attribuut mag de bank
+  laten zien hoe het gevuld hoort te zijn (`AttributeExample`, kolommen
+  `voorbeeld` en `voorbeeld_bron`), maar alleen met een waarde die op een
+  productpagina van een onderzochte winkel staat, met dat adres erbij. Zonder
+  bron vervalt het voorbeeld. De eigen invulling van de merchant
+  (`ScanReport.ownExamples`) staat alleen in een verse scan en gaat nooit mee de
+  opslag in: het zijn waarden uit zijn catalogus.
 - **Een overlay herweegt, maar herschrijft niet.** Zou een categorie de tekst
   van een basisvraag mogen veranderen, dan meten twee categorieën verschillende
   dingen onder hetzelfde id.

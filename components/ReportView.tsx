@@ -614,6 +614,56 @@ function AnsweredPanel({ s, locale, row }: { s: Strings; locale: Locale; row: Mo
   );
 }
 
+/**
+ * Wat er in een attribuut hoort te staan: het soort antwoord, hoe de retailer
+ * het zelf al invult, en hoe het bij een onderzochte winkel staat.
+ *
+ * Alleen echte waarden. Zijn eigen invulling is het zekerste voorbeeld dat er
+ * is; een waarde van een andere winkel staat er met het adres van de pagina
+ * erbij, zodat hij kan nakijken dat het klopt. Is er geen van beide, dan staat
+ * er geen voorbeeld — liever niets dan een verzonnen waarde die hij overneemt.
+ */
+function GapExpectation({ s, row }: { s: Strings; row: ReportModel['gaps'][number] }) {
+  const kind = row.expect?.shape?.kind ?? (row.expect?.answerType === 'enum' ? 'list' : row.expect?.answerType);
+  const kindText = kind ? s.report.expectKinds[kind] : undefined;
+  const unit = row.expect?.shape?.unit;
+  const examples = row.expect?.examples ?? [];
+  const own = row.ownExamples ?? [];
+  if (!kindText && examples.length === 0 && own.length === 0) return null;
+
+  return (
+    <div className="mt-1.5 space-y-0.5 text-xs leading-relaxed text-muted">
+      {kindText ? (
+        <p>
+          <span className="font-medium text-ink">{s.report.gapExpect}</span>{' '}
+          {kindText}{unit ? ` (${unit})` : ''}
+        </p>
+      ) : null}
+      {own.length > 0 ? (
+        <p>
+          <span className="font-medium text-ink">{s.report.gapOwnExamples}</span>{' '}
+          {own.map((value) => `"${value}"`).join(' · ')}
+        </p>
+      ) : null}
+      {examples.slice(0, 2).map((example) => (
+        <p key={`${example.url}|${example.value}`}>
+          <span className="font-medium text-ink">{s.report.gapExample}</span>{' '}
+          &ldquo;{example.value}&rdquo;{' '}
+          <a
+            href={example.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 underline decoration-dotted underline-offset-2 hover:text-ink"
+          >
+            {example.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/.*$/, '')}
+            <ArrowUpRight className="size-3" aria-hidden />
+          </a>
+        </p>
+      ))}
+    </div>
+  );
+}
+
 /** Hoeveel vragen er onder een attribuut staan voordat je moet klikken. */
 const BLOCKED_SHOWN = 2;
 
@@ -779,6 +829,7 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
                       </ul>
                     );
                   })() : null}
+                  <GapExpectation s={s} row={row} />
                 </td>
                 <td className="py-2 pr-3">
                   {/* Welke vragen hierdoor blijven liggen. Een gat zonder vraag

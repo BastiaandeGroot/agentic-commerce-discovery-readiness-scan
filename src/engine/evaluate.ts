@@ -309,6 +309,9 @@ export function assembleResult(
           attributeKey: group.attributeKey,
           label: group.label,
           fields: group.fields,
+          ...(group.shape ? { shape: group.shape } : {}),
+          ...(group.answerType ? { answerType: group.answerType } : {}),
+          ...(group.examples ? { examples: group.examples } : {}),
         })),
         importance: question.importance ?? CUSTOM_IMPORTANCE,
       });
