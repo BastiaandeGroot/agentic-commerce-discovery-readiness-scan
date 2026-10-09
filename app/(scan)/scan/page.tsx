@@ -20,6 +20,9 @@ import type { Linked, Mapping, Proposed } from '../../../src/questions/mapping';
 import { inheritMapping } from '../../../src/questions/mapping';
 import { bankStore, LOCAL_ACCOUNT, type StoredBank } from '../../../src/storage/banks';
 import { snapshotStoreFor } from '../../../src/storage/snapshots';
+import { isScored } from '../../../src/questions/compose';
+import { isStockQuestion, reusableSiteCheck } from '../../../src/collect/answers';
+import { SiteCheckRefused, requestSiteCheck } from '../../../src/sitecheck/remote';
 import { LocalSettingsStore, SupabaseSettingsStore, type SettingsStore } from '../../../src/storage/settings';
 import { applyWork, mergeWork, setKey, type QuestionWork } from '../../../src/questions/work';
 import type { ScanClient } from '../../../src/worker/client';
@@ -40,7 +43,7 @@ import { useAuth } from '../../../components/auth/AuthProvider';
 import { MappingStep } from '../../../components/MappingStep';
 import { CategorySetsCard } from '../../../components/CategorySetsCard';
 import { QuestionSetStep } from '../../../components/QuestionSetStep';
-import { ReportView } from '../../../components/ReportView';
+import { ReportView, type SiteCheckProgress } from '../../../components/ReportView';
 
 type Step = 'upload' | 'segments' | 'bank' | 'mapping' | 'questions' | 'report';
 
@@ -426,6 +429,57 @@ export default function Home() {
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId, banks, settingsStore]);
+
+  /**
+   * De sitetoets op de achtergrond starten, zodat het rapport ermee laadt.
+   *
+   * Zodra de retailer bij het koppelen is: dan staan zijn vragensets vast en is
+   * er nog een minuut of twee werk voor hem, ongeveer zo lang als de toets
+   * duurt. Eerst kijken of er een bruikbare eerdere uitkomst in zijn analyses
+   * staat; alleen anders wordt de site opnieuw gelezen. Eén keer per winkel en
+   * per vragenlijst in deze sessie.
+   */
+  const [siteProgress, setSiteProgress] = useState<SiteCheckProgress>({ status: 'idle' });
+  const siteStartedFor = useRef<string>(undefined);
+  useEffect(() => {
+    if (step !== 'mapping' && step !== 'report') return;
+    if (!user || !shopUrl || !questionState) return;
+    const seen = new Set<string>();
+    const questions = questionState.sets
+      .flatMap((set) => set.questions)
+      .filter((question) => !question.disabled && !isScored(question) && !isStockQuestion(question.label[locale]))
+      .filter((question) => (seen.has(question.id) ? false : (seen.add(question.id), true)))
+      .map((question) => ({ id: question.id, label: question.label[locale] }));
+    if (questions.length === 0) return;
+    const key = `${shopUrl}|${questions.map((question) => question.id).sort().join(',')}`;
+    if (siteStartedFor.current === key) return;
+    siteStartedFor.current = key;
+
+    // Geen opruimfunctie die het antwoord weggooit: de vragensets worden bij elke
+    // koppeling opnieuw samengesteld, dit effect loopt dan opnieuw, en een toets
+    // die al een minuut liep zou zijn uitkomst nergens meer kwijt kunnen. Het
+    // antwoord telt zolang het bij de toets hoort die nu gevraagd is.
+    const current = () => siteStartedFor.current === key;
+    setSiteProgress({ status: 'busy' });
+    void (async () => {
+      try {
+        const target = snapshotStoreFor(supabase(), accountId);
+        const earlier = (await target.store.list(target.accountId).catch(() => []))
+          .flatMap((one) => (one.siteCheck ? [one.siteCheck] : []));
+        const reuse = reusableSiteCheck(earlier, shopUrl, questions.map((question) => question.id), new Date().toISOString());
+        const check = reuse ?? await requestSiteCheck(
+          shopUrl,
+          questions,
+          // Alleen de namen van zijn categorieën, om te kiezen welke pagina's gelezen worden.
+          [...new Set(questionState.sets.flatMap((set) => [set.parent ?? '', set.category ?? '']).filter(Boolean))],
+        );
+        if (current()) setSiteProgress({ status: 'done', check });
+      } catch (caught) {
+        if (current()) setSiteProgress({ status: 'failed', reason: caught instanceof SiteCheckRefused ? caught.reason : 'failed' });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, user, shopUrl, questionState, locale]);
 
   /**
    * Eerdere keuzes overnemen voor kenmerken die onder een andere naam terugkomen.
@@ -819,6 +873,7 @@ export default function Home() {
             onRestart={restart}
             pristine={reportPristine}
             siteUrl={shopUrl}
+            siteProgress={siteProgress}
             onReviewQuestion={(question) => { setFocusQuestion(question); setStep('questions'); }}
           />
         ) : null}

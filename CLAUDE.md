@@ -48,8 +48,10 @@ mens ziet en bevestigt — geen oordeel dat stilzwijgend doorwerkt.
    gelezen zoals een AI-agent leest (kale html, platte tekst), en een model wijst
    per vraag de zin aan. Een antwoord telt alleen als dat citaat letterlijk op een
    gelezen pagina staat (`readSiteAnswers`). Er gaan vraagteksten en de tekst van
-   openbare pagina's de deur uit, geen catalogus. Eén keer per winkel, alleen door
-   de beheerder te starten, en de uitkomst blijft buiten de score.
+   openbare pagina's de deur uit, geen catalogus. Het rapport start hem zelf, op de
+   achtergrond vanaf het koppelscherm, voor elke ingelogde retailer; een eerdere
+   uitkomst van dezelfde winkel wordt dertig dagen hergebruikt (`reusableSiteCheck`)
+   en de route kent een rem per account. De uitkomst blijft buiten de score.
 
 Daarna draait de scan er deterministisch op. **Zet nooit een model in de scan
 zelf** — zie de afgevallen richtingen in `NOTES.md`.
@@ -77,7 +79,7 @@ browsermodel, met dat verschil in beeld.
 | `src/semantic/` | de modellen die koppelingen vóórstellen; nooit importeren vanuit de motor |
 | `src/generation/` | de vragenbankgeneratie als vaste reeks fasen; puur, het modelantwoord komt binnen als argument |
 | `src/collect/` | winkel doormeten: productgegevens uit html halen en productadressen uit sitemaps; en de sitetoets (`answers.ts`): een pagina lezen zoals een agent en citaten nalopen. Puur, de html en het modelantwoord komen binnen als argument |
-| `app/api/` | de serverroutes: `/api/mapping`, `/api/site`, `/api/bank-request`, `/api/bank-queue`, `/api/bank-run`, `/api/bank-result`, `/api/banks` (vrijgegeven banken voor de merchant), `/api/public-scan` (winkel doormeten, alleen beheerder), `/api/site-answers` (sitetoets, alleen beheerder), `/api/admin/queue` en `/api/admin/attribute-types` (kenmerken van een bank typeren) |
+| `app/api/` | de serverroutes: `/api/mapping`, `/api/site`, `/api/bank-request`, `/api/bank-queue`, `/api/bank-run`, `/api/bank-result`, `/api/banks` (vrijgegeven banken voor de merchant), `/api/public-scan` (winkel doormeten, alleen beheerder), `/api/site-answers` (sitetoets, elke ingelogde retailer, met een rem per account), `/api/admin/queue` en `/api/admin/attribute-types` (kenmerken van een bank typeren) |
 | `src/server/` | wat alleen serverzijdig mag draaien: de uitvoerderssleutel, de servicecliënt, de modelaanroep van de generatie (direct en via de batch-API), het aannemen van een bank en het ophalen van een winkel. Nooit importeren vanuit een component. |
 | `src/questions/` | vragenbanken, composer, generator, import (tabel én YAML), aanvraag en beoordeling |
 | `src/engine/` | plaatsing van een product in de boom, evaluatie, rapportaggregatie, vergelijken |

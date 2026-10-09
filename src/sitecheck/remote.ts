@@ -9,7 +9,7 @@ import type { SiteCheck, SiteQuestion } from '../collect/answers';
 
 /** Waarom de toets niet liep, in een vorm waar het scherm een zin bij heeft. */
 export class SiteCheckRefused extends Error {
-  constructor(readonly reason: 'forbidden' | 'not-configured' | 'failed', message?: string) {
+  constructor(readonly reason: 'forbidden' | 'not-configured' | 'too-many' | 'failed', message?: string) {
     super(message ?? reason);
     this.name = 'SiteCheckRefused';
   }
@@ -28,6 +28,7 @@ export async function requestSiteCheck(site: string, questions: SiteQuestion[], 
   }
   if (response.status === 403) throw new SiteCheckRefused('forbidden');
   if (response.status === 503) throw new SiteCheckRefused('not-configured');
+  if (response.status === 429) throw new SiteCheckRefused('too-many');
   const body = await response.json().catch(() => undefined) as (SiteCheck & { error?: string }) | undefined;
   if (!response.ok || !body || !Array.isArray(body.answers)) {
     throw new SiteCheckRefused('failed', body?.error);

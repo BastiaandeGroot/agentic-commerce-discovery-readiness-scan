@@ -31,7 +31,7 @@ function n(value: number): string {
 const STATUS_ORDER: Record<SiteAnswerStatus, number> = { 'not-found': 0, partial: 1, answered: 2, 'not-checked': 3 };
 const STATUS_TONE = { answered: 'ok', partial: 'warn', 'not-found': 'danger', 'not-checked': 'neutral' } as const;
 
-export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, defaultSite, saveHint }: {
+export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, defaultSite, saveHint, pending, pendingFailed }: {
   s: Strings;
   locale: Locale;
   model: ReportModel;
@@ -43,6 +43,10 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
   defaultSite?: string;
   /** De uitkomst is nog niet bewaard; zeg dat erbij. */
   saveHint?: boolean;
+  /** De toets loopt al op de achtergrond; het rapport startte hem zelf. */
+  pending?: boolean;
+  /** Die toets op de achtergrond mislukte, met de reden. */
+  pendingFailed?: 'forbidden' | 'not-configured' | 'too-many' | 'failed';
 }) {
   const { user } = useAuth();
   const [setId, setSetId] = useState('all');
@@ -50,6 +54,7 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
   // toets. Dan vragen we er niet opnieuw om; wijzigen kan, maar is een keuze.
   const known = siteCheck?.site ?? defaultSite ?? '';
   const [site, setSite] = useState(known);
+  // Het veld staat open als er geen adres is, of als hij opnieuw wil toetsen.
   const [editing, setEditing] = useState(known === '');
   const [phase, setPhase] = useState<'idle' | 'busy'>('idle');
   const [failure, setFailure] = useState<{ title: string; next: string }>();
@@ -75,6 +80,17 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
     ? siteCheckTotals({ ...siteCheck, answers: siteCheck.answers.filter((answer) => answer.skipped !== 'stock') })
     : undefined;
 
+  /** Wat er misging, en wat de retailer nu kan doen. */
+  function explain(reason: 'forbidden' | 'not-configured' | 'too-many' | 'failed', detail?: string): { title: string; next: string } {
+    return reason === 'forbidden' ? { title: s.report.siteForbidden, next: '' }
+      : reason === 'not-configured' ? { title: s.report.siteNotConfigured, next: '' }
+        : reason === 'too-many' ? { title: s.report.siteTooMany, next: '' }
+          : { title: detail ?? s.report.siteFailed, next: s.report.siteFailedNext };
+  }
+  // De toets die het rapport zelf startte telt net zo als een klik hier.
+  const busy = phase === 'busy' || (pending === true && !siteCheck);
+  const shownFailure = failure ?? (pendingFailed && !siteCheck ? explain(pendingFailed) : undefined);
+
   async function run() {
     setPhase('busy');
     setFailure(undefined);
@@ -95,11 +111,7 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
       }
     } catch (caught) {
       const reason = caught instanceof SiteCheckRefused ? caught.reason : 'failed';
-      setFailure(
-        reason === 'forbidden' ? { title: s.report.siteForbidden, next: '' }
-          : reason === 'not-configured' ? { title: s.report.siteNotConfigured, next: '' }
-            : { title: caught instanceof SiteCheckRefused && caught.message !== 'failed' ? caught.message : s.report.siteFailed, next: s.report.siteFailedNext },
-      );
+      setFailure(explain(reason, caught instanceof SiteCheckRefused && caught.message !== reason ? caught.message : undefined));
     } finally {
       setPhase('idle');
     }
@@ -109,46 +121,38 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
     <Card>
       <CardTitle sub={s.report.advisoryIntro}>{s.report.advisoryHeading}</CardTitle>
 
-      {/* De toets: starten, en wat eruit kwam. Alleen te starten door wie
-          ingelogd is; de server beslist of hij het mag. */}
-      {onSiteCheck && user ? (
+      {/* De toets start vanzelf; dit blok zegt waar hij staat. Een veld om het
+          adres te geven is er alleen nog als het rapport het niet kent, of als
+          de toets mislukte. */}
+      {busy ? (
+        <div className="mb-4 rounded-lg bg-surface-2 p-3" role="status">
+          <p className="text-sm font-medium">{s.report.siteHeading}</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted">{s.report.siteBusy}</p>
+        </div>
+      ) : !siteCheck && !user && onSiteCheck ? (
+        <p className="mb-4 rounded-lg bg-surface-2 p-3 text-xs leading-relaxed text-muted">{s.report.siteLogin}</p>
+      ) : (!siteCheck || editing) && onSiteCheck && user ? (
         <div className="mb-4 rounded-lg bg-surface-2 p-3">
           <p className="text-sm font-medium">{s.report.siteHeading}</p>
           <p className="mt-0.5 text-xs leading-relaxed text-muted">{s.report.siteIntro}</p>
           <div className="mt-2 flex flex-wrap items-end gap-3">
             <div className="min-w-0 flex-1">
-              {editing ? (
-                <Input
-                  id="site-check-url"
-                  label={s.report.siteUrlLabel}
-                  value={site}
-                  onChange={setSite}
-                  placeholder={s.report.siteUrlPlaceholder}
-                />
-              ) : (
-                <p className="text-sm">
-                  {s.report.siteKnown}{' '}
-                  <span className="font-medium">{site.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
-                  <button
-                    type="button"
-                    onClick={() => setEditing(true)}
-                    className="ml-3 text-xs text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
-                  >
-                    {s.report.siteChange}
-                  </button>
-                </p>
-              )}
+              <Input
+                id="site-check-url"
+                label={s.report.siteUrlLabel}
+                value={site}
+                onChange={setSite}
+                placeholder={s.report.siteUrlPlaceholder}
+              />
             </div>
-            <Button variant="secondary" onClick={() => void run()} loading={phase === 'busy'} disabled={site.trim() === ''}>
+            <Button variant="secondary" onClick={() => void run()} disabled={site.trim() === ''}>
               {siteCheck ? s.report.siteRerun : s.report.siteRun}
             </Button>
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-muted">
-            {phase === 'busy' ? s.report.siteBusy : s.report.siteSent}
-          </p>
-          {failure ? (
+          <p className="mt-2 text-xs leading-relaxed text-muted">{s.report.siteSent}</p>
+          {shownFailure ? (
             <div className="mt-2">
-              <ErrorState title={failure.title} body="" next={failure.next} />
+              <ErrorState title={shownFailure.title} body="" next={shownFailure.next} />
             </div>
           ) : null}
         </div>
@@ -178,6 +182,15 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
             >
               {showHow ? s.report.siteHowHide : s.report.siteHowShow}
             </button>
+            {onSiteCheck && user ? (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="underline decoration-dotted underline-offset-2 hover:text-ink"
+              >
+                {s.report.siteRerun}
+              </button>
+            ) : null}
             <button
               type="button"
               aria-expanded={showPages}

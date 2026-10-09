@@ -20,7 +20,7 @@ function allowlist(): string[] {
 }
 
 /** Het e-mailadres achter dit verzoek, of niets. */
-async function callerEmail(request: Request): Promise<string | undefined> {
+export async function callerEmail(request: Request): Promise<string | undefined> {
   const config = supabaseConfig();
   const token = request.headers.get('authorization');
   if (!config || !token) return undefined;

@@ -8,7 +8,7 @@
 // een koper in deze markt stelt.
 
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useRef, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, ArrowUpRight, Download } from 'lucide-react';
 import { adviceKey, categoryLabel } from '../src/report/derive';
 import { modelFromReport, type ModelQuestion, type ReportModel } from '../src/report/model';
@@ -24,6 +24,15 @@ import { Badge, Bar, Button, Card, CardTitle, ErrorState, InfoButton, InfoPanel,
 import { Explorer } from './Explorer';
 import { AdvisoryCard } from './AdvisoryCard';
 import type { SiteCheck } from '../src/collect/answers';
+
+/** Waarom de toets op de achtergrond niet liep; zie `SiteCheckRefused`. */
+export type SiteCheckFailure = 'forbidden' | 'not-configured' | 'too-many' | 'failed';
+/** Waar de toets staat die de scanpagina zelf startte. */
+export type SiteCheckProgress =
+  | { status: 'idle' }
+  | { status: 'busy' }
+  | { status: 'done'; check: SiteCheck }
+  | { status: 'failed'; reason: SiteCheckFailure };
 
 function n(value: number): string {
   return value.toLocaleString('nl-NL');
@@ -814,7 +823,7 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
  * hetzelfde uitzien. Wat alleen met de producten kan — de verkenner, bewaren en
  * de pdf — komt van buiten binnen.
  */
-export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestion, siteCheck, onSiteCheck, defaultSite, siteSaveHint }: {
+export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestion, siteCheck, onSiteCheck, defaultSite, siteSaveHint, sitePending, siteFailed }: {
   s: Strings;
   locale: Locale;
   model: ReportModel;
@@ -828,6 +837,9 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
   onSiteCheck?: (check: SiteCheck) => void | Promise<void>;
   defaultSite?: string;
   siteSaveHint?: boolean;
+  /** De toets die het rapport zelf startte: loopt hij nog, of mislukte hij. */
+  sitePending?: boolean;
+  siteFailed?: SiteCheckFailure;
 }) {
   // De status staat als label naast de zin en niet in de zin zelf: een cijfer
   // langs een voorlopige lat mag er niet hetzelfde uitzien als een cijfer langs
@@ -912,6 +924,8 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
         onSiteCheck={onSiteCheck}
         defaultSite={defaultSite}
         saveHint={siteSaveHint}
+        pending={sitePending}
+        pendingFailed={siteFailed}
       />
 
       <Card>
@@ -962,7 +976,7 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
   );
 }
 
-export function ReportView({ s, locale, report, onRestart, restartLabel, canSave = true, onReviewQuestion, pristine, siteUrl }: {
+export function ReportView({ s, locale, report, onRestart, restartLabel, canSave = true, onReviewQuestion, pristine, siteUrl, siteProgress }: {
   s: Strings;
   locale: Locale;
   report: ScanReport;
@@ -976,6 +990,8 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
   canSave?: boolean;
   /** Het adres van de winkel, als de merchant dat eerder opgaf. */
   siteUrl?: string;
+  /** De sitetoets die de scanpagina op de achtergrond startte. */
+  siteProgress?: SiteCheckProgress;
 }) {
   const { accountId } = useAuth();
   const router = useRouter();
@@ -1026,6 +1042,17 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
     if (saveState === 'saved') await target.store.save(snapshotNow(check));
   }
 
+  // De toets die op de achtergrond liep, komt binnen wanneer hij klaar is: soms
+  // vóór het rapport er staat, soms een minuut erna. Eén keer overnemen; wat de
+  // retailer daarna zelf opnieuw laat toetsen, gaat voor.
+  const taken = useRef<SiteCheck>(undefined);
+  useEffect(() => {
+    if (siteProgress?.status !== 'done' || taken.current === siteProgress.check) return;
+    taken.current = siteProgress.check;
+    void keepSiteCheck(siteProgress.check).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siteProgress]);
+
   async function save() {
     setSaveState('busy');
     try {
@@ -1059,6 +1086,8 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
       onSiteCheck={canSave ? keepSiteCheck : undefined}
       defaultSite={siteUrl}
       siteSaveHint={siteCheck !== undefined && saveState !== 'saved'}
+      sitePending={siteProgress?.status === 'busy'}
+      siteFailed={siteProgress?.status === 'failed' ? siteProgress.reason : undefined}
       // Bewaren zonder dat er data weggaat: de pdf wordt in de browser gemaakt
       // en rechtstreeks gedownload.
       footer={

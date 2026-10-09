@@ -9,7 +9,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  agentText, choosePages, isStockQuestion, pathAllowed, quoteLink, readSiteAnswers, siteCheckTotals, withoutSharedLines,
+  SITE_CHECK_VERSION, agentText, choosePages, isStockQuestion, pathAllowed, quoteLink, readSiteAnswers,
+  reusableSiteCheck, sameSite, siteCheckTotals, withoutSharedLines,
 } from '../src/collect/answers';
 
 const PAGINA = `<html><head><title>FAQ</title><script>var a = "<p>niet lezen</p>";</script></head><body>
@@ -124,4 +125,27 @@ test('vragen over voorraad worden herkend, andere niet', () => {
   assert.equal(isStockQuestion('Is deze stof op voorraad?'), true);
   assert.equal(isStockQuestion('Is this fabric in stock?'), true);
   assert.equal(isStockQuestion('Hoe snel heb ik de stof in huis?'), false);
+});
+
+test('een eerdere toets wordt hergebruikt als hij van dezelfde winkel is, vers genoeg, en elke vraag kent', () => {
+  const toets = (site: string, checkedAt: string, ids: string[], version = SITE_CHECK_VERSION) => ({
+    version, site, checkedAt, model: 'm', pages: [], namedBots: [], notes: [],
+    answers: ids.map((questionId) => ({ questionId, status: 'not-found' as const })),
+  });
+  const nu = '2026-10-09T12:00:00Z';
+  const goed = toets('https://www.winkel.nl', '2026-09-20T10:00:00Z', ['A', 'B', 'C']);
+
+  assert.equal(sameSite('https://www.winkel.nl', 'winkel.nl/'), true);
+  assert.equal(sameSite('https://www.winkel.nl', 'anderewinkel.nl'), false);
+
+  assert.equal(reusableSiteCheck([goed], 'www.winkel.nl', ['A', 'B'], nu), goed);
+  // Een vraag die er toen niet was, mag niet stil op "niet gevonden" uitkomen.
+  assert.equal(reusableSiteCheck([goed], 'www.winkel.nl', ['A', 'D'], nu), undefined);
+  // Te oud, een andere winkel, of gelezen met andere regels.
+  assert.equal(reusableSiteCheck([toets('https://www.winkel.nl', '2026-08-01T10:00:00Z', ['A'])], 'winkel.nl', ['A'], nu), undefined);
+  assert.equal(reusableSiteCheck([goed], 'anderewinkel.nl', ['A'], nu), undefined);
+  assert.equal(reusableSiteCheck([toets('https://www.winkel.nl', '2026-10-01T10:00:00Z', ['A'], 'oud')], 'winkel.nl', ['A'], nu), undefined);
+  // De meest recente van de bruikbare.
+  const nieuwer = toets('https://winkel.nl', '2026-10-05T10:00:00Z', ['A', 'B']);
+  assert.equal(reusableSiteCheck([goed, nieuwer], 'winkel.nl', ['A'], nu), nieuwer);
 });

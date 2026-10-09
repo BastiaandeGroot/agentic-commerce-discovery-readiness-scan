@@ -565,3 +565,40 @@ export function siteCheckTotals(check: SiteCheck): Record<SiteAnswerStatus, numb
   for (const answer of check.answers) totals[answer.status] += 1;
   return totals;
 }
+
+/** Hoe lang een uitkomst geldt voordat de site opnieuw gelezen wordt. */
+export const SITE_CHECK_DAYS = 30;
+
+/** Dezelfde winkel, met of zonder protocol, `www.` of een schuine streep erachter. */
+export function sameSite(a: string, b: string): boolean {
+  const host = (value: string) => value.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '');
+  return host(a) !== '' && host(a) === host(b);
+}
+
+/**
+ * Een eerdere toets die nog bruikbaar is, of niets.
+ *
+ * De site opnieuw lezen kost een à twee minuten en een modelaanroep; een winkel
+ * die twee keer per week scant hoeft dat niet elke keer te betalen. Bruikbaar is
+ * een toets van dezelfde winkel, gelezen met dezelfde regels, niet ouder dan
+ * `SITE_CHECK_DAYS`, die élke vraag van nu al beoordeelde — een vraag die er
+ * toen niet was, mag niet stil op "niet gevonden" uitkomen.
+ *
+ * `now` komt binnen als argument: deze module heeft geen klok.
+ */
+export function reusableSiteCheck(
+  earlier: SiteCheck[],
+  site: string,
+  questionIds: string[],
+  now: string,
+): SiteCheck | undefined {
+  const limit = Date.parse(now) - SITE_CHECK_DAYS * 24 * 60 * 60 * 1000;
+  return earlier
+    .filter((check) => check.version === SITE_CHECK_VERSION && sameSite(check.site, site))
+    .filter((check) => Date.parse(check.checkedAt) >= limit)
+    .filter((check) => {
+      const judged = new Set(check.answers.map((answer) => answer.questionId));
+      return questionIds.every((id) => judged.has(id));
+    })
+    .sort((a, b) => b.checkedAt.localeCompare(a.checkedAt))[0];
+}

@@ -873,7 +873,28 @@ in een blog, onder een categoriepagina of op een productpagina, en de retourpagi
 en de FAQ spreken elkaar tegen over annuleren. De eigenaar heeft een deel
 nagelopen en akkoord gegeven. De tabel staat lokaal in `meting/` (niet in git).
 
-**Niet gedaan:** de route is niet met een echte modelaanroep gedraaid — dat kost
+**De toets start vanzelf** — 9 oktober, na de eerste echte toets. De eigenaar
+vond een knop in het rapport de verkeerde plek: het rapport hoort compleet te
+laden. Nu start de scanpagina de toets op de achtergrond zodra de retailer bij
+het koppelen is (`siteProgress` in `app/(scan)/scan/page.tsx`); het rapport neemt
+de uitkomst over wanneer hij klaar is en toont tot dan "wordt gelezen". Daarvoor:
+
+- het adres van de webshop is verplicht op het categoriescherm, en komt bij een
+  volgende scan uit de meest recente analyse;
+- een eerdere toets van dezelfde winkel wordt dertig dagen hergebruikt als hij
+  elke vraag van nu kent (`reusableSiteCheck`), zonder tabel: de uitkomst hangt
+  aan de bewaarde analyse;
+- de route is open voor elke ingelogde retailer, met vier toetsen per uur per
+  account in het geheugen van het proces. Wie niet is ingelogd krijgt geen toets;
+- vragen over voorraad staan niet meer in de lijst.
+
+De eerste echte toets op De Groot gaf 21 beantwoord, 5 deels, 12 niet gevonden op
+28 pagina's; de handmeting 22, 4 en 11 op 22 pagina's. Liep binnen de tijd.
+
+**Niet gezien in de browser:** de automatische start in de scan zelf. Dat vraagt
+een catalogus aanleveren en de stappen doorlopen; de onderdelen staan onder test.
+
+**Oorspronkelijk niet gedaan (inmiddels wel, door de eigenaar):** de route is niet met een echte modelaanroep gedraaid — dat kost
 API-tegoed en schrijft in een account. De pure kant staat onder test en is op de
 opgehaalde pagina's van De Groot geprobeerd; het scherm is bekeken zonder
 uitkomst. Of één aanroep binnen de tijd van Render blijft (ophalen plus model,

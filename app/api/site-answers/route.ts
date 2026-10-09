@@ -1,15 +1,22 @@
 // De sitetoets: beantwoordt de website van een winkel de vragen die een
 // catalogus niet kan dragen?
 //
-// Alleen voor de beheerder, om dezelfde reden als de openbare meting: dit haalt
-// andermans site op en roept een model aan, en dat hoort geen knop te zijn die
-// iedereen kan indrukken.
+// Voor elke ingelogde retailer: het rapport start de toets zelf, zodat hij er
+// niet om hoeft te vragen. Wie niet is ingelogd krijgt hem niet — dit haalt een
+// site op en roept een model aan, en zonder account is er niets om een rem aan
+// te hangen.
+//
+// De rem: een paar toetsen per uur per account. Het rapport hergebruikt een
+// eerdere uitkomst (`reusableSiteCheck`), dus een gewone retailer komt daar niet
+// aan; het houdt alleen tegen dat iemand deze route als gratis sitelezer
+// gebruikt. Hij staat in het geheugen van dit proces en begint na een herstart
+// opnieuw: genoeg voor één instantie, en zonder tabel.
 //
 // Wat naar het model gaat zijn de vragen uit de vragenbank en de tekst van
 // openbare pagina's. Geen catalogus, geen productrij.
 
 import { NextResponse } from 'next/server';
-import { isAdmin } from '../../../src/server/admin';
+import { callerEmail, isAdmin } from '../../../src/server/admin';
 import { CollectError } from '../../../src/server/collect';
 import { SiteCheckFailed, checkSite } from '../../../src/server/siteAnswers';
 import type { SiteQuestion } from '../../../src/collect/answers';
@@ -19,9 +26,25 @@ export const maxDuration = 300;
 
 const MAX_QUESTIONS = 120;
 
+const PER_HOUR = 4;
+const recent = new Map<string, number[]>();
+
+/** Mag dit account nu een toets starten? Telt hem dan meteen mee. */
+function mayRun(caller: string, now: number): boolean {
+  const kept = (recent.get(caller) ?? []).filter((at) => now - at < 60 * 60 * 1000);
+  if (kept.length >= PER_HOUR) {
+    recent.set(caller, kept);
+    return false;
+  }
+  recent.set(caller, [...kept, now]);
+  return true;
+}
+
 export async function POST(request: Request) {
-  if (!(await isAdmin(request))) {
-    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  const caller = await callerEmail(request);
+  if (!caller) return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  if (!(await isAdmin(request)) && !mayRun(caller, Date.now())) {
+    return NextResponse.json({ error: 'too-many' }, { status: 429 });
   }
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: 'not-configured' }, { status: 503 });
