@@ -323,7 +323,12 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
   }
 
   if (report.unmatchedCount > 0) {
-    w.notice(`${n(report.unmatchedCount)} ${s.report.unmatched}`, [s.report.unmatchedExplain]);
+    const one = report.unmatchedCount === 1;
+    w.heading(s.report.otherFindingsHeading);
+    w.notice(
+      `${n(report.unmatchedCount)} ${one ? s.report.unmatchedOne : s.report.unmatched}`,
+      [one ? s.report.unmatchedExplainOne : s.report.unmatchedExplain],
+    );
   }
 
   // Welke vragen blijven onbeantwoord

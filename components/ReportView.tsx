@@ -850,13 +850,18 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
       </div>
 
       {model.unmatchedCount > 0 ? (
-        <div className="rounded-md bg-warn-soft px-3 py-2">
-          <p className="text-sm">
-            <span className="tnum font-semibold">{n(model.unmatchedCount)}</span>{' '}
-            {s.report.unmatched}
-          </p>
-          <p className="mt-0.5 text-xs leading-relaxed text-muted">{s.report.unmatchedExplain}</p>
-        </div>
+        <section>
+          <h2 className="mb-2 text-lg font-semibold tracking-tight">{s.report.otherFindingsHeading}</h2>
+          <div className="rounded-md bg-warn-soft px-3 py-2">
+            <p className="text-sm">
+              <span className="tnum font-semibold">{n(model.unmatchedCount)}</span>{' '}
+              {model.unmatchedCount === 1 ? s.report.unmatchedOne : s.report.unmatched}
+            </p>
+            <p className="mt-0.5 text-xs leading-relaxed text-muted">
+              {model.unmatchedCount === 1 ? s.report.unmatchedExplainOne : s.report.unmatchedExplain}
+            </p>
+          </div>
+        </section>
       ) : null}
 
       <QuestionCoverageCard s={s} model={model} locale={locale} onReviewQuestion={onReviewQuestion} />

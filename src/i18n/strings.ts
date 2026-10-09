@@ -565,7 +565,10 @@ export const STRINGS = {
       } as Record<string, string>,
       statusScale: 'van de',
       statusAnswered: 'vragen beantwoord',
+      otherFindingsHeading: 'Overige bevindingen',
       unmatched: 'producten zonder categorie',
+      unmatchedOne: 'product zonder categorie',
+      unmatchedExplainOne: 'Dit product wordt geteld maar niet gescoord: het valt in geen enkele categorie.',
       unmatchedExplain:
         'Deze producten worden geteld maar niet gescoord: ze vallen in geen enkele categorie.',
       questionsHeading: 'Welke vragen blijven onbeantwoord',
@@ -1719,7 +1722,10 @@ export const STRINGS = {
       } as Record<string, string>,
       statusScale: 'of',
       statusAnswered: 'questions answered',
+      otherFindingsHeading: 'Other findings',
       unmatched: 'products without a category',
+      unmatchedOne: 'product without a category',
+      unmatchedExplainOne: 'This product is counted but not scored: it falls into no category.',
       unmatchedExplain:
         'These products are counted but not scored. A catalogue where part of it matches nothing has a taxonomy problem worth reporting in its own right.',
       questionsHeading: 'Which questions go unanswered',
