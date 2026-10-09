@@ -706,12 +706,13 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
                             : <ArrowDown className="size-3" aria-hidden />}
                       </button>
                     )}
+                    {/* Alleen op klik. De uitleg staat bóven de tabel en duwt de kop
+                        omlaag: opende hij op aanwijzen, dan schoof het knopje onder
+                        de muis vandaan, sloot de uitleg, en begon het opnieuw. */}
                     <InfoButton
                       label={s.report.infoLabel}
                       open={openInfo === column.id}
                       onToggle={() => setOpenInfo(openInfo === column.id ? undefined : column.id)}
-                      onOpen={() => setOpenInfo(column.id)}
-                      onClose={() => setOpenInfo(undefined)}
                     />
                   </span>
                 </th>
