@@ -594,7 +594,7 @@ export const STRINGS = {
         questions:
           'Hoeveel vragen er door dit gat onbeantwoord blijven.',
         field:
-          'Het attribuut dat ontbreekt. Een rij met schuine strepen is een zoekpatroon over je eigen kolommen, geen veldnaam.',
+          'Het attribuut dat ontbreekt.',
         cause:
           'Waarom het ontbreekt, en daarmee wat voor werk het is.',
         affected:
@@ -1750,7 +1750,7 @@ export const STRINGS = {
       gapAffected: 'Products',
       gapColumnInfo: {
         field:
-          'The piece of information that is missing. A row with slashes is a search pattern across your own columns, not a field name.',
+          'The attribute that is missing.',
         cause:
           'Why it is missing, and therefore what kind of work it is.',
         affected:
