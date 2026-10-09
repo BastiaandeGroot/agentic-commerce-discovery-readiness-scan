@@ -130,7 +130,6 @@ export default function ScansPage() {
             snapshot={opened}
             detail={openedDetail?.detail}
             work={openedDetail?.work}
-            onRescan={() => router.push('/scan')}
             onRemove={() => remove(opened.id)}
             // Met bewaarde vragensets meteen naar die vraag; anders eerst de catalogus opnieuw in.
             onEditQuestions={openedDetail?.detail

@@ -220,8 +220,6 @@ export const STRINGS = {
         open: 'Bekijken',
         back: 'Terug naar alle analyses',
         rescan: 'Opnieuw scannen',
-        rescanNote:
-          'Je koppeling, vragensets en keuzes staan klaar. Alleen je catalogus lees je opnieuw in; die verlaat je apparaat nooit.',
         loadFailed: 'Je analyses konden niet worden opgehaald',
         loadFailedBody: 'De verbinding met je account lukte niet.',
         loadFailedNext: 'Probeer het opnieuw. Blijft het mislukken, log dan opnieuw in.',
@@ -245,8 +243,6 @@ export const STRINGS = {
         snapshotWeak: 'te mager of deels',
         snapshotOld:
           'Deze analyse is bewaard voordat de werklijst werd meegenomen. Je ziet hier alleen de tellingen en de gaten.',
-        snapshotNoProducts:
-          'Per product kijken kan hier niet: producten gaan niet mee de opslag in. Wil je dat, scan dan opnieuw.',
       },
     },
 
@@ -1381,8 +1377,6 @@ export const STRINGS = {
         open: 'View',
         back: 'Back to all analyses',
         rescan: 'Scan again',
-        rescanNote:
-          'Your mapping, question sets and choices are ready. You only read in your catalogue again; it never leaves your device.',
         loadFailed: 'Your analyses could not be loaded',
         loadFailedBody: 'Connecting to your account did not work.',
         loadFailedNext: 'Try again. If it keeps failing, sign in again.',
@@ -1406,8 +1400,6 @@ export const STRINGS = {
         snapshotWeak: 'too thin or partial',
         snapshotOld:
           'This analysis was saved before the work list was included. You only see the counts and the gaps here.',
-        snapshotNoProducts:
-          'Looking per product is not possible here: products are not stored. Scan again if you want that.',
       },
     },
 

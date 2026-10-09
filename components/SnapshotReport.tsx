@@ -27,7 +27,7 @@ function datum(iso: string, locale: Locale): string {
   return new Date(iso).toLocaleString(locale === 'nl' ? 'nl-NL' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-export function SnapshotReport({ s, locale, snapshot, detail, work, onRescan, onReviewQuestion, onEditQuestions, onRemove }: {
+export function SnapshotReport({ s, locale, snapshot, detail, work, onReviewQuestion, onEditQuestions, onRemove }: {
   s: Strings;
   locale: Locale;
   snapshot: ScanSnapshot;
@@ -35,7 +35,6 @@ export function SnapshotReport({ s, locale, snapshot, detail, work, onRescan, on
   detail?: SnapshotDetail;
   /** Het werk van nu op de vragensets van deze markt. */
   work?: QuestionWork;
-  onRescan: () => void;
   onReviewQuestion?: (question: { setId: string; questionId: string; base: boolean }) => void;
   /** Naar de vragensets van deze analyse; alleen als die bewaard zijn. */
   onEditQuestions?: () => void;
@@ -92,18 +91,6 @@ export function SnapshotReport({ s, locale, snapshot, detail, work, onRescan, on
         locale={locale}
         model={model}
         onReviewQuestion={onReviewQuestion}
-        // Helemaal onderaan en niet op de plek van de verkenner: het is een
-        // mededeling over wat hier niet kan, en die hoort het rapport niet te
-        // onderbreken.
-        footer={
-          <Card>
-            <p className="text-sm leading-relaxed text-muted">{s.pages.dashboard.snapshotNoProducts}</p>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button variant="secondary" onClick={onRescan}>{s.pages.dashboard.rescan}</Button>
-              <span className="text-xs leading-relaxed text-muted">{s.pages.dashboard.rescanNote}</span>
-            </div>
-          </Card>
-        }
       />
     </div>
   );
