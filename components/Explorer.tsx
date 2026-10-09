@@ -61,7 +61,7 @@ function CategoryTable({ s, report, locale }: {
                       <Badge
                         key={gap.field}
                         tone={gap.cause === 'unfilled' ? 'ok' : gap.cause === 'no-source' ? 'danger' : 'warn'}
-                    title={`${s.report.causeMeaning[gap.cause]} · ${s.report.causeEffort[gap.cause]}`}
+                    title={s.report.causeMeaning[gap.cause]}
                       >
                         {gap.label[locale]}
                       </Badge>
@@ -182,7 +182,7 @@ function ProductRow({ s, product, locale }: {
                 <li key={`${gap.field}-${gap.cause}`} className="flex flex-wrap items-baseline gap-1.5">
                   <Badge
                     tone={gap.cause === 'unfilled' ? 'ok' : gap.cause === 'no-source' ? 'danger' : 'warn'}
-                    title={`${s.report.causeMeaning[gap.cause]} · ${s.report.causeEffort[gap.cause]}`}
+                    title={s.report.causeMeaning[gap.cause]}
                   >
                     {s.report.causes[gap.cause]}
                   </Badge>

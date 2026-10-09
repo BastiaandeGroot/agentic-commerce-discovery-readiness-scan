@@ -740,7 +740,7 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
                       ons woord. De betekenis en de inspanning eronder maken er
                       een klus van die hij kan inplannen. */}
                   <span className="mt-0.5 block text-xs text-muted">
-                    {s.report.causeMeaning[row.cause]} · {s.report.causeEffort[row.cause]}
+                    {s.report.causeMeaning[row.cause]}
                   </span>
                 </td>
                 <td className="tnum py-2 text-right">{n(row.affected)}</td>

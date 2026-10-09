@@ -390,7 +390,7 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
       gaps.map((gap) => [
         gap.label[locale],
         n(gap.questions.length),
-        `${s.report.causes[gap.cause]}: ${s.report.causeMeaning[gap.cause]} · ${s.report.causeEffort[gap.cause]}`,
+        `${s.report.causes[gap.cause]}: ${s.report.causeMeaning[gap.cause]}`,
         n(gap.affected),
       ]),
     );
