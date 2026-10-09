@@ -18,7 +18,7 @@ import type { Locale } from '../src/domain/types';
 import type { Strings } from '../src/i18n/strings';
 import type { ReportModel } from '../src/report/model';
 import { categoryLabel } from '../src/report/derive';
-import { quoteLink, siteCheckTotals, type SiteAnswer, type SiteAnswerStatus, type SiteCheck } from '../src/collect/answers';
+import { isStockQuestion, quoteLink, siteCheckTotals, type SiteAnswer, type SiteAnswerStatus, type SiteCheck } from '../src/collect/answers';
 import { SiteCheckRefused, requestSiteCheck } from '../src/sitecheck/remote';
 import { useAuth } from './auth/AuthProvider';
 import { Badge, Button, Card, CardTitle, ErrorState, Input, Select } from './ui';
@@ -57,16 +57,23 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
   const [showHow, setShowHow] = useState(false);
   const [showPages, setShowPages] = useState(false);
 
-  if (model.advisory.length === 0) return null;
+  // Vragen over voorraad staan hier niet: voorraad wisselt per dag en komt uit
+  // een ander systeem, dus er valt op de site niets betrouwbaars over te toetsen
+  // en als advies zegt de vraag een retailer niets.
+  const advisory = model.advisory.filter((entry) => !isStockQuestion(entry.label));
+  if (advisory.length === 0) return null;
 
   const answerOf = new Map((siteCheck?.answers ?? []).map((answer) => [answer.questionId, answer]));
-  const items = (setId === 'all' ? model.advisory : model.advisory.filter((entry) => entry.setIds.includes(setId)))
+  const items = (setId === 'all' ? advisory : advisory.filter((entry) => entry.setIds.includes(setId)))
     .map((entry) => ({ entry, answer: answerOf.get(entry.id) }))
     // Zonder toets de volgorde van de bank; met toets wat werk is bovenaan.
     .sort((a, b) => (siteCheck
       ? (STATUS_ORDER[a.answer?.status ?? 'not-checked'] - STATUS_ORDER[b.answer?.status ?? 'not-checked'])
       : 0));
-  const totals = siteCheck ? siteCheckTotals(siteCheck) : undefined;
+  // De telling hoort bij de lijst eronder, dus ook zonder de voorraadvragen.
+  const totals = siteCheck
+    ? siteCheckTotals({ ...siteCheck, answers: siteCheck.answers.filter((answer) => answer.skipped !== 'stock') })
+    : undefined;
 
   async function run() {
     setPhase('busy');
@@ -75,7 +82,7 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
     try {
       const check = await requestSiteCheck(
         site.trim(),
-        model.advisory.map((entry) => ({ id: entry.id, label: entry.label })),
+        advisory.map((entry) => ({ id: entry.id, label: entry.label })),
         // De namen van zijn eigen categorieën, zodat hun pagina's als eerste gelezen worden.
         [...new Set(model.categories.flatMap((c) => [c.category, c.subcategory ?? '']).filter(Boolean))],
       );
@@ -227,8 +234,6 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
               <Badge tone="neutral">{s.questions.importance[entry.importance as keyof typeof s.questions.importance] ?? entry.importance}</Badge>
               <span className="min-w-0 flex-1 text-sm">{entry.label}</span>
               {answer ? <Badge tone={STATUS_TONE[answer.status]}>{s.report.siteStatus[answer.status]}</Badge> : null}
-              {/* Met één categorie gekozen zegt de lijst ernaast niets meer. */}
-              {setId === 'all' && !answer ? <span className="text-xs text-muted">{entry.categories.join(', ')}</span> : null}
             </div>
             {answer ? <AnswerDetail s={s} answer={answer} /> : null}
           </li>
@@ -240,11 +245,6 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
 
 /** Het bewijs onder een vraag: het citaat, waar het staat, en wat eraan schort. */
 function AnswerDetail({ s, answer }: { s: Strings; answer: SiteAnswer }) {
-  if (answer.status === 'not-checked') {
-    return answer.skipped === 'stock'
-      ? <p className="mt-1 text-xs leading-relaxed text-muted">{s.report.siteSkippedStock}</p>
-      : null;
-  }
   if (!answer.quote) return null;
   const link = quoteLink(answer);
   return (

@@ -16,7 +16,7 @@
 import { jsPDF } from 'jspdf';
 import type { Locale, ScanReport } from '../src/domain/types';
 import type { Strings } from '../src/i18n/strings';
-import { siteCheckTotals, type SiteCheck } from '../src/collect/answers';
+import { isStockQuestion, siteCheckTotals, type SiteCheck } from '../src/collect/answers';
 import {
   adviceKey, advisoryItems, categoryLabel, mergedGaps, scoreRows, unansweredQuestions,
   type AdviceKey, type Average,
@@ -398,14 +398,15 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
   }
 
   // Buiten de score
-  const advisory = advisoryItems(report, locale);
+  // Zonder de voorraadvragen, zoals op het scherm.
+  const advisory = advisoryItems(report, locale).filter((item) => !isStockQuestion(item.label));
   if (advisory.length > 0) {
     w.heading(s.report.advisoryHeading, s.report.advisoryIntro);
     // De sitetoets, als die gedaan is: dezelfde uitkomst en dezelfde uitleg als
     // op het scherm.
     const answerOf = new Map((siteCheck?.answers ?? []).map((answer) => [answer.questionId, answer]));
     if (siteCheck) {
-      const totals = siteCheckTotals(siteCheck);
+      const totals = siteCheckTotals({ ...siteCheck, answers: siteCheck.answers.filter((answer) => answer.skipped !== 'stock') });
       w.text(
         s.report.siteSummary
           .replace('{datum}', new Date(siteCheck.checkedAt).toLocaleDateString(tag, { dateStyle: 'long' }))
@@ -428,7 +429,7 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
       w.text(
         answer
           ? `${s.report.siteStatus[answer.status]} · ${s.questions.importance[item.importance] ?? item.importance}`
-          : `${s.questions.importance[item.importance] ?? item.importance} · ${item.categories.join(', ')}`,
+          : `${s.questions.importance[item.importance] ?? item.importance}`,
         { size: 8.5, color: 'muted', indent: 3, after: answer?.quote ? 0 : 1 },
       );
       if (answer?.quote) {
