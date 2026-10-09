@@ -603,11 +603,16 @@ function AnsweredPanel({ s, locale, row }: { s: Strings; locale: Locale; row: Mo
   );
 }
 
+/** Hoeveel vragen er onder een attribuut staan voordat je moet klikken. */
+const BLOCKED_SHOWN = 2;
+
 function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale: Locale }) {
   // Eén kolomuitleg tegelijk; twee open panelen boven een tabel is onleesbaar.
   const [openInfo, setOpenInfo] = useState<string>();
 
   const [setId, setSetId] = useState('all');
+  /** Het attribuut waarvan alle vragen uitgeklapt staan; één tegelijk. */
+  const [openBlocked, setOpenBlocked] = useState<string>();
   if (model.gaps.length === 0) return null;
   // Standaard de meeste producten eerst. Op oorzaak loopt van goedkoop naar duur
   // werk: invullen, modelleren, geen bron.
@@ -725,8 +730,45 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={`${row.field}-${row.cause}`} className="border-b border-line/60">
-                <td className="py-2 pr-3">{row.label[locale]}</td>
+              <tr key={`${row.field}-${row.cause}`} className="border-b border-line/60 align-top">
+                <td className="py-2 pr-3">
+                  {row.label[locale]}
+                  {/* De vragen zelf onder het attribuut: een naam als "bestelstap
+                      cm" zegt pas iets met de vraag van de koper erbij. De eerste
+                      twee staan er altijd, de rest achter een klik, anders wordt
+                      een attribuut waar tien vragen op leunen de hele tabel. */}
+                  {row.blocked && row.blocked.length > 0 ? (() => {
+                    const key = `${row.field}-${row.cause}`;
+                    const all = openBlocked === key;
+                    const shown = all ? row.blocked : row.blocked.slice(0, BLOCKED_SHOWN);
+                    return (
+                      <ul className="mt-1 space-y-0.5 text-xs text-muted" aria-label={s.report.gapBlockedHeading}>
+                        {shown.map((question) => (
+                          <li key={question.questionId}>
+                            {question.importance === 'critical' ? (
+                              <span className="mr-1 font-medium text-danger">{s.questions.importance.critical}</span>
+                            ) : null}
+                            {question.label[locale]}
+                          </li>
+                        ))}
+                        {row.blocked.length > BLOCKED_SHOWN ? (
+                          <li>
+                            <button
+                              type="button"
+                              aria-expanded={all}
+                              onClick={() => setOpenBlocked(all ? undefined : key)}
+                              className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                            >
+                              {all ? s.report.gapBlockedLess
+                                : row.blocked.length - BLOCKED_SHOWN === 1 ? s.report.gapBlockedMoreOne
+                                  : s.report.gapBlockedMore.replace('{aantal}', String(row.blocked.length - BLOCKED_SHOWN))}
+                            </button>
+                          </li>
+                        ) : null}
+                      </ul>
+                    );
+                  })() : null}
+                </td>
                 <td className="py-2 pr-3">
                   {/* Welke vragen hierdoor blijven liggen. Een gat zonder vraag
                       bestaat niet: dat is het verschil met een lege-veldenlijst. */}

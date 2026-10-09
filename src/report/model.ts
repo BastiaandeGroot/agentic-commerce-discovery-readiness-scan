@@ -79,7 +79,14 @@ export interface ReportModel {
     wouldBecome?: number;
     nearest?: { open: number; products: number };
   };
-  gaps: { field: string; label: Bilingual; cause: GapCause; affected: number; questions?: number }[];
+  gaps: {
+    field: string; label: Bilingual; cause: GapCause; affected: number; questions?: number;
+    /**
+     * De vragen zelf die door dit gat blijven liggen, zwaarste eerst. Onbekend bij
+     * een bewaarde analyse zonder metingen: die draagt alleen het aantal.
+     */
+    blocked?: { questionId: string; label: Bilingual; importance: string }[];
+  }[];
   /**
    * Dezelfde gaten per categorie, voor het filter boven de tabel. Op de voorste
    * set van het product, zoals de vragenlijst, zodat de aantallen bij elkaar
@@ -122,7 +129,40 @@ function answeredDetail(report: ScanReport): Map<string, { fields: Map<string, n
   return out;
 }
 
+/** De volgorde waarin vragen bij een gat staan: wat het zwaarst weegt eerst. */
+const WEIGHT_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+
 export function modelFromReport(report: ScanReport, locale: Locale, allLabel: string): ReportModel {
+  // Een vraag-id wijst in elke set dezelfde vraag aan; het zwaarste belang telt,
+  // zoals bij het product zelf.
+  const questionById = new Map<string, { questionId: string; label: Bilingual; importance: string }>();
+  for (const row of report.questionCoverage) {
+    const held = questionById.get(row.questionId);
+    if (!held || (WEIGHT_ORDER[row.importance] ?? 9) < (WEIGHT_ORDER[held.importance] ?? 9)) {
+      questionById.set(row.questionId, { questionId: row.questionId, label: row.label, importance: row.importance });
+    }
+  }
+  const gapRow = (gap: ScanReport['gaps'][number]): ReportModel['gaps'][number] => {
+    // Op tekst ontdubbeld: dezelfde vraag staat soms in drie vragensets onder
+    // drie nummers, en voor de merchant is dat één vraag. Het zwaarste belang
+    // wint, want de lijst staat al op belang.
+    const seen = new Set<string>();
+    const blocked = gap.questions
+      .flatMap((id) => { const found = questionById.get(id); return found ? [found] : []; })
+      .sort((a, b) => (WEIGHT_ORDER[a.importance] ?? 9) - (WEIGHT_ORDER[b.importance] ?? 9)
+        || a.label[locale].localeCompare(b.label[locale]))
+      .filter((question) => {
+        if (seen.has(question.label[locale])) return false;
+        seen.add(question.label[locale]);
+        return true;
+      });
+    return {
+      field: gap.field, label: gap.label, cause: gap.cause, affected: gap.affected,
+      // Het aantal dat in de tabel staat hoort bij de lijst eronder.
+      questions: blocked.length > 0 ? blocked.length : gap.questions.length,
+      blocked,
+    };
+  };
   const detail = answeredDetail(report);
   const fresh = report.products.some((product) => !product.key.startsWith('#'));
   return {
@@ -153,12 +193,12 @@ export function modelFromReport(report: ScanReport, locale: Locale, allLabel: st
       };
     }),
     blockers: topBlockers(report, locale),
-    gaps: mergedGaps(report).map((gap) => ({ ...gap, questions: gap.questions.length })),
+    gaps: mergedGaps(report).map(gapRow),
     gapsBySet: Object.fromEntries(report.categories.map((category) => [
       category.setId,
       aggregateGaps(report.products.filter((product) => !product.unmatched && product.setId === category.setId))
         .slice(0, GAPS_SHOWN)
-        .map((gap) => ({ field: gap.field, label: gap.label, cause: gap.cause, affected: gap.affected, questions: gap.questions.length })),
+        .map(gapRow),
     ])),
     advisory: advisoryItems(report, locale),
     stamp: report.stamp,
