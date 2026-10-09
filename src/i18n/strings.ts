@@ -511,23 +511,9 @@ export const STRINGS = {
     report: {
       heading: 'Rapport',
       funnelHeading: 'De trechter',
-      startHeading: 'Waar begin je?',
-      startIntro:
-        'De trechter is streng: volledig betekent élke vraag beantwoord. Dit zegt hoe ver je bent.',
-      startNoneFindable: 'Nog geen enkel product beantwoordt alle vragen.',
-      startSomeFindable: 'producten beantwoorden al elke vraag.',
       startNearest: 'Het dichtst in de buurt:',
       startNearestProducts: 'producten missen nog',
       startNearestQuestions: 'antwoorden.',
-      startBlockersHeading: 'Wat de meeste producten tegenhoudt',
-      startBlockerOpen: 'producten hebben deze vraag open',
-      startBlockerPim: 'waarvan het veld al bestaat',
-      startBlockerNowhere: 'er is geen veld voor',
-      startWinHeading: 'Wat de eerste stap oplevert',
-      startWinBody: 'Beantwoord je deze vragen voor je hele catalogus, dan zijn',
-      startWinProducts: 'producten meteen compleet.',
-      startWinNone:
-        'Deze vragen alleen zijn niet genoeg, maar ze zijn wel de grootste stap.',
       total: 'producten in je catalogus',
       qualified: 'basisgeschikt',
       findable: 'volledig beantwoord',
@@ -556,17 +542,15 @@ export const STRINGS = {
       advisoryHeading: 'Buiten de score: waar je data niets over kan zeggen',
       advisoryIntro:
         'Deze vragen stelt een koper wel, maar geen productattribuut kan ze beantwoorden. Ze tellen niet mee: dit lost je website of klantenservice op, niet je catalogus.',
-      bankHeading: 'Vragenbank',
-      blindHeading: 'De vragenbank sluit niet aan op je kolomnamen',
-      blindBody:
-        'Deze kenmerken komen in geen enkele kolom van je catalogus voor. Meestal staat het er wel, onder een andere naam — en dan telt de vraag onterecht als onbeantwoord.',
-      blindNext:
-        'Ga terug naar "Kenmerken koppelen" en wijs per kenmerk je eigen kolom aan.',
-      blindCount: 'attributen zonder kolom',
-      bankProvisional:
-        'Gemeten langs een voorlopige vragenbank uit vakkennis. De cijfers kloppen met de gestelde vragen; of dit de vragen van jouw kopers zijn, is beredeneerd.',
-      bankInReview:
-        'Gemeten langs de vragenlijst die je zelf hebt aangeleverd. De cijfers kloppen met de gestelde vragen; of dit de vragen van jouw kopers zijn, staat of valt met je lijst.',
+      bankMeasured: 'Gemeten langs de vragenbank van {naam}.',
+      bankQuestionsShow: 'Bekijk de vragen per categorie',
+      bankQuestionsHide: 'Vragen verbergen',
+      bankQuestionsHeading: 'De vragen per categorie',
+      bankQuestionsIntro: 'Wat een koper in jouw markt vraagt, hoe zwaar het weegt, en bij hoeveel producten je catalogus het antwoord geeft.',
+      bankQuestionsNeeds: 'Nodig:',
+      bankQuestionsNone: 'Voor deze categorie zijn geen vragen gemeten.',
+      blindHeading: 'De vragenbank mist de volgende attributen in de productcatalogus.',
+      blindBody: 'Deze attributen komen niet voor in je productcatalogus. Klopt dit niet, ga dan terug naar "Kenmerken koppelen".',
       infoLabel: 'Wat betekent dit?',
       findableInfo:
         'Het aantal producten waarvoor je catalogus élke vraag beantwoordt: alle algemene vragen en alle vragen van elke categorie waar het product onder hangt. Blijft er één vraag open, dan telt het product niet mee; er is geen "bijna", want een agent laat een product met een open vraag liever weg. Beantwoord betekent ook hier: gevuld en genoeg. Vragen die je uitzette en vragen buiten de score doen niet mee. Elk volledig beantwoord product is dus ook basisgeschikt.',
@@ -1682,23 +1666,9 @@ export const STRINGS = {
     report: {
       heading: 'Report',
       funnelHeading: 'The funnel',
-      startHeading: 'Where do you start?',
-      startIntro:
-        'The funnel is strict: complete means every question is answered. That does not tell you how far along you are, and this does.',
-      startNoneFindable: 'No product answers every question yet.',
-      startSomeFindable: 'products already answer every question.',
       startNearest: 'Closest to the line:',
       startNearestProducts: 'products are still missing',
       startNearestQuestions: 'answers.',
-      startBlockersHeading: 'What holds back the most products',
-      startBlockerOpen: 'products have this question open',
-      startBlockerPim: 'of which the field already exists',
-      startBlockerNowhere: 'there is no field for it',
-      startWinHeading: 'What the first step buys you',
-      startWinBody: 'Answer these questions across your catalogue and',
-      startWinProducts: 'products complete straight away.',
-      startWinNone:
-        'These questions alone are not enough: every product still has others open. That is no reason to leave them — they are still the biggest single step.',
       total: 'products in your catalogue',
       qualified: 'baseline fit',
       findable: 'fully answered',
@@ -1727,17 +1697,15 @@ export const STRINGS = {
       advisoryHeading: 'Outside the score: what your data cannot speak to',
       advisoryIntro:
         'Buyers do ask these, but no product attribute can answer them. They do not count: your website or customer service solves this, not your catalogue.',
-      bankHeading: 'Question bank',
-      blindHeading: 'The question bank does not line up with your column names',
-      blindBody:
-        'These characteristics appear in none of your catalogue columns. Usually they are there under a different name — and then the question counts as unanswered when it should not.',
-      blindNext:
-        'Go back to "Link characteristics" and point each characteristic at your own column.',
-      blindCount: 'attributes without a column',
-      bankProvisional:
-        'Measured against a provisional question bank from domain knowledge. The figures are correct for the questions asked; whether these are your buyers\' questions is reasoned.',
-      bankInReview:
-        'Measured against the question list you supplied yourself. The figures are correct for the questions asked; whether these are your buyers\' questions stands or falls with your list.',
+      bankMeasured: 'Measured against the question bank for {naam}.',
+      bankQuestionsShow: 'View the questions per category',
+      bankQuestionsHide: 'Hide questions',
+      bankQuestionsHeading: 'The questions per category',
+      bankQuestionsIntro: 'What a buyer in your market asks, how heavily it weighs, and for how many products your catalogue gives the answer.',
+      bankQuestionsNeeds: 'Needs:',
+      bankQuestionsNone: 'No questions were measured for this category.',
+      blindHeading: 'The question bank is missing the following attributes in the product catalogue.',
+      blindBody: 'These attributes do not occur in your product catalogue. If that is not right, go back to "Link characteristics".',
       infoLabel: 'What does this mean?',
       findableInfo:
         'The number of products for which your catalogue answers every question: all general questions and all questions of every category the product sits under. If one question stays open, the product does not count; there is no "almost", because an agent would rather leave out a product with an open question. Answered means here too: filled and enough. Questions you switched off and questions outside the score do not take part. Every fully answered product is therefore also basically suitable.',

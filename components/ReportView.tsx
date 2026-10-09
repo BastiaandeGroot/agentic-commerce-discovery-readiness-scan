@@ -240,66 +240,65 @@ function CategoryScores({ s, model }: { s: Strings; model: ReportModel }) {
   );
 }
 
-function NextStep({ s, model }: { s: Strings; model: ReportModel }) {
-  const { funnel } = model;
-  // Welke vragen de meeste producten tegenhouden, en wat het oplevert als juist
-  // die beantwoord worden. Afgeleid in `src/report/derive.ts`.
-  const { top, wouldBecome, nearest } = model.blockers;
+/** De volgorde waarin een retailer zijn vragen leest: wat het zwaarst weegt eerst. */
+const IMPORTANCE_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
-  if (top.length === 0) return null;
+/**
+ * De vragen van de bank, per categorie.
+ *
+ * Alleen wat een retailer nodig heeft om de lijst te beoordelen: de vraag, hoe
+ * zwaar hij weegt, welk kenmerk hem beantwoordt en bij hoeveel producten dat
+ * lukt. Dekking, herkomst en weging staan op het vragensetscherm; hier zou het
+ * de vraag zelf wegdrukken.
+ */
+function BankQuestions({ s, locale, model, rows }: {
+  s: Strings; locale: Locale; model: ReportModel; rows: NonNullable<ReportModel['bankQuestions']>;
+}) {
+  const [setId, setSetId] = useState(model.categories[0]?.setId ?? '');
+  const shown = useMemo(() => rows
+    .filter((row) => row.setId === setId)
+    .sort((a, b) => Number(!a.scored) - Number(!b.scored)
+      || (IMPORTANCE_ORDER[a.importance] ?? 9) - (IMPORTANCE_ORDER[b.importance] ?? 9)
+      || a.label[locale].localeCompare(b.label[locale])), [rows, setId, locale]);
 
   return (
     <Card>
-      <CardTitle sub={s.report.startIntro}>{s.report.startHeading}</CardTitle>
-
-      <p className="text-sm leading-relaxed">
-        {funnel.findable === 0 ? (
-          s.report.startNoneFindable
-        ) : (
-          <><span className="tnum font-semibold">{n(funnel.findable)}</span> {s.report.startSomeFindable}</>
-        )}
-        {nearest ? (
-          <>
-            {' '}{s.report.startNearest}{' '}
-            <span className="tnum font-semibold">{n(nearest.products)}</span>{' '}
-            {s.report.startNearestProducts}{' '}
-            <span className="tnum font-semibold">{nearest.open}</span>{' '}
-            {s.report.startNearestQuestions}
-          </>
-        ) : null}
-      </p>
-
-      <div className="mt-4">
-        <h3 className="text-xs font-medium text-muted">{s.report.startBlockersHeading}</h3>
-        <ul className="mt-1.5 space-y-1.5">
-          {top.map((entry) => (
-            <li key={entry.label} className="text-sm">
-              <span className="font-medium">{entry.label}</span>
-              <span className="tnum ml-2 text-xs text-muted">
-                {n(entry.open)} {s.report.startBlockerOpen}
-                {entry.empty > 0
-                  ? <>, <span className="text-warn">{n(entry.empty)}</span> {s.report.startBlockerPim}</>
-                  : <>, {s.report.startBlockerNowhere}</>}
+      <CardTitle sub={s.report.bankQuestionsIntro}>{s.report.bankQuestionsHeading}</CardTitle>
+      {model.categories.length > 1 ? (
+        <div className="mb-3">
+          <Select
+            label={s.report.filterCategory}
+            value={setId}
+            onChange={setSetId}
+            options={model.categories.map((c) => ({ value: c.setId, label: `${categoryLabel(c)} (${n(c.total)})` }))}
+          />
+        </div>
+      ) : null}
+      {shown.length === 0 ? (
+        <p className="text-sm text-muted">{s.report.bankQuestionsNone}</p>
+      ) : (
+        <ul>
+          {shown.map((row) => (
+            <li key={row.questionId} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line py-2 first:border-t-0">
+              <Badge tone={row.importance === 'critical' ? 'danger' : 'neutral'}>
+                {s.questions.importance[row.importance as keyof typeof s.questions.importance] ?? row.importance}
+              </Badge>
+              <span className="min-w-0 flex-1 text-sm">
+                {row.label[locale]}
+                {row.needs.length > 0 ? (
+                  <span className="mt-0.5 block text-xs text-muted">
+                    {s.report.bankQuestionsNeeds} {row.needs.map((need) => need[locale]).join(', ')}
+                  </span>
+                ) : null}
+              </span>
+              <span className="tnum shrink-0 text-xs text-muted">
+                {row.scored
+                  ? <>{n(row.answered)}/{n(row.applicable)} {s.report.fromFeed}</>
+                  : s.questions.notScored}
               </span>
             </li>
           ))}
         </ul>
-      </div>
-
-      {/* Een oudere bewaarde analyse weet dit niet: het vraagt de producten. */}
-      {wouldBecome === undefined ? null : (
-      <div className="mt-4 rounded-md bg-surface-2 px-3 py-2.5">
-        <h3 className="text-xs font-medium text-muted">{s.report.startWinHeading}</h3>
-        {wouldBecome > 0 ? (
-          <p className="mt-1 text-sm leading-relaxed">
-            {s.report.startWinBody}{' '}
-            <span className="tnum font-semibold text-ok">{n(wouldBecome)}</span>{' '}
-            {s.report.startWinProducts}
-          </p>
-        ) : (
-          <p className="mt-1 text-sm leading-relaxed text-muted">{s.report.startWinNone}</p>
-        )}
-      </div>
       )}
     </Card>
   );
@@ -718,39 +717,44 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
   explorer?: ReactNode;
   footer?: ReactNode;
 }) {
-  // Niet-bevroren banken dragen allebei een voorbehoud, maar niet hetzelfde.
-  // Een voorlopige bank is ónze terugval uit vakkennis; een ingelezen lijst zonder
-  // sitepanel is de lijst van de merchant zelf. Die over één kam scheren vertelt
-  // hem dat zijn eigen vragen uit onze vakkennis komen, en dat klopt niet.
-  const unfrozen = model.stamp.banks.filter((bank) => bank.status !== 'frozen');
-  const anyProvisional = unfrozen.some((bank) => bank.status === 'provisional');
+  // De status staat als label naast de zin en niet in de zin zelf: een cijfer
+  // langs een voorlopige lat mag er niet hetzelfde uitzien als een cijfer langs
+  // een bevroren lat, maar de merchant hoeft er geen alinea over te lezen.
+  const banks = model.stamp.banks;
+  const unfrozen = banks.filter((bank) => bank.status !== 'frozen');
+  const [showQuestions, setShowQuestions] = useState(false);
 
   return (
     <div className="space-y-4">
-      {/* Bovenaan en niet in het stempel onderaan: wie een cijfer leest hoort
-          meteen te weten dat de lat beredeneerd is en niet onderzocht. */}
-      {unfrozen.length > 0 ? (
-        <div className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3">
-          <p className="font-medium text-warn">
-            {s.report.bankHeading}: {unfrozen.map((bank) => bank.label?.[locale] ?? bank.id).join(', ')}
+      {banks.length > 0 ? (
+        <div className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 ${unfrozen.length > 0 ? 'border-warn/40 bg-warn-soft' : 'border-line bg-surface'}`}>
+          <p className="flex flex-wrap items-center gap-2 text-sm text-ink">
+            <span>
+              {s.report.bankMeasured.replace('{naam}', banks.map((bank) => bank.label?.[locale] ?? bank.id).join(', '))}
+            </span>
+            {/* Eén label per status: vier voorlopige banken zeggen samen één keer "Voorlopig". */}
+            {[...new Set(unfrozen.map((bank) => bank.status))].map((status) => (
+              <Badge key={status} tone="warn">{s.bank.status[status as keyof typeof s.bank.status] ?? status}</Badge>
+            ))}
           </p>
-          <p className="mt-1 text-sm leading-relaxed text-ink">
-            {anyProvisional ? s.report.bankProvisional : s.report.bankInReview}
-          </p>
+          {model.bankQuestions ? (
+            <Button variant="secondary" onClick={() => setShowQuestions(!showQuestions)}>
+              {showQuestions ? s.report.bankQuestionsHide : s.report.bankQuestionsShow}
+            </Button>
+          ) : null}
         </div>
+      ) : null}
+
+      {showQuestions && model.bankQuestions ? (
+        <BankQuestions s={s} locale={locale} model={model} rows={model.bankQuestions} />
       ) : null}
 
       {model.stamp.blindAttributes.length > 0 ? (
         <div className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3">
-          <p className="font-medium text-warn">
-            {s.report.blindHeading} —{' '}
-            <span className="tnum">{model.stamp.blindAttributes.length}</span>{' '}
-            {s.report.blindCount}
-          </p>
+          <p className="font-medium text-warn">{s.report.blindHeading}</p>
           <p className="mt-1 text-sm leading-relaxed text-ink">{s.report.blindBody}</p>
-          <p className="mt-2 text-sm leading-relaxed text-ink">{s.report.blindNext}</p>
           <ul className="mt-2 flex flex-wrap gap-1.5">
-            {model.stamp.blindAttributes.slice(0, 16).map((attribute) => (
+            {model.stamp.blindAttributes.map((attribute) => (
               <li key={attribute.key}>
                 <Badge tone="neutral">{attribute.key}</Badge>
               </li>
@@ -761,7 +765,6 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
 
       <div className="grid gap-4 lg:grid-cols-2">
         <FunnelCard s={s} model={model} />
-        <NextStep s={s} model={model} />
         <CategoryScores s={s} model={model} />
       </div>
 

@@ -17,7 +17,7 @@ import { jsPDF } from 'jspdf';
 import type { Locale, ScanReport } from '../src/domain/types';
 import type { Strings } from '../src/i18n/strings';
 import {
-  adviceKey, advisoryItems, categoryLabel, mergedGaps, scoreRows, topBlockers, unansweredQuestions,
+  adviceKey, advisoryItems, categoryLabel, mergedGaps, scoreRows, unansweredQuestions,
   type AdviceKey, type Average,
 } from '../src/report/derive';
 
@@ -258,19 +258,18 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
     { size: 9, color: 'muted', after: 4 },
   );
 
-  // Voorbehouden bovenaan, zoals op het scherm.
-  const unfrozen = report.stamp.banks.filter((bank) => bank.status !== 'frozen');
-  if (unfrozen.length > 0) {
-    const provisional = unfrozen.some((bank) => bank.status === 'provisional');
+  // Dezelfde twee mededelingen bovenaan als op het scherm.
+  if (report.stamp.banks.length > 0) {
+    const unfrozen = report.stamp.banks.filter((bank) => bank.status !== 'frozen');
     w.notice(
-      `${s.report.bankHeading}: ${unfrozen.map((bank) => bank.label[locale]).join(', ')}`,
-      [provisional ? s.report.bankProvisional : s.report.bankInReview],
+      s.report.bankMeasured.replace('{naam}', report.stamp.banks.map((bank) => bank.label[locale]).join(', ')),
+      unfrozen.map((bank) => `${bank.label[locale]}: ${s.bank.status[bank.status as keyof typeof s.bank.status] ?? bank.status}`),
     );
   }
   if (report.stamp.blindAttributes.length > 0) {
     w.notice(
-      `${s.report.blindHeading}: ${report.stamp.blindAttributes.length} ${s.report.blindCount}`,
-      [s.report.blindBody, report.stamp.blindAttributes.slice(0, 24).map((attribute) => attribute.key).join(', ')],
+      s.report.blindHeading,
+      [s.report.blindBody, report.stamp.blindAttributes.map((attribute) => attribute.key).join(', ')],
     );
   }
 
@@ -298,32 +297,6 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
     { size: 9, color: 'muted', after: 1 },
   );
   w.text(s.report.statusExplain[status], { size: 9, after: 2 });
-
-  // Waar begin je?
-  const start = topBlockers(report, locale);
-  if (start.top.length > 0) {
-    w.heading(s.report.startHeading, s.report.startIntro);
-    let sentence = funnel.findable === 0 ? s.report.startNoneFindable : `${n(funnel.findable)} ${s.report.startSomeFindable}`;
-    if (start.nearest) {
-      sentence += ` ${s.report.startNearest} ${n(start.nearest.products)} ${s.report.startNearestProducts} ${start.nearest.open} ${s.report.startNearestQuestions}`;
-    }
-    w.text(sentence, { after: 2 });
-    w.text(s.report.startBlockersHeading, { size: 9, bold: true, color: 'muted', after: 0.5 });
-    for (const entry of start.top) {
-      const detail = entry.empty > 0
-        ? `${n(entry.open)} ${s.report.startBlockerOpen}, ${n(entry.empty)} ${s.report.startBlockerPim}`
-        : `${n(entry.open)} ${s.report.startBlockerOpen}, ${s.report.startBlockerNowhere}`;
-      w.text(`• ${entry.label}`, { size: 10, bold: true, after: 0 });
-      w.text(detail, { size: 9, color: 'muted', indent: 3, after: 1 });
-    }
-    w.text(s.report.startWinHeading, { size: 9, bold: true, color: 'muted', after: 0.5 });
-    w.text(
-      start.wouldBecome > 0
-        ? `${s.report.startWinBody} ${n(start.wouldBecome)} ${s.report.startWinProducts}`
-        : s.report.startWinNone,
-      { after: 2 },
-    );
-  }
 
   // Waar sta je per categorie
   if (report.categories.length > 0) {

@@ -57,6 +57,16 @@ export interface ReportModel {
   scoreRows: ModelScoreRow[];
   /** Onbekend bij een oudere snapshot; dan staat de regel over niveaus er niet. */
   hasSubcategories?: boolean;
+  /**
+   * Alle vragen van de bank zoals ze gemeten zijn, per set: voor het overzicht
+   * "vragen per categorie". Onbekend bij een bewaarde analyse zonder metingen.
+   */
+  bankQuestions?: {
+    setId: string; questionId: string; label: Bilingual; importance: string; scored: boolean;
+    answered: number; applicable: number;
+    /** De kenmerken waar de vraag op leunt, zoals het rapport ze noemt. */
+    needs: Bilingual[];
+  }[];
   /** Onbeantwoorde gescoorde vragen, beste eerst. Onbekend bij een oudere snapshot. */
   questions?: ModelQuestion[];
   blockers: {
@@ -114,6 +124,11 @@ export function modelFromReport(report: ScanReport, locale: Locale, allLabel: st
       key: row.key, label: row.label, total: row.total, critical: row.critical, general: row.general, all: row.all,
     })),
     hasSubcategories: report.products.some((product) => product.subcategory !== undefined),
+    bankQuestions: report.questionCoverage.map((row) => ({
+      setId: row.setId, questionId: row.questionId, label: row.label, importance: row.importance,
+      scored: row.scored, answered: row.answered, applicable: row.applicable,
+      needs: (row.evidence ?? []).map((group) => group.label),
+    })),
     questions: unansweredQuestions(report).map((row) => {
       const entry = detail.get(`${row.setId}|${row.questionId}`);
       const answeredBy = [...(entry?.fields ?? new Map<string, number>()).entries()]
