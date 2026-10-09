@@ -376,9 +376,25 @@ function QuestionCoverageCard({ s, model, locale, onReviewQuestion }: {
                   ) : null}
                   <span className="min-w-0">{row.label[locale]}</span>
                 </span>
-                <span className="tnum text-xs text-muted">
-                  {n(row.answered)}/{n(row.applicable)} {s.report.ofProducts}
-                </span>
+                {/* Het ene getal dat zegt hoe het staat, en meteen de ingang naar
+                    waarmee beantwoord is: een vinkje zonder herkomst is een oordeel
+                    dat de merchant moet geloven, met de kolommen erbij kan hij het
+                    nakijken. Eronder staat alleen nog wat werk is. */}
+                {row.answered > 0 && row.answeredBy ? (
+                  <button
+                    type="button"
+                    title={s.report.qAnsweredVia}
+                    aria-expanded={openAnswered === rowKey}
+                    onClick={() => setOpenAnswered(openAnswered === rowKey ? undefined : rowKey)}
+                    className="tnum text-xs text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+                  >
+                    {n(row.answered)}/{n(row.applicable)} {s.report.ofProducts}
+                  </button>
+                ) : (
+                  <span className="tnum text-xs text-muted">
+                    {n(row.answered)}/{n(row.applicable)} {s.report.ofProducts}
+                  </span>
+                )}
               </div>
               {/* Vier lagen: beantwoord, veld leeg, gevuld maar te mager, en
                   geen veld. Elke laag wijst naar ander werk — invullen,
@@ -405,23 +421,6 @@ function QuestionCoverageCard({ s, model, locale, onReviewQuestion }: {
               </div>
               <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted">
                 <span>{categoryName.get(row.setId) ?? row.setId}</span>
-                {/* Klikbaar zodra bekend is waarmee beantwoord is. Een vinkje zonder
-                    herkomst is een oordeel dat de merchant moet geloven; met de
-                    kolommen erbij kan hij het nakijken. */}
-                {row.answered > 0 && row.answeredBy ? (
-                  <button
-                    type="button"
-                    aria-expanded={openAnswered === rowKey}
-                    onClick={() => setOpenAnswered(openAnswered === rowKey ? undefined : rowKey)}
-                    className="tnum underline decoration-dotted underline-offset-2 hover:text-ink"
-                  >
-                    <span className="text-ok">{n(row.answered)}</span> {s.report.fromFeed}
-                  </button>
-                ) : (
-                  <span className="tnum">
-                    <span className="text-ok">{n(row.answered)}</span> {s.report.fromFeed}
-                  </span>
-                )}
                 {/* Beantwoord, maar alleen dankzij de plek in de boom: geen gat, wel
                     werk. Los geteld, anders verdwijnt het in het groene getal. */}
                 {(row.fromTree ?? 0) > 0 ? (
@@ -447,16 +446,20 @@ function QuestionCoverageCard({ s, model, locale, onReviewQuestion }: {
                     {n(row.incomplete)} {s.report.states.incomplete.toLowerCase()}
                   </span>
                 ) : null}
-                <span className="tnum" title={s.report.statesExplain.absent}>
-                  {n(row.absent)} {s.report.neither}
-                </span>
-                {row.evidence ? (
+                {row.absent > 0 ? (
+                  <span className="tnum" title={s.report.statesExplain.absent}>
+                    {n(row.absent)} {s.report.neither}
+                  </span>
+                ) : null}
+                {/* Alleen waar er iets te doen valt: bij een vraag die overal uit
+                    een kolom beantwoord is, valt er niets uit te leggen. */}
+                {row.evidence && (row.answered < row.applicable || (row.fromTree ?? 0) > 0) ? (
                   <button
                     type="button"
                     onClick={() => setOpenRow(rowKey === openRow ? undefined : rowKey)}
                     className="underline decoration-dotted underline-offset-2 hover:text-ink"
                   >
-                    {rowKey === openRow ? s.report.qDetailClose : s.report.qDetail}
+                    {rowKey === openRow ? s.report.qDetailClose : row.answered < row.applicable ? s.report.qDetail : s.report.qNext}
                   </button>
                 ) : null}
                 {/* Een vraag die hier niet klopt, meteen kunnen uitzetten: naar
