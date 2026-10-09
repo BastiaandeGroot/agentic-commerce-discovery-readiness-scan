@@ -11,6 +11,10 @@
 import type { Average, Bilingual, Funnel, GapCause, Locale, ScanReport } from '../domain/types';
 import type { ScanSnapshot } from '../engine/snapshot';
 import { advisoryItems, mergedGaps, scoreRows, topBlockers, unansweredQuestions } from './derive';
+import { aggregateGaps } from '../engine/report';
+
+/** Hoeveel gaten de tabel toont; gelijk aan `mergedGaps`. */
+const GAPS_SHOWN = 25;
 import type { AdvisoryItem, Blocker } from './derive';
 
 export interface ModelQuestion {
@@ -76,6 +80,12 @@ export interface ReportModel {
     nearest?: { open: number; products: number };
   };
   gaps: { field: string; label: Bilingual; cause: GapCause; affected: number; questions?: number }[];
+  /**
+   * Dezelfde gaten per categorie, voor het filter boven de tabel. Op de voorste
+   * set van het product, zoals de vragenlijst, zodat de aantallen bij elkaar
+   * passen. Onbekend bij een bewaarde analyse zonder metingen.
+   */
+  gapsBySet?: Record<string, ReportModel['gaps']>;
   advisory: AdvisoryItem[];
   stamp: {
     scanVersion: string;
@@ -144,6 +154,12 @@ export function modelFromReport(report: ScanReport, locale: Locale, allLabel: st
     }),
     blockers: topBlockers(report, locale),
     gaps: mergedGaps(report).map((gap) => ({ ...gap, questions: gap.questions.length })),
+    gapsBySet: Object.fromEntries(report.categories.map((category) => [
+      category.setId,
+      aggregateGaps(report.products.filter((product) => !product.unmatched && product.setId === category.setId))
+        .slice(0, GAPS_SHOWN)
+        .map((gap) => ({ field: gap.field, label: gap.label, cause: gap.cause, affected: gap.affected, questions: gap.questions.length })),
+    ])),
     advisory: advisoryItems(report, locale),
     stamp: report.stamp,
   };

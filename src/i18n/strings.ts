@@ -580,6 +580,7 @@ export const STRINGS = {
       neither: 'geen veld voor',
       ofProducts: 'van de producten',
       gapsHeading: 'Waar komt elk gat vandaan',
+      gapsNone: 'In deze categorie blijft geen vraag liggen door een ontbrekend of leeg veld.',
       gapsIntro:
         'Per gat: wat voor werk het is, en welke vragen erdoor blijven liggen.',
       gapsWhy:
@@ -1736,6 +1737,7 @@ export const STRINGS = {
       neither: 'no field for it',
       ofProducts: 'of products',
       gapsHeading: 'Where each gap comes from',
+      gapsNone: 'In this category no question is left open by a missing or empty field.',
       gapsIntro:
         'Per gap: what kind of work it is, and which questions it leaves unanswered.',
       gapsWhy:

@@ -607,8 +607,9 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
   // Eén kolomuitleg tegelijk; twee open panelen boven een tabel is onleesbaar.
   const [openInfo, setOpenInfo] = useState<string>();
 
-  const rows = model.gaps;
-  if (rows.length === 0) return null;
+  const [setId, setSetId] = useState('all');
+  if (model.gaps.length === 0) return null;
+  const rows = setId === 'all' ? model.gaps : model.gapsBySet?.[setId] ?? [];
 
   // Op inspanning en niet op ernst: invulwerk is de goedkoopste winst die er is,
   // modelwerk vraagt eerst een beslissing over je datamodel, en geen bron vraagt
@@ -633,11 +634,31 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
         {s.report.gapsWhy}
       </p>
 
+      {/* Hetzelfde filter als boven de vragenlijst: een merchant werkt per
+          categorie, en dan wil hij de gaten van die categorie zien. */}
+      {model.gapsBySet && model.categories.length > 1 ? (
+        <div className="mt-3">
+          <Select
+            label={s.report.filterCategory}
+            value={setId}
+            onChange={setSetId}
+            options={[
+              { value: 'all', label: s.report.allCategories },
+              ...model.categories.map((c) => ({ value: c.setId, label: `${categoryLabel(c)} (${n(c.total)})` })),
+            ]}
+          />
+        </div>
+      ) : null}
+
       {/* De uitleg staat boven de tabel en niet in de cel: een paneel binnen een
           scrollende tabel verdwijnt half achter de rand. */}
       {openInfo ? <InfoPanel>{s.report.gapColumnInfo[openInfo]}</InfoPanel> : null}
 
-      <div className="mt-3 overflow-x-auto">
+      {rows.length === 0 ? (
+        <p className="mt-3 text-sm text-muted">{s.report.gapsNone}</p>
+      ) : null}
+
+      <div className={`mt-3 overflow-x-auto ${rows.length === 0 ? 'hidden' : ''}`}>
         <table className="w-full min-w-[34rem] text-left text-sm">
           <thead className="text-xs text-muted">
             <tr className="border-b border-line">
