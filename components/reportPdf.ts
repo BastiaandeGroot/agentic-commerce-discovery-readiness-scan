@@ -355,9 +355,8 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
           row.absent > 0 ? `${n(row.absent)} ${s.report.neither}` : '',
           (row.fromTree ?? 0) > 0 ? `${n(row.fromTree ?? 0)} ${s.report.fromTree}` : '',
         ].filter(Boolean).join(', ');
-        const critical = row.importance === 'critical' ? `${s.questions.importance.critical} · ` : '';
         return [
-          `${critical}${row.label[locale]}`,
+          row.label[locale],
           categoryName.get(row.setId) ?? row.setId,
           `${n(row.answered)}/${n(row.applicable)}`,
           stuck,
@@ -425,13 +424,10 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
     }
     for (const item of advisory) {
       const answer = answerOf.get(item.id);
-      w.text(`• ${item.label}`, { size: 9.5, after: 0 });
-      w.text(
-        answer
-          ? `${s.report.siteStatus[answer.status]} · ${s.questions.importance[item.importance] ?? item.importance}`
-          : `${s.questions.importance[item.importance] ?? item.importance}`,
-        { size: 8.5, color: 'muted', indent: 3, after: answer?.quote ? 0 : 1 },
-      );
+      w.text(`• ${item.label}`, { size: 9.5, after: answer ? 0 : 1 });
+      if (answer) {
+        w.text(s.report.siteStatus[answer.status], { size: 8.5, color: 'muted', indent: 3, after: answer.quote ? 0 : 1 });
+      }
       if (answer?.quote) {
         w.text(`"${answer.quote}"`, { size: 8.5, indent: 3, after: 0 });
         const where = [

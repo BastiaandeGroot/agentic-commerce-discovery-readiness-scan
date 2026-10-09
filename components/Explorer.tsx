@@ -218,7 +218,7 @@ function ProductRow({ s, product, locale }: {
                   <li key={q.questionId} className="flex flex-wrap items-baseline gap-1.5">
                     {/* De toestand staat erbij, want "onbeantwoord" is geen
                         opdracht: leeg vraagt om invullen, ontbreekt om een veld. */}
-                    <Badge tone={q.importance === 'critical' ? 'danger' : 'neutral'}>
+                    <Badge tone="neutral">
                       {s.report.states[q.state]}
                     </Badge>
                     <span className="min-w-0 flex-1">{q.label[locale]}</span>
