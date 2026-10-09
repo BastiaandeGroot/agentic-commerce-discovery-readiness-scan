@@ -19,6 +19,7 @@ import { applyImportanceCorrections } from '../../../src/questions/critical';
 import type { Linked, Mapping, Proposed } from '../../../src/questions/mapping';
 import { inheritMapping } from '../../../src/questions/mapping';
 import { bankStore, LOCAL_ACCOUNT, type StoredBank } from '../../../src/storage/banks';
+import { snapshotStoreFor } from '../../../src/storage/snapshots';
 import { LocalSettingsStore, SupabaseSettingsStore, type SettingsStore } from '../../../src/storage/settings';
 import { applyWork, mergeWork, setKey, type QuestionWork } from '../../../src/questions/work';
 import type { ScanClient } from '../../../src/worker/client';
@@ -122,6 +123,23 @@ export default function Home() {
     const client = supabase();
     return client ? new SupabaseVerdictStore(client) : new NoVerdictStore();
   }, []);
+
+  /**
+   * Het adres van de winkel uit zijn meest recente analyse, zodat hij het bij
+   * een volgende scan niet opnieuw hoeft te typen.
+   */
+  const [knownSite, setKnownSite] = useState<string>();
+  useEffect(() => {
+    let alive = true;
+    const target = snapshotStoreFor(supabase(), accountId);
+    void target.store.list(target.accountId)
+      .then((list) => {
+        const recent = list.find((one) => one.siteUrl ?? one.siteCheck?.site);
+        if (alive && recent) setKnownSite(recent.siteUrl ?? recent.siteCheck?.site);
+      })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, [accountId]);
 
   /**
    * Waar koppeling, categoriekeuze en het werk op de vragensets blijven staan.
@@ -697,6 +715,7 @@ export default function Home() {
         {step === 'segments' && catalog ? (
           <SegmentStep
             s={s}
+            defaultSite={shopUrl ?? knownSite}
             paths={paths}
             verdicts={verdicts}
             onDecide={decideCategory}

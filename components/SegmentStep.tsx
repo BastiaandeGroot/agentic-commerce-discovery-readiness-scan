@@ -188,7 +188,7 @@ function Rows({ s, rows, onDecide }: {
   );
 }
 
-export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onFacets, onExcluded, onSite, onContinue }: {
+export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onFacets, onExcluded, onSite, onContinue, defaultSite }: {
   s: Strings;
   paths: CategoryPath[];
   verdicts: Verdicts;
@@ -229,8 +229,20 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onFacets
    */
   onSite: (url: string) => void;
   onContinue: () => void;
+  /** Het adres uit een eerdere scan, zodat hij het niet opnieuw hoeft te typen. */
+  defaultSite?: string;
 }) {
-  const [site, setSite] = useState('');
+  const [site, setSite] = useState(defaultSite ?? '');
+  // Het eerdere adres komt soms pas binnen nadat het scherm er al staat.
+  useEffect(() => {
+    if (defaultSite) setSite((current) => (current.trim() === '' ? defaultSite : current));
+  }, [defaultSite]);
+  /**
+   * Is dit een adres? Verplicht om verder te gaan: het rapport toetst ook of de
+   * website de vragen beantwoordt die een catalogus niet kan dragen, en dat kan
+   * alleen als bekend is welke website het is.
+   */
+  const validSite = /^https?:\/\/[^\s.]+\.[^\s]+$/i.test(site.trim()) || /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(site.trim());
   const [state, setState] = useState<SiteState>({ kind: 'idle' });
   /** Wat het model voorstelde. Los van `verdicts`: een voorstel is geen keuze. */
   const [proposals, setProposals] = useState<Verdicts>({});
@@ -251,10 +263,7 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onFacets
   // en dan reisde zijn winkel niet mee naar de aanvraag — precies wat er in de
   // eerste echte aanvraag misging.
   useEffect(() => {
-    const value = site.trim();
-    if (/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(value) || /^[a-z0-9-]+\.[a-z.]{2,}$/i.test(value)) {
-      onSite(value);
-    }
+    if (validSite) onSite(site.trim());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [site]);
 
@@ -504,7 +513,11 @@ export function SegmentStep({ s, paths, verdicts, onDecide, onSegments, onFacets
         </Card>
       ) : null}
 
-      <Button onClick={onContinue}>{s.segments.continue}</Button>
+      {/* Zeggen waarom de knop dicht zit, en wat er dan moet gebeuren. */}
+      {!validSite ? <p className="text-sm text-warn">{s.segments.siteRequired}</p> : null}
+      <div>
+        <Button onClick={onContinue} disabled={!validSite}>{s.segments.continue}</Button>
+      </div>
     </div>
   );
 }
