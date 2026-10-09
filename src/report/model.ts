@@ -263,6 +263,7 @@ export function modelFromSnapshot(snapshot: ScanSnapshot, locale: Locale, allLab
       label: row.label[locale],
       importance: row.importance,
       categories: [...new Set(row.setIds.map((id) => names.get(id) ?? id))],
+      setIds: row.setIds,
     })),
     stamp: {
       scanVersion: snapshot.scanVersion,

@@ -536,6 +536,7 @@ export const STRINGS = {
         absent: 'Je catalogus kent dit kenmerk niet: er is geen kolom voor. Er moet eerst een veld bij, en daarna pas een waarde.',
       } as Record<string, string>,
       advisoryHeading: 'Buiten de score: waar je data niets over kan zeggen',
+      advisoryNone: 'In deze categorie stelt de vragenbank geen vragen buiten de score.',
       advisoryIntro:
         'Deze vragen stelt een koper wel, maar geen productattribuut kan ze beantwoorden. Ze tellen niet mee: dit lost je website of klantenservice op, niet je catalogus.',
       bankMeasured: 'Gemeten langs de vragenbank van {naam}.',
@@ -1700,6 +1701,7 @@ export const STRINGS = {
         absent: 'Your catalogue does not know this characteristic: there is no column for it. A field has to be added first, and only then a value.',
       } as Record<string, string>,
       advisoryHeading: 'Outside the score: what your data cannot speak to',
+      advisoryNone: 'The question bank asks no questions outside the score in this category.',
       advisoryIntro:
         'Buyers do ask these, but no product attribute can answer them. They do not count: your website or customer service solves this, not your catalogue.',
       bankMeasured: 'Measured against the question bank for {naam}.',

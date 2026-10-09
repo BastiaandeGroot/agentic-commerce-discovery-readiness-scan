@@ -808,18 +808,35 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
 function Advisory({ s, model }: { s: Strings; model: ReportModel }) {
   // Ontdubbeld op vraag, met de categorieën erachter: dezelfde procesvraag komt
   // in meerdere categorieën terug en hoeft maar één keer als advies te staan.
-  const items = model.advisory;
-  if (items.length === 0) return null;
+  const [setId, setSetId] = useState('all');
+  if (model.advisory.length === 0) return null;
+  const items = setId === 'all' ? model.advisory : model.advisory.filter((entry) => entry.setIds.includes(setId));
 
   return (
     <Card>
       <CardTitle sub={s.report.advisoryIntro}>{s.report.advisoryHeading}</CardTitle>
+      {/* Hetzelfde filter als boven de vragenlijst en de attributen. */}
+      {model.categories.length > 1 ? (
+        <div className="mb-3">
+          <Select
+            label={s.report.filterCategory}
+            value={setId}
+            onChange={setSetId}
+            options={[
+              { value: 'all', label: s.report.allCategories },
+              ...model.categories.map((c) => ({ value: c.setId, label: `${categoryLabel(c)} (${n(c.total)})` })),
+            ]}
+          />
+        </div>
+      ) : null}
+      {items.length === 0 ? <p className="text-sm text-muted">{s.report.advisoryNone}</p> : null}
       <ul className="space-y-2">
         {items.map((entry) => (
           <li key={entry.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line pt-2">
             <Badge tone="neutral">{s.questions.importance[entry.importance as keyof typeof s.questions.importance] ?? entry.importance}</Badge>
             <span className="min-w-0 flex-1 text-sm">{entry.label}</span>
-            <span className="text-xs text-muted">{entry.categories.join(', ')}</span>
+            {/* Met één categorie gekozen zegt de lijst ernaast niets meer. */}
+            {setId === 'all' ? <span className="text-xs text-muted">{entry.categories.join(', ')}</span> : null}
           </li>
         ))}
       </ul>
