@@ -78,6 +78,11 @@ export interface ScanSnapshot {
    * productdata. Zie `src/collect/answers.ts`.
    */
   siteCheck?: SiteCheck;
+  /**
+   * Het adres van de winkel, zoals de merchant het bij zijn categorieën opgaf.
+   * Reist mee zodat het rapport er niet opnieuw om hoeft te vragen.
+   */
+  siteUrl?: string;
   id: string;
   /** Elke rij met merchantdata draagt een account, ook nu er nog geen login is. */
   accountId: string;

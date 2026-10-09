@@ -46,7 +46,11 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
 }) {
   const { user } = useAuth();
   const [setId, setSetId] = useState('all');
-  const [site, setSite] = useState(siteCheck?.site ?? defaultSite ?? '');
+  // Het adres gaf de merchant al op bij zijn categorieën, of bij een eerdere
+  // toets. Dan vragen we er niet opnieuw om; wijzigen kan, maar is een keuze.
+  const known = siteCheck?.site ?? defaultSite ?? '';
+  const [site, setSite] = useState(known);
+  const [editing, setEditing] = useState(known === '');
   const [phase, setPhase] = useState<'idle' | 'busy'>('idle');
   const [failure, setFailure] = useState<{ title: string; next: string }>();
   const [saveFailed, setSaveFailed] = useState(false);
@@ -75,6 +79,8 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
         // De namen van zijn eigen categorieën, zodat hun pagina's als eerste gelezen worden.
         [...new Set(model.categories.flatMap((c) => [c.category, c.subcategory ?? '']).filter(Boolean))],
       );
+      // Het adres werkte: vanaf nu is het bekend en hoeft het veld niet meer open.
+      setEditing(false);
       try {
         await onSiteCheck?.(check);
       } catch {
@@ -104,13 +110,27 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
           <p className="mt-0.5 text-xs leading-relaxed text-muted">{s.report.siteIntro}</p>
           <div className="mt-2 flex flex-wrap items-end gap-3">
             <div className="min-w-0 flex-1">
-              <Input
-                id="site-check-url"
-                label={s.report.siteUrlLabel}
-                value={site}
-                onChange={setSite}
-                placeholder={s.report.siteUrlPlaceholder}
-              />
+              {editing ? (
+                <Input
+                  id="site-check-url"
+                  label={s.report.siteUrlLabel}
+                  value={site}
+                  onChange={setSite}
+                  placeholder={s.report.siteUrlPlaceholder}
+                />
+              ) : (
+                <p className="text-sm">
+                  {s.report.siteKnown}{' '}
+                  <span className="font-medium">{site.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(true)}
+                    className="ml-3 text-xs text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+                  >
+                    {s.report.siteChange}
+                  </button>
+                </p>
+              )}
             </div>
             <Button variant="secondary" onClick={() => void run()} loading={phase === 'busy'} disabled={site.trim() === ''}>
               {siteCheck ? s.report.siteRerun : s.report.siteRun}

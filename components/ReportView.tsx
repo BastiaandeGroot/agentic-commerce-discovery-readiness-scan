@@ -1017,6 +1017,7 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
       label: report.sources.catalog.filename,
     }),
     ...(check ? { siteCheck: check } : {}),
+    ...(siteUrl ? { siteUrl } : {}),
   });
 
   /** Een nieuwe sitetoets: tonen, en bijschrijven als de analyse al bewaard is. */

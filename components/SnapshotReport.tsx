@@ -98,6 +98,7 @@ export function SnapshotReport({ s, locale, snapshot, detail, work, onReviewQues
         model={model}
         onReviewQuestion={onReviewQuestion}
         siteCheck={fresh?.id === snapshot.id ? fresh.check : snapshot.siteCheck}
+        defaultSite={snapshot.siteUrl}
         onSiteCheck={onSiteCheck ? async (check) => { setFresh({ id: snapshot.id, check }); await onSiteCheck(check); } : undefined}
       />
     </div>
