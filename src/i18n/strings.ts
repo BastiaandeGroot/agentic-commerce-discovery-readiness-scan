@@ -592,7 +592,7 @@ export const STRINGS = {
       gapAffected: 'Producten',
       gapColumnInfo: {
         questions:
-          'Hoeveel vragen er door dit gat onbeantwoord blijven.',
+          'Hoeveel vragen er door dit missende of niet ingevulde attribuut onbeantwoord blijven.',
         field:
           'Het attribuut dat ontbreekt of niet ingevuld is.',
         cause:
@@ -1751,6 +1751,8 @@ export const STRINGS = {
       gapColumnInfo: {
         field:
           'The attribute that is missing or not filled in.',
+        questions:
+          'How many questions stay unanswered because of this missing or unfilled attribute.',
         cause:
           'Why it is missing, and therefore what kind of work it is.',
         affected:
