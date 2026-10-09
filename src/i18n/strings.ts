@@ -653,8 +653,8 @@ export const STRINGS = {
         'no-source': 'Geen bron',
       } as Record<string, string>,
       causeMeaning: {
-        unfilled: 'De kolom bestaat, maar staat hier leeg',
-        unmodelled: 'Je catalogus heeft geen kolom voor dit kenmerk',
+        unfilled: 'Het attribuut bestaat, maar is hier leeg',
+        unmodelled: 'Je catalogus heeft dit attribuut niet',
         'no-source': 'Komt uit een systeem dat een catalogus niet draagt',
       } as Record<string, string>,
       causeEffort: {
@@ -1813,6 +1813,8 @@ export const STRINGS = {
         'no-source': 'No source',
       } as Record<string, string>,
       causeMeaning: {
+        unfilled: 'The attribute exists, but is empty here',
+        unmodelled: 'Your catalogue does not have this attribute',
         mapping: 'In the catalogue, not mapped into the feed',
         enrichment: 'In neither source',
         'no-source': 'In no system you can read',
