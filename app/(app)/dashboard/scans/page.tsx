@@ -133,7 +133,7 @@ export default function ScansPage() {
             onRemove={() => remove(opened.id)}
             // Koppelen kan alleen met de catalogus erbij; de scan vraagt hem opnieuw
             // en gaat dan rechtstreeks naar het koppelscherm.
-            onLinkAttributes={() => router.push('/scan?stap=koppelen')}
+            onLinkAttributes={() => router.push(`/scan?stap=koppelen&analyse=${encodeURIComponent(opened.id)}`)}
             // De sitetoets hoort bij deze analyse en gaat in dezelfde rij mee.
             onSiteCheck={async (check) => {
               const next = { ...opened, siteCheck: check };

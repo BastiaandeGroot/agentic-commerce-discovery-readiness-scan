@@ -43,6 +43,7 @@ import { BankRequestForm } from '../../../components/BankRequestForm';
 import { useAuth } from '../../../components/auth/AuthProvider';
 import { MappingStep } from '../../../components/MappingStep';
 import { CategorySetsCard } from '../../../components/CategorySetsCard';
+import { Card, SkeletonLines } from '../../../components/ui';
 import { QuestionSetStep } from '../../../components/QuestionSetStep';
 import { ReportView, type SiteCheckProgress } from '../../../components/ReportView';
 
@@ -61,10 +62,13 @@ export default function Home() {
    * dus nergens bewaard.
    */
   const [toMapping, setToMapping] = useState(false);
+  /** Uit welke bewaarde analyse hij kwam; zonder id de nieuwste. */
+  const [resumeId, setResumeId] = useState<string>();
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('stap') === 'koppelen') {
-      void Promise.resolve().then(() => { setToMapping(true); setFromSaved(true); });
+      const analysis = params.get('analyse') ?? undefined;
+      void Promise.resolve().then(() => { setToMapping(true); setFromSaved(true); setResumeId(analysis); });
       return;
     }
     const questionId = params.get('vraag');
@@ -78,6 +82,7 @@ export default function Home() {
   }, []);
   const [catalog, setCatalog] = useState<Dataset>();
   const [banks, setBanks] = useState<StoredBank[]>([]);
+  const [banksLoaded, setBanksLoaded] = useState(false);
   const [questionState, setQuestionState] = useState<QuestionSetState>();
   // De koppeling van kenmerk naar kolom. Hij hoort bij deze catalogus en niet bij
   // de vragenlijst, want de kolomnamen zijn van de merchant; hij wordt daarom op
@@ -320,6 +325,27 @@ export default function Home() {
    * stappenbalk zeggen dat dan ook; teruglopen kan pas met een catalogus.
    */
   const resuming = fromSaved && toMapping && step === 'upload';
+  /**
+   * De categorie-indeling van de analyse waar hij vandaan komt. Die scan rustte
+   * op een indeling die hij toen gezien en bevestigd heeft; dezelfde gebruiken
+   * houdt de twee scans vergelijkbaar en bespaart hem het hele voortraject.
+   * `null` zodra we weten dat er geen is.
+   */
+  const [resumeState, setResumeState] = useState<QuestionSetState | null>();
+  const authSettled = user !== undefined && (user === null || accountId !== undefined);
+  useEffect(() => {
+    if (!toMapping || !authSettled) return;
+    let alive = true;
+    const target = snapshotStoreFor(supabase(), accountId);
+    void (async () => {
+      const id = resumeId ?? (await target.store.list(target.accountId).catch(() => []))[0]?.id;
+      const detail = id ? await target.store.loadDetail(target.accountId, id).catch(() => undefined) : undefined;
+      if (alive) setResumeState(detail?.pristine ?? null);
+    })();
+    return () => { alive = false; };
+  }, [toMapping, authSettled, accountId, resumeId]);
+  /** Pas inlezen als bekend is waar hij op verder gaat; anders valt hij terug op het hele traject. */
+  const resumeReady = !resuming || (banksLoaded && resumeState !== undefined);
   const shownStep: Step = resuming ? 'mapping' : step;
 
   // Eerder ingelezen banken staan op dit apparaat; ze horen er meteen te zijn,
@@ -328,6 +354,7 @@ export default function Home() {
   useEffect(() => {
     void bankStore.list(LOCAL_ACCOUNT).then((stored) => {
       setBanks(stored);
+      setBanksLoaded(true);
       // De koppeling van de vorige keer hoort er meteen te zijn, anders begint
       // elke sessie opnieuw met tientallen ongekoppelde kenmerken.
       const saved = stored.find((entry) => entry.mapping || entry.categories);
@@ -587,6 +614,16 @@ export default function Home() {
     // gaan we meteen door. Anders niet: een pad zonder oordeel valt terug op een
     // gok, en dan zouden de vragensets op een andere indeling rusten dan zijn
     // vorige scan.
+    if (fromSaved && toMapping && banks.length > 0 && resumeState) {
+      const nextFacets = resumeState.facetPaths ?? [];
+      const nextExcluded = resumeState.excludedPaths ?? [];
+      setFacets(nextFacets);
+      setExcluded(nextExcluded);
+      compose(banks, nextCatalog, latest.current.mapping, latest.current.categories, nextFacets, nextExcluded);
+      setStep('mapping');
+      return;
+    }
+
     if (fromSaved && (focusQuestion || toMapping) && banks.length > 0) {
       const nextPaths = pathsFromProducts(nextCatalog.products, categoryPath);
       const decided = nextPaths.length > 0 && nextPaths.every((path) => verdicts[pathKey(path.segments)] !== undefined);
@@ -800,7 +837,10 @@ export default function Home() {
         {fromSaved && toMapping && step !== 'upload' && step !== 'mapping' && step !== 'report' ? (
           <p className="mb-4 rounded-md bg-surface-2 px-3 py-2 text-sm leading-relaxed text-muted">{s.report.blindLinkPending}</p>
         ) : null}
-        {step === 'upload' ? <UploadStep s={s} onReady={handleReady} resume={resuming} /> : null}
+        {step === 'upload' && !resumeReady ? <Card><SkeletonLines lines={4} /></Card> : null}
+        {step === 'upload' && resumeReady ? (
+          <UploadStep s={s} onReady={handleReady} resume={resuming} owner={authSettled ? accountId ?? LOCAL_ACCOUNT : undefined} />
+        ) : null}
 
         {step === 'segments' && catalog ? (
           <SegmentStep
