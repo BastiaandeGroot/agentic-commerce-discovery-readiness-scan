@@ -259,7 +259,10 @@ export const STRINGS = {
       heading: 'Lever je productdata aan',
       resumeHeading: 'Kies eerst je catalogus opnieuw',
       resumeIntro:
-        'Om kenmerken te koppelen zijn je kolommen nodig, en je bestand wordt nergens bewaard. Zodra het is ingelezen sta je op het koppelscherm; je eerdere keuzes staan er nog.',
+        'Om kenmerken te koppelen is je catalogus nodig, en die staat niet meer in deze browser. Zodra hij is ingelezen sta je op het koppelscherm; je eerdere keuzes staan er nog.',
+      restoring: 'Je catalogus wordt ingelezen',
+      restoringBody: 'Het bestand van je vorige scan staat nog in deze browser. Daarna sta je op het koppelscherm.',
+      remembered: 'Je laatste catalogus blijft in deze browser staan, zodat je later verder kunt zonder hem opnieuw te kiezen.',
       resumeContinue: 'Verder naar koppelen',
       intro:
         'Eén export uit het systeem waar je productdata echt onderhouden wordt: je PIM, Magento of Shopify.',
@@ -601,7 +604,7 @@ export const STRINGS = {
       bankQuestionsNone: 'Voor deze categorie zijn geen vragen gemeten.',
       blindHeading: 'De vragenbank mist de volgende attributen in de productcatalogus.',
       blindLink: 'Naar Kenmerken koppelen',
-      blindLinkPending: 'Kies je catalogus opnieuw: je bestand wordt nergens bewaard. Daarna ga je direct naar Kenmerken koppelen; je eerdere keuzes staan er nog.',
+      blindLinkPending: 'Loop deze stap nog even na; daarna ga je door naar Kenmerken koppelen. Je eerdere keuzes staan er nog.',
       blindBody: 'Deze attributen komen niet voor in je productcatalogus. Klopt dit niet, ga dan terug naar "Kenmerken koppelen".',
       infoLabel: 'Wat betekent dit?',
       findableInfo:
@@ -1489,7 +1492,10 @@ export const STRINGS = {
       heading: 'Supply your product data',
       resumeHeading: 'First choose your catalogue again',
       resumeIntro:
-        'Linking characteristics needs your columns, and your file is not stored anywhere. As soon as it is read you are on the linking screen; your earlier choices are still there.',
+        'Linking characteristics needs your catalogue, and it is no longer in this browser. As soon as it is read you are on the linking screen; your earlier choices are still there.',
+      restoring: 'Reading your catalogue',
+      restoringBody: 'The file from your previous scan is still in this browser. After that you are on the linking screen.',
+      remembered: 'Your latest catalogue stays in this browser, so you can continue later without choosing it again.',
       resumeContinue: 'Continue to linking',
       intro:
         'One export from the system where your product data is really maintained: your PIM, Magento or Shopify.',
@@ -1828,7 +1834,7 @@ export const STRINGS = {
       bankQuestionsNone: 'No questions were measured for this category.',
       blindHeading: 'The question bank is missing the following attributes in the product catalogue.',
       blindLink: 'To Link characteristics',
-      blindLinkPending: 'Choose your catalogue again: your file is not stored anywhere. After that you go straight to Link characteristics; your earlier choices are still there.',
+      blindLinkPending: 'Check this step first; after that you continue to Link characteristics. Your earlier choices are still there.',
       blindBody: 'These attributes do not occur in your product catalogue. If that is not right, go back to "Link characteristics".',
       infoLabel: 'What does this mean?',
       findableInfo:

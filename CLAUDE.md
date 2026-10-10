@@ -283,6 +283,14 @@ rapport: tellingen, categorienamen en veldnamen, geen productdata en geen
 bronbestand. Dat houdt de belofte overeind dat de catalogus het apparaat niet
 verlaat, ook zodra er serverzijdig bewaard wordt.
 
+Het **catalogusbestand zelf** blijft alleen in de browser staan
+(`src/storage/catalogFile.ts`, IndexedDB, één bestand per account), zodat een
+merchant vanuit een bewaarde analyse terug kan naar het koppelscherm zonder het
+opnieuw te kiezen. Het gaat nooit naar de server; staat het er niet (ander
+apparaat, privévenster), dan vraagt het scherm erom. Die terugweg neemt de
+categorie-indeling van de bewaarde analyse over (`pristine.facetPaths`,
+`excludedPaths`) en slaat het voortraject over.
+
 Naast de snapshot gaat een **detail** mee (`SnapshotDetail`, kolom `detail`): de
 vragensets zoals ze voor de scan zijn samengesteld, zonder het werk van de
 merchant, en per product de toestand van elke vraag (`src/engine/rescore.ts`).

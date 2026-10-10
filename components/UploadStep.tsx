@@ -21,7 +21,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { Dataset } from '../src/domain/types';
 import type { Strings } from '../src/i18n/strings';
 import { ScanClient, type Progress } from '../src/worker/client';
-import { Badge, Button, Card, CardTitle, ErrorState, FileDropzone } from './ui';
+import { recallCatalogFile, rememberCatalogFile } from '../src/storage/catalogFile';
+import { Badge, Button, Card, CardTitle, ErrorState, FileDropzone, SkeletonLines } from './ui';
 
 /**
  * Boven deze grens waarschuwen we voordat de scan in de browser draait.
@@ -48,6 +49,11 @@ interface Props {
    * kaart zegt waarvoor het bestand nodig is en gaat na het inlezen vanzelf door.
    */
   resume?: boolean;
+  /**
+   * Onder welke naam het bestand in deze browser blijft staan; zie
+   * `src/storage/catalogFile.ts`. Zonder naam wordt er niets onthouden.
+   */
+  owner?: string;
 }
 
 interface Source {
@@ -104,7 +110,7 @@ function Preview({ s, dataset }: { s: Strings; dataset: Dataset }) {
   );
 }
 
-export function UploadStep({ s, onReady, resume = false }: Props) {
+export function UploadStep({ s, onReady, resume = false, owner }: Props) {
   // Eén client voor de hele stap; hij houdt de worker en de datasets vast.
   const clientRef = useRef<ScanClient>(undefined);
   if (!clientRef.current) clientRef.current = new ScanClient();
@@ -130,6 +136,27 @@ export function UploadStep({ s, onReady, resume = false }: Props) {
 
   const largeMb = source ? bytesToMb(source.text) : 0;
   const tooLarge = largeMb > LARGE_FILE_MB && !acceptedLarge;
+
+  /**
+   * Terug naar het koppelscherm: eerst kijken of het bestand van de vorige keer
+   * nog in deze browser staat. Zo ja, dan hoeft hij niets aan te leveren.
+   */
+  const [restoring, setRestoring] = useState(resume);
+  const restored = useRef(false);
+  useEffect(() => {
+    if (!resume || restored.current) return;
+    restored.current = true;
+    void (async () => {
+      const found = owner ? await recallCatalogFile(owner) : undefined;
+      if (found) {
+        setSource(found);
+        await reingest(found);
+      }
+      setRestoring(false);
+    })();
+    // Eén keer bij het openen; `reingest` verandert per render en hoort hier niet in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resume, owner]);
 
   /** Lees opnieuw in; dat is ook de weg terug na een correctie. */
   async function reingest(next: Source | undefined) {
@@ -167,6 +194,9 @@ export function UploadStep({ s, onReady, resume = false }: Props) {
     const next = { name: file.name, text: await file.text() };
     setSource(next);
     setAcceptedLarge(false);
+    // Onthouden vóór het inlezen: bij terugkomen gaat het scherm na het inlezen
+    // meteen door, en dan is deze stap al weg.
+    if (owner) void rememberCatalogFile(owner, next);
     await reingest(next);
   }
 
@@ -187,6 +217,15 @@ export function UploadStep({ s, onReady, resume = false }: Props) {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (restoring) {
+    return (
+      <Card>
+        <CardTitle sub={s.upload.restoringBody}>{s.upload.restoring}</CardTitle>
+        <SkeletonLines lines={3} />
+      </Card>
+    );
   }
 
   return (
@@ -276,7 +315,7 @@ export function UploadStep({ s, onReady, resume = false }: Props) {
       ) : null}
 
       <p className="mt-3 text-xs leading-relaxed text-muted">
-        {s.upload.privacy}{' '}
+        {s.upload.privacy}{' '}{owner ? `${s.upload.remembered} ` : ''}
         {offMainThread === undefined ? null : offMainThread ? s.upload.workerOn : s.upload.workerOff}
       </p>
     </Card>
