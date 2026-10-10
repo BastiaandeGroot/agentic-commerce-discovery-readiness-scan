@@ -292,9 +292,6 @@ function BankQuestions({ s, locale, model, rows }: {
         <ul>
           {shown.map((row) => (
             <li key={row.questionId} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line py-2 first:border-t-0">
-              <Badge tone={row.importance === 'critical' ? 'danger' : 'neutral'}>
-                {s.questions.importance[row.importance as keyof typeof s.questions.importance] ?? row.importance}
-              </Badge>
               <span className="min-w-0 flex-1 text-sm">
                 {row.label[locale]}
                 {row.needs.length > 0 ? (
@@ -377,14 +374,6 @@ function QuestionCoverageCard({ s, model, locale, onReviewQuestion }: {
             <li key={rowKey}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-2 text-sm">
-                  {/* Het gewicht staat vóór de vraag: het bepaalt of dit de
-                      eerste trede van de trechter blokkeert of alleen de laatste. */}
-                  {row.importance === 'critical' ? (
-                    <Badge tone="danger">{s.questions.importance.critical}</Badge>
-                  ) : null}
-                  {row.layer === 'category' ? (
-                    <Badge tone="neutral">{s.questions.layerCategory}</Badge>
-                  ) : null}
                   <span className="min-w-0">{row.label[locale]}</span>
                 </span>
                 {/* Het ene getal dat zegt hoe het staat, en meteen de ingang naar
@@ -806,9 +795,6 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
                       <ul className="mt-1 space-y-0.5 text-xs text-muted" aria-label={s.report.gapBlockedHeading}>
                         {shown.map((question) => (
                           <li key={question.questionId}>
-                            {question.importance === 'critical' ? (
-                              <span className="mr-1 font-medium text-danger">{s.questions.importance.critical}</span>
-                            ) : null}
                             {question.label[locale]}
                           </li>
                         ))}

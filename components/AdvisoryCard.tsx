@@ -244,7 +244,6 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
         {items.map(({ entry, answer }) => (
           <li key={entry.id} className="border-t border-line pt-2">
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <Badge tone="neutral">{s.questions.importance[entry.importance as keyof typeof s.questions.importance] ?? entry.importance}</Badge>
               <span className="min-w-0 flex-1 text-sm">{entry.label}</span>
               {answer ? <Badge tone={STATUS_TONE[answer.status]}>{s.report.siteStatus[answer.status]}</Badge> : null}
             </div>
