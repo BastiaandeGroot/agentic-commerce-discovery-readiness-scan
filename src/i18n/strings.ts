@@ -257,6 +257,10 @@ export const STRINGS = {
 
     upload: {
       heading: 'Lever je productdata aan',
+      resumeHeading: 'Kies eerst je catalogus opnieuw',
+      resumeIntro:
+        'Om kenmerken te koppelen zijn je kolommen nodig, en je bestand wordt nergens bewaard. Zodra het is ingelezen sta je op het koppelscherm; je eerdere keuzes staan er nog.',
+      resumeContinue: 'Verder naar koppelen',
       intro:
         'Eén export uit het systeem waar je productdata echt onderhouden wordt: je PIM, Magento of Shopify.',
       drop: 'Sleep je bestand hierheen of klik om te kiezen',
@@ -1483,6 +1487,10 @@ export const STRINGS = {
 
     upload: {
       heading: 'Supply your product data',
+      resumeHeading: 'First choose your catalogue again',
+      resumeIntro:
+        'Linking characteristics needs your columns, and your file is not stored anywhere. As soon as it is read you are on the linking screen; your earlier choices are still there.',
+      resumeContinue: 'Continue to linking',
       intro:
         'One export from the system where your product data is really maintained: your PIM, Magento or Shopify.',
       drop: 'Drop your file here, or click to choose one',
