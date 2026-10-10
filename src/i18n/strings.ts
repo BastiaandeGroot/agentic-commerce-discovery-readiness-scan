@@ -375,6 +375,7 @@ export const STRINGS = {
       backToQuestions: 'Terug naar vragensets valideren',
       noColumnIsFine: '"Geen kolom" is een geldig antwoord en houdt de scan niet tegen: dan legt je catalogus dit kenmerk niet vast.',
       inherited: '{aantal} keuzes zijn overgenomen uit eerdere scans van deze webshop. Klopt er een niet meer, wijzig hem dan hier.',
+      runAndReturn: 'Scan opnieuw en terug naar het rapport',
       openSettles: '{aantal} kenmerken hebben nog geen kolom. Start je de scan, dan leggen we die vast als "geen kolom" en vragen we er de volgende keer niet opnieuw naar.',
       filledShare: 'gevuld bij {pct}%',
       filledIn: 'vooral in {categorieen}',
@@ -595,6 +596,7 @@ export const STRINGS = {
       bankQuestionsNeeds: 'Nodig:',
       bankQuestionsNone: 'Voor deze categorie zijn geen vragen gemeten.',
       blindHeading: 'De vragenbank mist de volgende attributen in de productcatalogus.',
+      blindLink: 'Naar Kenmerken koppelen',
       blindBody: 'Deze attributen komen niet voor in je productcatalogus. Klopt dit niet, ga dan terug naar "Kenmerken koppelen".',
       infoLabel: 'Wat betekent dit?',
       findableInfo:
@@ -1595,6 +1597,7 @@ export const STRINGS = {
       backToQuestions: 'Back to validating question sets',
       noColumnIsFine: '"No column" is a valid answer and does not block the scan: it means your catalogue does not record this characteristic.',
       inherited: '{aantal} choices were taken over from earlier scans of this shop. If one is no longer right, change it here.',
+      runAndReturn: 'Scan again and back to the report',
       openSettles: '{aantal} characteristics have no column yet. If you start the scan, we record them as "no column" and will not ask about them again next time.',
       filledShare: 'filled for {pct}%',
       filledIn: 'mainly in {categorieen}',
@@ -1815,6 +1818,7 @@ export const STRINGS = {
       bankQuestionsNeeds: 'Needs:',
       bankQuestionsNone: 'No questions were measured for this category.',
       blindHeading: 'The question bank is missing the following attributes in the product catalogue.',
+      blindLink: 'To Link characteristics',
       blindBody: 'These attributes do not occur in your product catalogue. If that is not right, go back to "Link characteristics".',
       infoLabel: 'What does this mean?',
       findableInfo:

@@ -860,12 +860,17 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
  * hetzelfde uitzien. Wat alleen met de producten kan — de verkenner, bewaren en
  * de pdf — komt van buiten binnen.
  */
-export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestion, siteCheck, onSiteCheck, defaultSite, siteSaveHint, sitePending, siteFailed }: {
+export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestion, onLinkAttributes, siteCheck, onSiteCheck, defaultSite, siteSaveHint, sitePending, siteFailed }: {
   s: Strings;
   locale: Locale;
   model: ReportModel;
   /** Naar een vraag op het vragensetscherm. Alleen waar dat scherm bereikbaar is. */
   onReviewQuestion?: (question: { setId: string; questionId: string; base: boolean }) => void;
+  /**
+   * Terug naar het koppelscherm. Alleen waar de catalogus nog in het geheugen
+   * staat: daar start "Scan uitvoeren" de scan opnieuw en komt hij hier terug.
+   */
+  onLinkAttributes?: () => void;
   /** Per product kijken, of de uitleg waarom dat hier niet kan. */
   explorer?: ReactNode;
   footer?: ReactNode;
@@ -912,8 +917,16 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
 
       {model.stamp.blindAttributes.length > 0 ? (
         <div className="rounded-lg border border-warn/40 bg-warn-soft px-4 py-3">
-          <p className="font-medium text-warn">{s.report.blindHeading}</p>
-          <p className="mt-1 text-sm leading-relaxed text-ink">{s.report.blindBody}</p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-medium text-warn">{s.report.blindHeading}</p>
+              <p className="mt-1 text-sm leading-relaxed text-ink">{s.report.blindBody}</p>
+            </div>
+            {/* De zin zegt "ga terug"; dan hoort er ook een weg terug te zijn. */}
+            {onLinkAttributes ? (
+              <Button variant="secondary" onClick={onLinkAttributes}>{s.report.blindLink}</Button>
+            ) : null}
+          </div>
           <ul className="mt-2 flex flex-wrap gap-1.5">
             {model.stamp.blindAttributes.map((attribute) => (
               <li key={attribute.key}>
@@ -1013,13 +1026,15 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
   );
 }
 
-export function ReportView({ s, locale, report, onRestart, restartLabel, canSave = true, onReviewQuestion, pristine, siteUrl, siteProgress }: {
+export function ReportView({ s, locale, report, onRestart, restartLabel, canSave = true, onReviewQuestion, onLinkAttributes, pristine, siteUrl, siteProgress }: {
   s: Strings;
   locale: Locale;
   report: ScanReport;
   /** De samenstelling zonder werk; gaat mee bij bewaren zodat de analyse later bij te werken is. */
   pristine?: QuestionSetState;
   onReviewQuestion?: (question: { setId: string; questionId: string; base: boolean }) => void;
+  /** Terug naar het koppelscherm; de scan komt daarna hier terug. */
+  onLinkAttributes?: () => void;
   onRestart: () => void;
   /** Op /demo is de weg terug niet "nieuwe scan" maar "doe dit zelf". */
   restartLabel?: string;
@@ -1118,6 +1133,7 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
       locale={locale}
       model={model}
       onReviewQuestion={onReviewQuestion}
+      onLinkAttributes={onLinkAttributes}
       explorer={<Explorer s={s} locale={locale} report={report} />}
       siteCheck={siteCheck}
       onSiteCheck={canSave ? keepSiteCheck : undefined}

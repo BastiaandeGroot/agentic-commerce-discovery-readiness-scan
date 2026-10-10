@@ -42,6 +42,8 @@ interface Props {
   proposalVersion?: string;
   /** Kenmerken waarvan de keuze uit een eerdere scan is overgenomen. */
   inherited?: string[];
+  /** Hij kwam hier vanuit het rapport; zeg dat de knop hem daar terugbrengt. */
+  returning?: boolean;
   /**
    * Een functie in plaats van een waarde werkt op de koppeling van nú. Dat is
    * nodig voor alles wat asynchroon terugkomt: een voorstel dat na een minuut
@@ -85,7 +87,7 @@ const MAX_COLUMNS = 300;
 const CATEGORIES_SHOWN = 3;
 
 export function MappingStep({
-  s, locale, catalog, state, mapping, proposed, proposalVersion, inherited = [], onChange, onRun, running, error, onBack,
+  s, locale, catalog, state, mapping, proposed, proposalVersion, inherited = [], returning, onChange, onRun, running, error, onBack,
 }: Props) {
   const ready = allValidated(state);
   const [busy, setBusy] = useState<LoadProgress | 'remote'>();
@@ -621,7 +623,9 @@ export function MappingStep({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={runScan} disabled={!ready || busy !== undefined} loading={running}>{s.questions.runScan}</Button>
+        <Button onClick={runScan} disabled={!ready || busy !== undefined} loading={running}>
+          {returning ? s.mapping.runAndReturn : s.questions.runScan}
+        </Button>
         {ready ? <span className="text-sm text-muted">{s.questions.allValidated}</span> : null}
         {error ? (
           <div className="mt-3 w-full">
