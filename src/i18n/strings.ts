@@ -597,6 +597,7 @@ export const STRINGS = {
       bankQuestionsNone: 'Voor deze categorie zijn geen vragen gemeten.',
       blindHeading: 'De vragenbank mist de volgende attributen in de productcatalogus.',
       blindLink: 'Naar Kenmerken koppelen',
+      blindLinkPending: 'Kies je catalogus opnieuw: je bestand wordt nergens bewaard. Daarna ga je direct naar Kenmerken koppelen; je eerdere keuzes staan er nog.',
       blindBody: 'Deze attributen komen niet voor in je productcatalogus. Klopt dit niet, ga dan terug naar "Kenmerken koppelen".',
       infoLabel: 'Wat betekent dit?',
       findableInfo:
@@ -1819,6 +1820,7 @@ export const STRINGS = {
       bankQuestionsNone: 'No questions were measured for this category.',
       blindHeading: 'The question bank is missing the following attributes in the product catalogue.',
       blindLink: 'To Link characteristics',
+      blindLinkPending: 'Choose your catalogue again: your file is not stored anywhere. After that you go straight to Link characteristics; your earlier choices are still there.',
       blindBody: 'These attributes do not occur in your product catalogue. If that is not right, go back to "Link characteristics".',
       infoLabel: 'What does this mean?',
       findableInfo:

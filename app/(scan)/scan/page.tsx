@@ -55,8 +55,18 @@ export default function Home() {
   const [focusQuestion, setFocusQuestion] = useState<{ setId: string; questionId: string; base: boolean }>();
   /** Vanuit een bewaarde analyse: de vraag staat in het adres, want de catalogus moet eerst opnieuw in. */
   const [fromSaved, setFromSaved] = useState(false);
+  /**
+   * Vanuit een bewaarde analyse op weg naar het koppelscherm. Ook dan moet de
+   * catalogus eerst opnieuw in: het bestand verlaat het apparaat niet en staat
+   * dus nergens bewaard.
+   */
+  const [toMapping, setToMapping] = useState(false);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.get('stap') === 'koppelen') {
+      void Promise.resolve().then(() => { setToMapping(true); setFromSaved(true); });
+      return;
+    }
     const questionId = params.get('vraag');
     const setId = params.get('set');
     if (!questionId || !setId) return;
@@ -447,7 +457,10 @@ export default function Home() {
   const siteStartedFor = useRef<string>(undefined);
   useEffect(() => {
     if (step !== 'mapping' && step !== 'report') return;
-    if (!user || !shopUrl || !questionState) return;
+    // Het adres van nu, of dat uit zijn meest recente analyse: wie vanuit een
+    // bewaarde analyse komt, slaat het categoriescherm over.
+    const site = shopUrl ?? knownSite;
+    if (!user || !site || !questionState) return;
     const seen = new Set<string>();
     const questions = questionState.sets
       .flatMap((set) => set.questions)
@@ -455,7 +468,7 @@ export default function Home() {
       .filter((question) => (seen.has(question.id) ? false : (seen.add(question.id), true)))
       .map((question) => ({ id: question.id, label: question.label[locale] }));
     if (questions.length === 0) return;
-    const key = `${shopUrl}|${questions.map((question) => question.id).sort().join(',')}`;
+    const key = `${site}|${questions.map((question) => question.id).sort().join(',')}`;
     if (siteStartedFor.current === key) return;
     siteStartedFor.current = key;
 
@@ -470,9 +483,9 @@ export default function Home() {
         const target = snapshotStoreFor(supabase(), accountId);
         const earlier = (await target.store.list(target.accountId).catch(() => []))
           .flatMap((one) => (one.siteCheck ? [one.siteCheck] : []));
-        const reuse = reusableSiteCheck(earlier, shopUrl, questions.map((question) => question.id), new Date().toISOString());
+        const reuse = reusableSiteCheck(earlier, site, questions.map((question) => question.id), new Date().toISOString());
         const check = reuse ?? await requestSiteCheck(
-          shopUrl,
+          site,
           questions,
           // Alleen de namen van zijn categorieën, om te kiezen welke pagina's gelezen worden.
           [...new Set(questionState.sets.flatMap((set) => [set.parent ?? '', set.category ?? '']).filter(Boolean))],
@@ -483,7 +496,7 @@ export default function Home() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, user, shopUrl, questionState, locale]);
+  }, [step, user, shopUrl, knownSite, questionState, locale]);
 
   /**
    * Eerdere keuzes overnemen voor kenmerken die onder een andere naam terugkomen.
@@ -567,7 +580,7 @@ export default function Home() {
     // gaan we meteen door. Anders niet: een pad zonder oordeel valt terug op een
     // gok, en dan zouden de vragensets op een andere indeling rusten dan zijn
     // vorige scan.
-    if (fromSaved && focusQuestion && banks.length > 0) {
+    if (fromSaved && (focusQuestion || toMapping) && banks.length > 0) {
       const nextPaths = pathsFromProducts(nextCatalog.products, categoryPath);
       const decided = nextPaths.length > 0 && nextPaths.every((path) => verdicts[pathKey(path.segments)] !== undefined);
       if (decided) {
@@ -577,7 +590,9 @@ export default function Home() {
         setFacets(nextFacets);
         setExcluded(nextExcluded);
         compose(banks, nextCatalog, latest.current.mapping, latest.current.categories, nextFacets, nextExcluded);
-        setStep('questions');
+        // Naar het koppelscherm als hij daarvoor kwam; de vragensets zijn dan al
+        // bevestigd, anders houdt het koppelscherm hem zelf tegen.
+        setStep(toMapping ? 'mapping' : 'questions');
         return;
       }
     }
@@ -775,6 +790,9 @@ export default function Home() {
         {fromSaved && focusQuestion && step !== 'questions' && step !== 'report' ? (
           <p className="mb-4 rounded-md bg-surface-2 px-3 py-2 text-sm leading-relaxed text-muted">{s.report.qReviewPending}</p>
         ) : null}
+        {fromSaved && toMapping && step !== 'mapping' && step !== 'report' ? (
+          <p className="mb-4 rounded-md bg-surface-2 px-3 py-2 text-sm leading-relaxed text-muted">{s.report.blindLinkPending}</p>
+        ) : null}
         {step === 'upload' ? <UploadStep s={s} onReady={handleReady} /> : null}
 
         {step === 'segments' && catalog ? (
@@ -869,7 +887,7 @@ export default function Home() {
             proposalVersion={proposalVersion}
             inherited={inherited}
             // Er ligt al een rapport: de knop zegt dan dat hij daar terugkomt.
-            returning={report !== undefined}
+            returning={report !== undefined || toMapping}
             onChange={handleMapping}
             onRun={() => void handleRun()}
             running={scanning}
@@ -885,7 +903,7 @@ export default function Home() {
             report={report}
             onRestart={restart}
             pristine={reportPristine}
-            siteUrl={shopUrl}
+            siteUrl={shopUrl ?? knownSite}
             siteProgress={siteProgress}
             // Naar het koppelscherm; "Scan uitvoeren" daar brengt hem terug naar het rapport.
             onLinkAttributes={() => setStep('mapping')}
