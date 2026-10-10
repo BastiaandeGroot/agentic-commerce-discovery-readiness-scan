@@ -868,6 +868,8 @@ export default function Home() {
             proposed={proposed}
             proposalVersion={proposalVersion}
             inherited={inherited}
+            // Er ligt al een rapport: de knop zegt dan dat hij daar terugkomt.
+            returning={report !== undefined}
             onChange={handleMapping}
             onRun={() => void handleRun()}
             running={scanning}
@@ -885,6 +887,8 @@ export default function Home() {
             pristine={reportPristine}
             siteUrl={shopUrl}
             siteProgress={siteProgress}
+            // Naar het koppelscherm; "Scan uitvoeren" daar brengt hem terug naar het rapport.
+            onLinkAttributes={() => setStep('mapping')}
             onReviewQuestion={(question) => { setFocusQuestion(question); setStep('questions'); }}
           />
         ) : null}
