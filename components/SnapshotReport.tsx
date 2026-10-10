@@ -28,7 +28,7 @@ function datum(iso: string, locale: Locale): string {
   return new Date(iso).toLocaleString(locale === 'nl' ? 'nl-NL' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-export function SnapshotReport({ s, locale, snapshot, detail, work, onReviewQuestion, onEditQuestions, onRemove, onSiteCheck }: {
+export function SnapshotReport({ s, locale, snapshot, detail, work, onReviewQuestion, onEditQuestions, onRemove, onSiteCheck, onLinkAttributes }: {
   s: Strings;
   locale: Locale;
   snapshot: ScanSnapshot;
@@ -41,6 +41,8 @@ export function SnapshotReport({ s, locale, snapshot, detail, work, onReviewQues
   onEditQuestions?: () => void;
   /** Deze analyse verwijderen, na bevestiging; gooit bij een fout. */
   onRemove?: () => Promise<void>;
+  /** Naar het koppelscherm; daarvoor moet de catalogus opnieuw in. */
+  onLinkAttributes?: () => void;
   /** Een nieuwe sitetoets bij deze analyse bewaren; gooit bij een fout. */
   onSiteCheck?: (check: SiteCheck) => Promise<void>;
 }) {
@@ -97,6 +99,7 @@ export function SnapshotReport({ s, locale, snapshot, detail, work, onReviewQues
         locale={locale}
         model={model}
         onReviewQuestion={onReviewQuestion}
+        onLinkAttributes={onLinkAttributes}
         siteCheck={fresh?.id === snapshot.id ? fresh.check : snapshot.siteCheck}
         defaultSite={snapshot.siteUrl}
         onSiteCheck={onSiteCheck ? async (check) => { setFresh({ id: snapshot.id, check }); await onSiteCheck(check); } : undefined}
