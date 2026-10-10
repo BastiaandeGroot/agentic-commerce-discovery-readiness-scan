@@ -314,6 +314,13 @@ export default function Home() {
     { id: 'mapping', label: s.steps.mapping },
     { id: 'report', label: s.steps.report },
   ];
+  /**
+   * Vanuit een bewaarde analyse naar het koppelscherm: de catalogus moet eerst
+   * opnieuw in, maar voor de merchant ís dit het koppelscherm. De kop en de
+   * stappenbalk zeggen dat dan ook; teruglopen kan pas met een catalogus.
+   */
+  const resuming = fromSaved && toMapping && step === 'upload';
+  const shownStep: Step = resuming ? 'mapping' : step;
 
   // Eerder ingelezen banken staan op dit apparaat; ze horen er meteen te zijn,
   // anders draait de eerste scan van een sessie op de terugval terwijl er allang
@@ -750,13 +757,13 @@ export default function Home() {
   return (
     <div className="mx-auto max-w-5xl">
       <header className="mb-8">
-        <h1 className="font-display text-2xl font-semibold tracking-tight">{steps.find((x) => x.id === step)?.label}</h1>
+        <h1 className="font-display text-2xl font-semibold tracking-tight">{steps.find((x) => x.id === shownStep)?.label}</h1>
         <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">{s.tagline}</p>
 
         <ol className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           {steps.map((entry, index) => {
-            const done = steps.findIndex((x) => x.id === step) > index;
-            const current = entry.id === step;
+            const done = steps.findIndex((x) => x.id === shownStep) > index;
+            const current = entry.id === shownStep;
             return (
               <li key={entry.id} className="flex items-center gap-2">
                 {index > 0 ? <span className="text-muted">→</span> : null}
@@ -764,7 +771,7 @@ export default function Home() {
                     stap vooruit heeft nog niet wat hij nodig heeft. Terug gaan
                     gooit niets weg — koppeling, keuzes en het werk op de
                     vragensets blijven staan. */}
-                {done ? (
+                {done && !resuming ? (
                   <button
                     type="button"
                     onClick={() => { setFocusQuestion(undefined); setStep(entry.id as Step); }}
@@ -774,10 +781,10 @@ export default function Home() {
                   </button>
                 ) : (
                   <span
-                    className={current ? 'font-medium text-ink' : 'text-muted'}
+                    className={current ? 'font-medium text-ink' : done ? 'text-ok' : 'text-muted'}
                     aria-current={current ? 'step' : undefined}
                   >
-                    {entry.label}
+                    {done ? '✓ ' : ''}{entry.label}
                   </span>
                 )}
               </li>
@@ -790,10 +797,10 @@ export default function Home() {
         {fromSaved && focusQuestion && step !== 'questions' && step !== 'report' ? (
           <p className="mb-4 rounded-md bg-surface-2 px-3 py-2 text-sm leading-relaxed text-muted">{s.report.qReviewPending}</p>
         ) : null}
-        {fromSaved && toMapping && step !== 'mapping' && step !== 'report' ? (
+        {fromSaved && toMapping && step !== 'upload' && step !== 'mapping' && step !== 'report' ? (
           <p className="mb-4 rounded-md bg-surface-2 px-3 py-2 text-sm leading-relaxed text-muted">{s.report.blindLinkPending}</p>
         ) : null}
-        {step === 'upload' ? <UploadStep s={s} onReady={handleReady} /> : null}
+        {step === 'upload' ? <UploadStep s={s} onReady={handleReady} resume={resuming} /> : null}
 
         {step === 'segments' && catalog ? (
           <SegmentStep

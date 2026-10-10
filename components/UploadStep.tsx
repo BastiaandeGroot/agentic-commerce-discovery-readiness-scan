@@ -42,6 +42,12 @@ const LARGE_FILE_MB = 50;
 interface Props {
   s: Strings;
   onReady: (client: ScanClient, catalog: Dataset) => void;
+  /**
+   * Terug vanuit een bewaarde analyse naar het koppelscherm. De catalogus is
+   * nergens bewaard en moet dus opnieuw in, maar dit is geen nieuwe scan: de
+   * kaart zegt waarvoor het bestand nodig is en gaat na het inlezen vanzelf door.
+   */
+  resume?: boolean;
 }
 
 interface Source {
@@ -98,7 +104,7 @@ function Preview({ s, dataset }: { s: Strings; dataset: Dataset }) {
   );
 }
 
-export function UploadStep({ s, onReady }: Props) {
+export function UploadStep({ s, onReady, resume = false }: Props) {
   // Eén client voor de hele stap; hij houdt de worker en de datasets vast.
   const clientRef = useRef<ScanClient>(undefined);
   if (!clientRef.current) clientRef.current = new ScanClient();
@@ -140,6 +146,9 @@ export function UploadStep({ s, onReady }: Props) {
 
       if (Object.keys(result.mapping).length === 0) {
         setError({ title: s.errors.noColumns, body: s.errors.noColumnsNext });
+      } else if (resume && bytesToMb(next.text) <= LARGE_FILE_MB) {
+        // Hij kwam om te koppelen, niet om zijn bestand na te kijken.
+        onReady(client, result);
       }
     } catch (caught) {
       setDataset(undefined);
@@ -182,7 +191,7 @@ export function UploadStep({ s, onReady }: Props) {
 
   return (
     <Card>
-      <CardTitle sub={s.upload.intro}>{s.upload.heading}</CardTitle>
+      <CardTitle sub={resume ? s.upload.resumeIntro : s.upload.intro}>{resume ? s.upload.resumeHeading : s.upload.heading}</CardTitle>
 
       {error ? (
         <div className="mb-4">
@@ -251,11 +260,13 @@ export function UploadStep({ s, onReady }: Props) {
           disabled={!dataset || busy || tooLarge}
           loading={busy}
         >
-          {busy ? s.upload.reading : s.upload.analyse}
+          {busy ? s.upload.reading : resume ? s.upload.resumeContinue : s.upload.analyse}
         </Button>
-        <Button variant="secondary" onClick={loadSample} disabled={busy}>
-          {s.upload.sample}
-        </Button>
+        {resume ? null : (
+          <Button variant="secondary" onClick={loadSample} disabled={busy}>
+            {s.upload.sample}
+          </Button>
+        )}
       </div>
 
       {progress ? (
