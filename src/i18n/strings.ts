@@ -819,7 +819,7 @@ export const STRINGS = {
     nodes: {
       heading: 'Categorieknopen voor de vragenbank',
       intro:
-        'Wat elke merchant op zijn categoriescherm als categorie heeft aangemerkt. Dit is de opdracht voor het onderzoek: per knoop wordt er een panel van vijf sites langsgegaan die díé subcategorie werkelijk voeren.',
+        'Wat elke merchant op zijn categoriescherm als categorie heeft aangemerkt. Dit is de opdracht voor het onderzoek: per knoop wordt er een panel van acht sites langsgegaan die díé subcategorie werkelijk voeren.',
       rule:
         'Alleen categorieën staan hier. Een pad dat de merchant een kenmerk noemde — een materiaal, een collectie, een kleur — krijgt nooit een vragenset en wordt dus ook niet onderzocht. Dat scheelt het meeste werk: van een boom van zestig knopen blijft ongeveer de helft over.',
       nodeCount: 'categorieknopen',
@@ -1071,7 +1071,7 @@ export const STRINGS = {
       marketTooMany: 'Geef \u00e9\u00e9n markt op, zonder komma of schuine streep. Verkoop je in twee markten, doe dan eerst de ene en daarna de andere.',
       marketBusy: 'Markt bepalen…',
       panelLabel: 'Welke webshops moeten we bekijken?',
-      panelHint: 'Eén per regel, en dit mag leeg blijven. We onderzoeken vijf winkels in jouw markt om te zien welke vragen kopers stellen. Ken jij de serieuze spelers, noem ze dan — we voegen ze toe aan wat we zelf vinden. Je krijgt altijd te zien welke sites we uiteindelijk hebben gebruikt.',
+      panelHint: 'Eén per regel, en dit mag leeg blijven. We onderzoeken acht winkels in jouw markt om te zien welke vragen kopers stellen. Ken jij de serieuze spelers, noem ze dan — we voegen ze toe aan wat we zelf vinden. Je krijgt altijd te zien welke sites we uiteindelijk hebben gebruikt.',
       panelPlaceholder: 'https://voorbeeld.nl',
       submit: 'Zet de aanvraag klaar',
       submitBusy: 'Bezig…',
@@ -1085,7 +1085,7 @@ export const STRINGS = {
         'De vragen komen niet uit je eigen kolommen maar uit onderzoek naar jouw markt: wat kopers vragen voordat ze bestellen, verzameld over meerdere webshops. Dat is werk dat één keer per markt gebeurt — en jij bent de eerste in de jouwe.',
       what: 'Wat er nu gebeurt',
       whatBody:
-        'We nemen vijf webshops in jouw markt door. De webshops die je hierboven opgaf horen daar altijd bij, net als je eigen winkel; de rest zoeken wij erbij. Van elke site lezen we de veelgestelde vragen, de categorieteksten en de productpagina\u2019s. Daaruit komt de vragenlijst waarmee we jouw data meten.',
+        'We nemen acht webshops in jouw markt door. De webshops die je hierboven opgaf horen daar altijd bij, net als je eigen winkel; de rest zoeken wij erbij. Van elke site lezen we de veelgestelde vragen, de categorieteksten en de productpagina\u2019s. Daaruit komt de vragenlijst waarmee we jouw data meten.',
       when: 'Hoe lang dit duurt',
       whenBody:
         'Reken op één tot twee werkdagen. Je hoeft niet te wachten: sluit dit venster gerust. Je krijgt een mail zodra je scan klaarstaat, en je gegevens blijven bewaard.',
@@ -2049,7 +2049,7 @@ export const STRINGS = {
     nodes: {
       heading: 'Category nodes for the question bank',
       intro:
-        'What each merchant marked as a category on their category screen. This is the research brief: per node a panel of five sites that actually carry that subcategory.',
+        'What each merchant marked as a category on their category screen. This is the research brief: per node a panel of eight sites that actually carry that subcategory.',
       rule:
         'Only categories appear here. A path the merchant called a characteristic — a material, a collection, a colour — never gets a question set and is therefore never researched. That saves most of the work: of a sixty-node tree, roughly half remains.',
       nodeCount: 'category nodes',
@@ -2301,7 +2301,7 @@ export const STRINGS = {
       marketTooMany: 'Give one market, without a comma or slash. If you trade in two markets, do one first and the other after.',
       marketBusy: 'Determining the market…',
       panelLabel: 'Which shops should we look at?',
-      panelHint: 'One per line, and this may stay empty. We research five shops in your market to see what questions buyers ask. If you know the serious players, name them — we add them to what we find ourselves. You will always be shown which sites we ended up using.',
+      panelHint: 'One per line, and this may stay empty. We research eight shops in your market to see what questions buyers ask. If you know the serious players, name them — we add them to what we find ourselves. You will always be shown which sites we ended up using.',
       panelPlaceholder: 'https://example.com',
       submit: 'Put the request in',
       submitBusy: 'Working…',
@@ -2315,7 +2315,7 @@ export const STRINGS = {
         'The questions do not come from your own columns but from research into your market: what buyers ask before they order, gathered across several shops. That is work done once per market — and you are the first in yours.',
       what: 'What is happening now',
       whatBody:
-        'We are going through five shops in your market. The ones you named above are always included, as is your own shop; we find the rest ourselves. For each site we read the FAQs, the category texts and the product pages. That produces the list of questions we measure your data against.',
+        'We are going through eight shops in your market. The ones you named above are always included, as is your own shop; we find the rest ourselves. For each site we read the FAQs, the category texts and the product pages. That produces the list of questions we measure your data against.',
       when: 'How long this takes',
       whenBody:
         'Expect one to two working days. You do not have to wait: feel free to close this window. You will get an email as soon as your scan is ready, and your details are kept.',

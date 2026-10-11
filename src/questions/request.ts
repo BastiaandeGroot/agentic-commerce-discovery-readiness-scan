@@ -9,7 +9,7 @@
 // vergelijking het hele bestaansrecht van een bank op vertical-niveau is.
 //
 // Dus: de aanvraag hangt aan de **markt**. De site van de merchant is één van de
-// vijf panelsites, en het resultaat geldt voor iedereen die daarna in
+// acht panelsites, en het resultaat geldt voor iedereen die daarna in
 // diezelfde markt scant. Daarmee is het dure pad ook zeldzaam: één keer per
 // vertical, daarna kost de volgende merchant niets.
 //
@@ -27,20 +27,19 @@ import type { CategoryStat } from './generate';
 
 /** Het soort bron dat de methode in een panel wil zien, met hoeveel ervan. */
 /**
- * Het panel: vijf sites, en de verdeling erbij.
+ * Het panel: acht sites, en de verdeling erbij.
  *
- * Vijf en niet acht, op verzoek van de opdrachtgever: het onderzoek per site is
- * het meeste werk, en acht sites maakt een bank per markt een dagtaak waar er
- * geen tijd voor is. De verdeling telt daarom precies op tot vijf en de
- * marketplace is eruit — die bracht verplichte feedvelden, en die hangen aan een
- * feedspecificatie waar deze scan niet tegen meet.
- *
- * Wat je met vijf inlevert is de frequentiemaat: dekking 3 van 5 is grover dan
- * 5 van 8. Dat staat als waarschuwing bij de dekking, niet verstopt.
+ * Acht sinds woontextiel v5, op verzoek van de opdrachtgever (11 oktober 2026).
+ * Het panel was eerder vijf om het werk per bank klein te houden; bij v5 bleek
+ * dat te grof: dekking hing aan één of twee sites en segmenten haalden de lat
+ * van twee sites te vaak niet. De verdeling telt precies op tot `PANEL_SIZE` in
+ * `src/generation/state.ts`. De marketplace blijft eruit — die bracht verplichte
+ * feedvelden, en die hangen aan een feedspecificatie waar deze scan niet tegen
+ * meet.
  */
 export const PANEL_RECIPE: { type: PanelSiteType; count: string; brings: Bilingual }[] = [
   {
-    type: 'category-leader', count: '2',
+    type: 'category-leader', count: '4',
     brings: {
       nl: 'vragen, FAQ\'s en gepubliceerde beslisregels',
       en: 'questions, FAQs and published decision rules',
@@ -61,7 +60,7 @@ export const PANEL_RECIPE: { type: PanelSiteType; count: string; brings: Bilingu
     },
   },
   {
-    type: 'foreign', count: '1',
+    type: 'foreign', count: '2',
     brings: {
       nl: 'vaak veel technischer, en andere wetgeving',
       en: 'often far more technical, and different legislation',
@@ -84,7 +83,7 @@ export interface BankRequest {
   /** De markt, niet de merchant. Sleutel van de bank die eruit moet komen. */
   vertical: string;
   verticalLabel: Bilingual;
-  /** De site van de merchant; hij wordt één panelsite van de vijf. */
+  /** De site van de merchant; hij wordt één panelsite van de acht. */
   merchantSite?: string;
   /** Categorienaam met aantal producten. Nodig voor de facetanalyse. */
   categories: { name: string; count: number }[];
@@ -181,8 +180,8 @@ export function renderBankRequest(request: BankRequest, locale: Locale = 'nl'): 
   lines.push(nl ? '## Panel samen te stellen' : '## Panel to assemble');
   lines.push('');
   lines.push(nl
-    ? 'Vijf tot acht sites, bewust van verschillende soorten. Leg naam, URL, type en datum van raadpleging vast, anders is `dekking` later niet reproduceerbaar.'
-    : 'Five to eight sites, deliberately of different kinds. Record name, URL, type and date consulted, otherwise `coverage` is not reproducible later.');
+    ? 'Acht sites, bewust van verschillende soorten. Leg naam, URL, type en datum van raadpleging vast, anders is `dekking` later niet reproduceerbaar.'
+    : 'Eight sites, deliberately of different kinds. Record name, URL, type and date consulted, otherwise `coverage` is not reproducible later.');
   lines.push('');
   lines.push(nl ? '| Soort | Aantal | Wat het bijdraagt |' : '| Kind | Count | What it contributes |');
   lines.push('|---|---|---|');

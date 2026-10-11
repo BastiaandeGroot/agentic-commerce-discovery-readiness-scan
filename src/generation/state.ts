@@ -32,14 +32,26 @@ export type Phase =
   | { kind: 'panel' }
   | { kind: 'harvest'; index: number }
   | { kind: 'consolidate' }
+  | { kind: 'recheck' }
   | { kind: 'structure' }
   | { kind: 'base' }
   | { kind: 'overlay'; index: number }
   | { kind: 'facets' }
+  | { kind: 'examples' }
   | { kind: 'assemble' }
   | { kind: 'done' };
 
 export const FIRST_PHASE: Phase = { kind: 'panel' };
+
+/**
+ * Uit hoeveel sites het panel bestaat.
+ *
+ * Acht sinds woontextiel v5. Met vijf hing de dekking van een vraag aan één of
+ * twee sites, en een segment dat twee sites moet voeren haalde die lat te vaak
+ * niet; de drie die erbij kwamen brachten daar achttien onderwerpen en een
+ * buitenlandse tweede stem.
+ */
+export const PANEL_SIZE = 8;
 
 /**
  * De fase als tekst, want de database bewaart hem als kolom.
@@ -60,6 +72,8 @@ export function decodePhase(raw: string): Phase {
     case 'harvest': return { kind: 'harvest', index: Number.isFinite(at) ? at : 0 };
     case 'overlay': return { kind: 'overlay', index: Number.isFinite(at) ? at : 0 };
     case 'consolidate': return { kind: 'consolidate' };
+    case 'recheck': return { kind: 'recheck' };
+    case 'examples': return { kind: 'examples' };
     case 'structure': return { kind: 'structure' };
     case 'base': return { kind: 'base' };
     case 'facets': return { kind: 'facets' };
@@ -83,6 +97,33 @@ export interface RunBrief {
   segments: { name: string; count: number }[];
   merchantSite?: string;
   suggestedSites: string[];
+  /**
+   * Het eerste vraagnummer. Een eerdere bank voor dezelfde markt gebruikt
+   * dezelfde voorvoegsels (BAS, MEU) voor andere vragen, en het werk van een
+   * merchant hangt aan markt en nummer. De aanroeper legt het boven het hoogste
+   * nummer dat er al is; zie `firstFreeNumber`.
+   */
+  firstNumber?: number;
+}
+
+/**
+ * Het eerste nummer dat geen eerdere bank van deze markt gebruikt: het
+ * eerstvolgende honderdtal plus één. Zonder eerdere bank 101.
+ */
+export function firstFreeNumber(ids: Iterable<string>): number {
+  let highest = 0;
+  for (const id of ids) {
+    const found = /-(\d+)(?:-\d+)?$/.exec(id.trim());
+    if (found) highest = Math.max(highest, Number(found[1]));
+  }
+  return Math.floor(highest / 100) * 100 + 101;
+}
+
+/** Een echte waarde van een productpagina van een panelsite, met het adres. */
+export interface HarvestedExample {
+  attribute: string;
+  value: string;
+  url: string;
 }
 
 // --- Wat de fasen opleveren --------------------------------------------------
@@ -268,6 +309,8 @@ export interface RunState {
   base?: LayerDraft;
   overlays: LayerDraft[];
   facets: FacetEntry[];
+  /** Voorbeelden per kenmerk; alleen wat letterlijk op de genoemde pagina staat. */
+  examples?: HarvestedExample[];
   /** Wat de generatie zelf al markeerde. Gaat mee als bevinding naar de review. */
   findings: string[];
   csv?: string;
@@ -332,6 +375,8 @@ export function nextPhase(phase: Phase, state: RunState): Phase {
         ? { kind: 'harvest', index: phase.index + 1 }
         : { kind: 'consolidate' };
     case 'consolidate':
+      return { kind: 'recheck' };
+    case 'recheck':
       return { kind: 'structure' };
     case 'structure':
       return { kind: 'base' };
@@ -342,6 +387,8 @@ export function nextPhase(phase: Phase, state: RunState): Phase {
         ? { kind: 'overlay', index: phase.index + 1 }
         : { kind: 'facets' };
     case 'facets':
+      return { kind: 'examples' };
+    case 'examples':
       return { kind: 'assemble' };
     default:
       return { kind: 'done' };
@@ -350,8 +397,8 @@ export function nextPhase(phase: Phase, state: RunState): Phase {
 
 /** Hoeveel stappen deze run in totaal telt, zodat een scherm voortgang kan tonen. */
 export function totalPhases(state: RunState): number {
-  // panel + oogst per site + consolidatie + indeling + basis + overlay per segment + facetten + samenstellen
-  return 1 + Math.max(state.panel.length, 1) + 1 + 1 + 1 + overlayCategories(state).length + 1 + 1;
+  // panel + oogst per site + consolidatie + nalopen + indeling + basis + overlay per segment + facetten + voorbeelden + samenstellen
+  return 1 + Math.max(state.panel.length, 1) + 1 + 1 + 1 + 1 + overlayCategories(state).length + 1 + 1 + 1;
 }
 
 /** De hoeveelste stap dit is. Alleen voor de voortgang; de reeks stuurt zichzelf. */
@@ -362,11 +409,13 @@ export function phaseNumber(phase: Phase, state: RunState): number {
     case 'panel': return 1;
     case 'harvest': return 2 + phase.index;
     case 'consolidate': return 2 + sites;
-    case 'structure': return 3 + sites;
-    case 'base': return 4 + sites;
-    case 'overlay': return 5 + sites + phase.index;
-    case 'facets': return 5 + sites + overlays;
-    case 'assemble': return 6 + sites + overlays;
+    case 'recheck': return 3 + sites;
+    case 'structure': return 4 + sites;
+    case 'base': return 5 + sites;
+    case 'overlay': return 6 + sites + phase.index;
+    case 'facets': return 6 + sites + overlays;
+    case 'examples': return 7 + sites + overlays;
+    case 'assemble': return 8 + sites + overlays;
     default: return totalPhases(state);
   }
 }

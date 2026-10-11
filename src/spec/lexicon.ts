@@ -113,6 +113,18 @@ const LEXICON: Record<string, string> = {
   certifications: 'certification', keurmerk: 'certification', keurmerken: 'certification',
 };
 
+/**
+ * Is dit één woord dat élke catalogus gebruikt (breedte, lengte, gewicht)?
+ *
+ * Voor de generatie: zo'n woord als synoniem van een smaller kenmerk legt het op
+ * de verkeerde kolom. "lengte" bij de looplengte van garen viel op de rollengte
+ * van stof.
+ */
+export function isGenericWord(name: string): boolean {
+  const words = split(name).filter((word) => !UNITS.has(word) && !FILLER.has(word));
+  return words.length === 1 && LEXICON[words[0]] !== undefined;
+}
+
 /** Splits op scheidingstekens én op camelCase, zodat `fabricWidth` ook uiteenvalt. */
 function split(name: string): string[] {
   return name

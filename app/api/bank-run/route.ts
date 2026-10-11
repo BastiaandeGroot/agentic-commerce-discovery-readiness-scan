@@ -2,7 +2,7 @@
 //
 // Dit is wat de poller aanroept. Hij doet geen onderzoek en houdt geen lus vast;
 // hij zet één fase, bewaart wat eruit kwam en geeft antwoord. De volgende beurt
-// pakt de volgende fase. Een markt is daarmee twaalf tot vijftien beurten, en
+// pakt de volgende fase. Een markt is daarmee een kleine dertig beurten, en
 // tussen twee beurten mag alles omvallen zonder dat er werk verloren gaat.
 //
 // Waarom niet één lange aanroep die de hele bank maakt: dan is er geen hervatten
@@ -28,6 +28,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   decodePhase,
   emptyState,
+  firstFreeNumber,
   encodePhase,
   FIRST_PHASE,
   phaseNumber,
@@ -40,7 +41,7 @@ import {
 /**
  * Hoe lang een beurt de run voor zichzelf houdt.
  *
- * Een fase die vijf sites leest duurt minuten, en de poller komt elk kwartier
+ * Een fase die een site leest duurt minuten, en de poller komt elk kwartier
  * langs. Zonder deze grendel zou een tweede beurt dezelfde fase nog een keer
  * draaien — twee keer betalen voor één stap, en twee schrijvers op dezelfde rij.
  *
@@ -78,7 +79,8 @@ interface RunRow {
   updated_at: string;
 }
 
-const briefOf = (row: RequestRow): RunBrief => ({
+const briefOf = (row: RequestRow, firstNumber?: number): RunBrief => ({
+  ...(firstNumber === undefined ? {} : { firstNumber }),
   vertical: row.vertical,
   segments: Array.isArray(row.segments) ? row.segments : [],
   merchantSite: row.site_url ?? undefined,
@@ -129,13 +131,21 @@ export async function POST(request: Request) {
       // Nieuw werk. De insert is meteen de grendel: `request_id` is uniek, dus
       // een tweede beurt die hier tegelijk aankomt krijgt een conflict en gaat
       // door naar de volgende aanvraag.
+      // De nummers van deze bank beginnen boven die van elke eerdere bank voor
+      // dezelfde markt: het werk van een merchant hangt aan markt en nummer. Is
+      // de tabel niet te lezen, dan begint hij bij 101 — nooit bij 1.
+      const earlier = await supabase.from('question_banks').select('csv').eq('vertical', row.vertical);
+      const usedIds = ((earlier.data ?? []) as { csv: string | null }[])
+        .flatMap((bank) => (bank.csv ?? '').split('\n').slice(1).map((line) => line.split(',')[0] ?? ''));
+      const firstNumber = firstFreeNumber(usedIds);
+
       const created = await supabase
         .from('bank_runs')
         .insert({
           request_id: row.id,
           account_id: row.account_id,
           phase: encodePhase(FIRST_PHASE),
-          state: emptyState(briefOf(row)),
+          state: emptyState(briefOf(row, firstNumber)),
           leased_until: new Date(now.getTime() + LEASE_MINUTES * 60_000).toISOString(),
         })
         .select('id, request_id, phase, state, attempts, leased_until, batch_id, input_tokens, output_tokens, cached_tokens, updated_at')

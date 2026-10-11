@@ -142,7 +142,7 @@ export function BankRequestForm({ s, locale, segments, accountId, siteUrl, onQue
    * Eén markt, en niet twee.
    *
    * De vragenlijst wordt voor één markt gemaakt: hij hangt aan een panel van
-   * vijf winkels in díe markt. "Woontextiel en tuinmeubelen" zou één bank
+   * acht winkels in díe markt. "Woontextiel en tuinmeubelen" zou één bank
    * opleveren die voor allebei half klopt, en die is dan voor geen van beide een
    * meetlat. Wie in twee markten handelt doet ze na elkaar.
    */

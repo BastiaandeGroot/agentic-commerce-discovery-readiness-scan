@@ -32,6 +32,8 @@ Scheidingsteken: puntkomma. Codering: UTF-8.
 | `waarschuwing` | Wat er misgaat als dit antwoord verkeerd getoond wordt. "Alleen bij aantoonbare leveranciersverklaring, nooit afleiden." |
 | `toelichting` | Waarom deze vraag ertoe doet, voor de domeinexpert. |
 | `toepassingsprofielen_kritiek` | De toepassingen binnen dit segment waarin deze vraag kritiek is, komma-gescheiden: `banken, eetkamerstoelen`. Zo blijft één vraag staan waar tien overlays zouden ontstaan. Alleen op een `overlay`-rij — een basisrij heeft geen categorie om een profiel aan te hangen, en de lezer laat hem dan vallen met een waarschuwing. De scan weegt nog niet per profiel; de kolom legt de parametrisering vast en de drempel per profiel hoort in `toelichting` tot dat er wel is. |
+| `voorbeeld` | Optioneel. Een echte waarde per kenmerk, als `kenmerk: waarde`, meerdere gescheiden door `;`. Alleen een waarde die letterlijk op een productpagina van een onderzochte winkel staat. |
+| `voorbeeld_bron` | Het adres van die productpagina, als `kenmerk: https://…`, in dezelfde volgorde. Een voorbeeld zonder bron wordt niet overgenomen. |
 
 ## Overige kolommen die de scan kent
 

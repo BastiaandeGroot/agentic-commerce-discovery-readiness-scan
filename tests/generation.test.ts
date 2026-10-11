@@ -9,13 +9,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { advance, EmptyPhase, enforceCriticalTest, taskFor, type Ask } from '../src/generation/pipeline';
+import { advance, applyReply, EmptyPhase, enforceCriticalTest, taskFor, type Ask } from '../src/generation/pipeline';
 import { extractJson } from '../src/generation/json';
 import {
   decodePhase,
   emptyState,
   encodePhase,
   FIRST_PHASE,
+  firstFreeNumber,
   type DraftQuestion,
   type Phase,
   type RunState,
@@ -142,6 +143,28 @@ function antwoord(phase: string): unknown {
       findings: [],
     };
   }
+  if (phase === 'recheck') {
+    return {
+      topics: [
+        // Twee sites uit het panel en één die er niet in zit: de app telt zelf.
+        { topic: 'tas_draagkracht', question: 'Hoeveel gewicht kan een tas van deze stof dragen?', coverage: 9, coverageSites: ['Vijf', 'een', 'Verzonnen site'], sources: ['faq'] },
+        { topic: 'garen_looplengte', question: 'Hoeveel meter garen zit er op de klos?', coverageSites: [], sources: ['vakkennis'] },
+      ],
+      findings: [],
+    };
+  }
+  if (phase === 'examples') {
+    return {
+      examples: [
+        { attribute: 'schuurweerstand_martindale', value: '40.000  toeren', url: 'https://een.nl/product/velours-blauw' },
+        // Staat niet op de pagina, is van een site buiten het panel, kenmerk onbekend.
+        { attribute: 'baanbreedte_cm', value: '140 cm', url: 'https://een.nl/product/velours-blauw' },
+        { attribute: 'patroonrapport_cm', value: '64 cm', url: 'https://elders.nl/product/x' },
+        { attribute: 'bestaat_niet', value: 'Martindale', url: 'https://een.nl/product/velours-blauw' },
+      ],
+      findings: [],
+    };
+  }
   if (phase === 'facets') {
     return {
       facets: [{ category: 'Vlekwerend', count: 64, attribute: 'vlekwerend', condition: 'behandeling aanwezig', panelSites: 4, priority: 'hoog' }],
@@ -153,14 +176,20 @@ function antwoord(phase: string): unknown {
 }
 
 /** De hele reeks draaien, met een teller zodat de test de volgorde kan nakijken. */
-async function draai(): Promise<{ state: RunState; phases: string[] }> {
+async function draai(brief: typeof BRIEF & { firstNumber?: number } = BRIEF): Promise<{ state: RunState; phases: string[] }> {
   const phases: string[] = [];
   const ask: Ask = async (task) => {
     phases.push(task.phase);
-    return { json: antwoord(task.phase), usage: { input: 100, output: 50, cached: 0 } };
+    return {
+      json: antwoord(task.phase),
+      usage: { input: 100, output: 50, cached: 0 },
+      pages: task.phase === 'examples'
+        ? { 'https://een.nl/product/velours-blauw': 'Velours blauw\nMartindale: 40.000 Toeren\nBreedte: 145 cm' }
+        : undefined,
+    };
   };
 
-  let state = emptyState(BRIEF);
+  let state = emptyState(brief);
   let phase: Phase = FIRST_PHASE;
 
   for (let stap = 0; stap < 40 && phase.kind !== 'done'; stap++) {
@@ -184,10 +213,12 @@ test('de reeks loopt van panel tot tabel en stuurt zichzelf', async () => {
     'panel',
     'harvest:0', 'harvest:1', 'harvest:2', 'harvest:3', 'harvest:4',
     'consolidate',
+    'recheck',
     'structure',
     'base',
     'overlay:0', 'overlay:1',
     'facets',
+    'examples',
   ]);
 
   assert.ok(state.csv, 'de reeks levert een tabel op');
@@ -650,4 +681,71 @@ test('kritiek zonder volledige toets, of over beleid of voorraad, wordt hoog', (
   assert.deepEqual(questions.map((q) => q.importance), ['kritiek', 'hoog', 'hoog', 'hoog', 'hoog']);
   assert.equal(questions[3].criticalTest, undefined);
   assert.match(findings[0], /B, C, E/);
+});
+
+test('het samenvoegen wordt nagelopen, en de app telt de dekking zelf', async () => {
+  const { state } = await draai();
+  const tas = state.topics.find((topic) => topic.topic === 'tas_draagkracht');
+  assert.deepEqual(tas?.coverageSites, ['Vijf', 'Een'], 'alleen sites uit het panel, onder hun eigen naam');
+  assert.equal(tas?.coverage, 2, 'geteld, niet overgenomen');
+  const garen = state.topics.find((topic) => topic.topic === 'garen_looplengte');
+  assert.equal(garen?.coverage, 0);
+  assert.deepEqual(garen?.sources, ['vakkennis']);
+  assert.ok(state.findings.some((finding) => /Samenvoegen nagelopen: 2 onderwerpen/.test(finding)));
+});
+
+test('een voorbeeld telt alleen als het letterlijk op een pagina van een panelsite staat', async () => {
+  const { state } = await draai();
+  assert.deepEqual(state.examples, [
+    { attribute: 'schuurweerstand_martindale', value: '40.000 toeren', url: 'https://een.nl/product/velours-blauw' },
+  ]);
+  assert.ok(state.findings.some((finding) => /1 aangewezen voorbeeld stond niet letterlijk/.test(finding)));
+
+  // En het komt als echte waarde met bron door de lezer van de vragenlijst.
+  const read = importQuestionList([{ name: 'woontextiel.csv', text: state.csv ?? '' }]);
+  const martindale = read.bank?.attributes.find((attribute) => attribute.key === 'schuurweerstand_martindale');
+  assert.deepEqual(martindale?.examples, [{ value: '40.000 toeren', url: 'https://een.nl/product/velours-blauw' }]);
+});
+
+test('de nummers beginnen boven die van een eerdere bank', async () => {
+  assert.equal(firstFreeNumber([]), 101);
+  assert.equal(firstFreeNumber(['BAS-01', 'MEU-30', 'GOR-07-2']), 101);
+  assert.equal(firstFreeNumber(['BAS-101', 'MEU-134']), 201);
+
+  const { state } = await draai({ ...BRIEF, firstNumber: 201 });
+  assert.deepEqual(state.base?.questions.map((question) => question.id), ['BAS-201', 'BAS-202']);
+  assert.ok(state.overlays.every((overlay) => overlay.questions.every((question) => /-201$/.test(question.id))));
+});
+
+test('een los algemeen woord is geen synoniem van een smaller kenmerk', () => {
+  const vraag = (evidence: string[], synonyms: string[]) => ({
+    questionNl: 'Hoeveel meter garen zit er op de klos?', questionEn: 'How many metres are on the spool?',
+    intent: 'hoeveelheid', importance: 'middel', coverage: 0, coverageSites: [], sources: ['vakkennis'],
+    evidence, synonyms, answerType: 'getal', answerable: 'true',
+  });
+  const result = applyReply(
+    emptyState(BRIEF),
+    { kind: 'base' },
+    { json: { questions: [vraag(['looplengte_m'], ['lengte', 'klosinhoud']), vraag(['lengte_cm'], ['lengte'])] }, usage: { input: 0, output: 0, cached: 0 } },
+    '2026-10-11',
+  );
+  const [garen, lengte] = result.state.base?.questions ?? [];
+  assert.deepEqual(garen.synonyms, ['klosinhoud'], '"lengte" zou de looplengte op de rollengte leggen');
+  assert.deepEqual(lengte.synonyms, ['lengte'], 'bij het kenmerk lengte zelf mag het blijven');
+  assert.ok(result.state.findings.some((finding) => /te algemeen/.test(finding)));
+});
+
+test('de categorienaam uit de catalogus van de aanvrager reist mee als alias, maar telt niet als site', async () => {
+  const { state } = await draai();
+  const segments = [
+    { category: 'Meubelstoffen', kind: 'overlay', reason: 'eigen vragen', distinct: ['Is dit sterk genoeg voor mijn bank?'],
+      aliases: [{ site: 'Een', name: 'Meubelstoffen' }, { site: 'Twee', name: 'Meubelstoffen' }, { site: 'Vijf', name: 'Eetkamerstoelen' }] },
+    // Alleen de catalogusnaam van de aanvrager: dat is geen vondst op een site.
+    { category: 'Vergeten', kind: 'overlay', reason: 'staat alleen in zijn catalogus', aliases: [{ site: 'Vijf', name: 'Vergeten categorie' }] },
+  ];
+  const result = applyReply(state, { kind: 'structure' }, { json: { segments }, usage: { input: 0, output: 0, cached: 0 } }, '2026-10-11');
+  const meubel = result.state.grouping.find((entry) => entry.category === 'Meubelstoffen');
+  assert.ok(meubel?.aliases?.some((alias) => alias.site === 'Vijf' && alias.name === 'Eetkamerstoelen'));
+  assert.deepEqual(meubel?.sites, ['Een', 'Twee'], 'de aanvrager voert het segment hier niet op zijn site');
+  assert.equal(result.state.grouping.some((entry) => entry.category === 'Vergeten'), false);
 });

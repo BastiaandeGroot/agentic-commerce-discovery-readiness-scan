@@ -975,6 +975,31 @@ een kolom wijst die de intake als standaardveld plaatste (`samenstelling` →
 het bij elk product als leeg. Of dat in de echte keten ook zo loopt, is niet
 nagegaan.
 
+## De werkwijze van woontextiel v5 is de standaard — 11 oktober 2026
+
+Op verzoek van de opdrachtgever: wat voor v5 met de hand is gedaan, doet de
+generatie nu zelf (`GENERATION_VERSION` 2.1.0), en de methode en de plugin zeggen
+hetzelfde.
+
+- **Panel van acht** (`PANEL_SIZE`): vier categorieleiders, één specialist, één
+  merk, twee buitenlandse; de aanvrager is er één van. Dit draait de eerdere
+  keuze voor vijf terug.
+- **Nalopen na het samenvoegen** (fase `recheck`): geoogste vragen die wegvielen
+  komen terug als onderwerp. De app telt de dekking zelf, alleen over panelsites.
+- **Catalogusnamen van de aanvrager als alias** in de indeling. Ze dragen geen
+  segment en tellen niet als site.
+- **Nummers boven een eerdere bank** (`firstFreeNumber`, `RunBrief.firstNumber`):
+  101, 201, … De app nummert zelf; het nummer van het model wordt niet gevolgd.
+- **Te algemene synoniemen eruit** (`withoutGenericSynonyms`): één los woord uit
+  de generieke woordenlijst bij een smaller kenmerk.
+- **Voorbeelden** (fase `examples`): een model wijst per kenmerk een waarde op een
+  productpagina van een panelsite aan; de server haalt die pagina's op
+  (`src/server/examplePages.ts`) en alleen wat er letterlijk op staat blijft. Of
+  de waarde de vraag beantwoordt, ziet die controle niet: een mens loopt ze na.
+
+Niet gedaan: geen echte run tegen de API met deze versie. Een bank kost nu vijf
+aanroepen meer (drie sites, nalopen, voorbeelden), vier daarvan met het web.
+
 ## Bewust afgevallen
 
 Niet opnieuw voorstellen zonder dat er iets veranderd is.

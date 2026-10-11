@@ -9,7 +9,7 @@
 //
 //   npx esbuild scripts/generate-local.ts --bundle --platform=node --format=esm --outfile=<tmp>/gen.mjs
 //
-//   node <tmp>/gen.mjs init   <run.json> --vertical=woontextiel --segments=<segmenten.json> [--site=https://…] [--suggested=a.nl,b.nl]
+//   node <tmp>/gen.mjs init   <run.json> --vertical=woontextiel --segments=<segmenten.json> [--site=https://…] [--suggested=a.nl,b.nl] [--first=101]
 //   node <tmp>/gen.mjs prompt <run.json> [--out=<opdracht.md>]     wat deze stap vraagt
 //   node <tmp>/gen.mjs answer <run.json> <antwoord.json> [--at=JJJJ-MM-DD]   het antwoord verwerken
 //   node <tmp>/gen.mjs status <run.json>
@@ -31,6 +31,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { applyReply, EmptyPhase, taskFor } from '../src/generation/pipeline';
 import { extractJson } from '../src/generation/json';
+import { fetchExamplePages } from '../src/server/examplePages';
 import { GENERATION_VERSION } from '../src/generation/prompts';
 import {
   decodePhase, emptyState, encodePhase, FIRST_PHASE, phaseNumber, totalPhases, type RunState,
@@ -77,6 +78,8 @@ if (command === 'init') {
       segments: segments.map((segment) => ({ name: String(segment.name), count: Number(segment.count) || 0 })),
       merchantSite: flag('site'),
       suggestedSites: (flag('suggested') ?? '').split(',').map((one) => one.trim()).filter(Boolean),
+      // Boven de nummers van een eerdere bank voor deze markt; zie `firstFreeNumber`.
+      firstNumber: Number(flag('first')) || 101,
     }),
   };
   save(run);
@@ -158,10 +161,14 @@ if (command === 'init') {
     process.exit(1);
   }
   try {
+    // De voorbeeldenstap: de genoemde pagina's ophalen, net als de app doet.
+    const pages = needsModel && phase.kind === 'examples'
+      ? await fetchExamplePages(extractJson(readFileSync(answerPath as string, 'utf8')))
+      : undefined;
     const reply = needsModel
       // Dezelfde lezer als de app: een antwoord met een zin ervoor of in een
       // codeblok is nog steeds een antwoord.
-      ? { json: extractJson(readFileSync(answerPath as string, 'utf8')), usage: { input: 0, output: 0, cached: 0 } }
+      ? { json: extractJson(readFileSync(answerPath as string, 'utf8')), usage: { input: 0, output: 0, cached: 0 }, pages }
       : undefined;
     const before = run.state.findings.length;
     const result = applyReply(run.state, phase, reply, at);
