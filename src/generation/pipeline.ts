@@ -23,6 +23,9 @@ import {
   overlayCategories,
   PANEL_SIZE,
   requesterSite,
+  isSupportSource,
+  SUPPORT_SOURCE,
+  supportOnly,
   type HarvestedExample,
   type CriticalTest,
   type DraftQuestion,
@@ -181,10 +184,13 @@ export function enforceCriticalTest(
   const ownBar: string[] = [];
   // Alleen de aanvrager behandelt dit: dan is het zijn eigen lat. Dekking 0 valt
   // hier niet onder — dat is vakkennis, en die legt een vakexpert vast.
+  // Hetzelfde voor een vraag die alleen uit zijn klantenservice komt: dat is
+  // zijn eigen mail, geen panelsite en geen vakkennis.
   const onlyRequester = (question: DraftQuestion) =>
-    requester !== undefined
-    && question.coverageSites.length > 0
-    && question.coverageSites.every((site) => site.toLowerCase() === requester.toLowerCase());
+    supportOnly(question)
+    || (requester !== undefined
+      && question.coverageSites.length > 0
+      && question.coverageSites.every((site) => site.toLowerCase() === requester.toLowerCase()));
   const out = questions.map((question) => {
     if (question.importance !== 'kritiek') return { ...question, criticalTest: undefined };
     if (onlyRequester(question)) {
@@ -202,7 +208,7 @@ export function enforceCriticalTest(
         `${where}: ${lowered.length} vra${lowered.length === 1 ? 'ag' : 'gen'} kwam${lowered.length === 1 ? '' : 'en'} als kritiek terug zonder de volledige toets, ${lowered.length === 1 ? 'gaat' : 'gaan'} over beleid, levering of voorraad, of ${lowered.length === 1 ? 'is een berekening' : 'zijn berekeningen'}. Die staan op hoog: ${lowered.join(', ')}.`,
       ]),
       ...(ownBar.length === 0 ? [] : [
-        `${where}: ${ownBar.length} vra${ownBar.length === 1 ? 'ag wordt' : 'gen worden'} alleen op de site van de aanvrager behandeld en ${ownBar.length === 1 ? 'kan' : 'kunnen'} daarom niet kritiek zijn: wie gemeten wordt, legt niet zijn eigen poort. ${ownBar.length === 1 ? 'Die staat' : 'Die staan'} op hoog: ${ownBar.join(', ')}.`,
+        `${where}: ${ownBar.length} vra${ownBar.length === 1 ? 'ag wordt' : 'gen worden'} alleen op de site of in de klantenservice van de aanvrager behandeld en ${ownBar.length === 1 ? 'kan' : 'kunnen'} daarom niet kritiek zijn: wie gemeten wordt, legt niet zijn eigen poort. ${ownBar.length === 1 ? 'Die staat' : 'Die staan'} op hoog: ${ownBar.join(', ')}.`,
       ]),
     ],
   };
@@ -550,6 +556,36 @@ function readTopics(raw: unknown): Topic[] {
     .filter((one): one is Topic => one !== null);
 }
 
+/**
+ * De klantenservice van de aanvrager telt niet als site.
+ *
+ * Het model zou hem in `coverageSites` kunnen zetten, of een onderwerp dat
+ * alleen daaruit komt een dekking kunnen geven. Allebei terugdraaien: wat de
+ * klantenservice aandroeg staat met dekking 0 en bron `SUPPORT_SOURCE`, en een
+ * onderwerp dat ook panelsites behandelen houdt alleen de dekking van die sites.
+ */
+function withoutSupportCoverage(topic: Topic): Topic {
+  const fromSupport = topic.sources.some(isSupportSource) || topic.coverageSites.some(isSupportSource);
+  if (!fromSupport) return topic;
+  const coverageSites = topic.coverageSites.filter((site) => !isSupportSource(site));
+  const sources = [...topic.sources.filter((source) => !isSupportSource(source)), SUPPORT_SOURCE];
+  return coverageSites.length === 0
+    ? { ...topic, coverage: 0, coverageSites, sources: [SUPPORT_SOURCE] }
+    : { ...topic, coverage: Math.min(topic.coverage, coverageSites.length), coverageSites, sources };
+}
+
+/** Wat de klantenservice in deze stap aandroeg, zodat de beheerder het kan nakijken. */
+function supportFindings(state: RunState, topics: Topic[], step: 'samenvoegen' | 'nalopen'): string[] {
+  const given = state.brief.support?.length ?? 0;
+  if (given === 0) return [];
+  const own = topics.filter(supportOnly);
+  if (step === 'nalopen' && own.length === 0) return [];
+  const names = own.slice(0, 8).map((topic) => topic.topic).join(', ') + (own.length > 8 ? ', …' : '');
+  return [step === 'samenvoegen'
+    ? `Klantenservice van de aanvrager: ${given} vra${given === 1 ? 'ag' : 'gen'} meegegeven als aanwijzing, niet als panelsite. ${own.length === 0 ? 'Geen onderwerp komt alleen daaruit.' : `${own.length} onderwerp${own.length === 1 ? ' komt' : 'en komen'} alleen daaruit en ${own.length === 1 ? 'staat' : 'staan'} op dekking 0 (${names}).`}`
+    : `Nalopen: ${own.length} onderwerp${own.length === 1 ? '' : 'en'} uit de klantenservice van de aanvrager erbij, op dekking 0 (${names}).`];
+}
+
 function readFacets(raw: unknown): FacetEntry[] {
   return asArray(raw)
     .map((one): FacetEntry | null => {
@@ -769,14 +805,17 @@ export function applyReply(
     }
 
     case 'consolidate': {
-      const topics = readTopics(answer.topics);
+      const topics = readTopics(answer.topics).map(withoutSupportCoverage);
       updated = {
         ...state,
         topics,
         findings: [
           ...state.findings,
           ...findingsOf(answer),
-          ...(topics.some((topic) => topic.coverage === 0)
+          ...supportFindings(state, topics, 'samenvoegen'),
+          // Een onderwerp uit de klantenservice is geen vakkennis: dat heeft één
+          // winkel aangedragen, niet de stap die de hele branche naloopt.
+          ...(topics.some((topic) => topic.coverage === 0 && !supportOnly(topic))
             ? []
             : ['Geen enkel onderwerp heeft dekking 0. De stap voor vragen die niemand beantwoordt heeft niets opgeleverd, en dan meet de bank het marktgemiddelde.']),
         ],
@@ -794,11 +833,14 @@ export function applyReply(
         if (known.has(topic.topic.toLowerCase())) continue;
         known.add(topic.topic.toLowerCase());
         const coverageSites = [...new Set(topic.coverageSites.flatMap((name) => sites.get(name.toLowerCase()) ?? []))];
+        const fromSupport = topic.sources.some(isSupportSource);
         added.push({
           ...topic,
           coverage: coverageSites.length,
           coverageSites,
-          sources: coverageSites.length === 0 ? ['vakkennis'] : [...topic.sources, 'nagelopen na het samenvoegen'],
+          sources: coverageSites.length === 0
+            ? [fromSupport ? SUPPORT_SOURCE : 'vakkennis']
+            : [...topic.sources.filter((source) => !isSupportSource(source)), 'nagelopen na het samenvoegen', ...(fromSupport ? [SUPPORT_SOURCE] : [])],
           conflict: undefined,
         });
       }
@@ -808,6 +850,7 @@ export function applyReply(
         findings: [
           ...state.findings,
           ...findingsOf(answer),
+          ...supportFindings(state, added, 'nalopen'),
           added.length > 0
             ? `Samenvoegen nagelopen: ${added.length} onderwerp${added.length === 1 ? '' : 'en'} die bij het samenvoegen ${added.length === 1 ? 'was' : 'waren'} weggevallen, ${added.length === 1 ? 'staat' : 'staan'} er weer bij (${added.slice(0, 8).map((topic) => topic.topic).join(', ')}${added.length > 8 ? ', …' : ''}).`
             : 'Samenvoegen nagelopen: geen geoogste vraag is weggevallen.',

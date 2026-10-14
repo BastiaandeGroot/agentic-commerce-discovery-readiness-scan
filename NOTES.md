@@ -992,9 +992,19 @@ productvraag met maar één onderscheidend woord ("Welke stoffen zijn
 brandvertragend?") vindt geen koppeling en gaat door de sitetoets; bij twijfel
 niet koppelen.
 
-Nog niet gebouwd: de klantvragen als aanwijzing bij het maken van een nieuwe bank
-(deel drie van het voorstel). Vraagt een kolom op `bank_requests` en een veld in
-het aanvraagformulier.
+**Deel drie, ook op 14 oktober: de klantvragen als aanwijzing bij een nieuwe
+bank** (`GENERATION_VERSION` 2.2.0). Wie een bank aanvraagt en klantvragen
+aanleverde, kan die meegeven (vinkje in het aanvraagformulier, standaard aan).
+Ze gaan als `support_questions` op `bank_requests` (migratie 0016, nog zelf
+draaien; zonder de kolom gaat de aanvraag zonder klantvragen) en als
+`RunBrief.support` de generatie in, alleen in samenvoegen en nalopen. Ze mogen
+een onderwerp aandragen maar tellen niet als panelsite: de app zet zo'n
+onderwerp zelf op dekking 0 met bron `klantenservice aanvrager`
+(`withoutSupportCoverage`), haalt de klantenservice uit `coverageSites` als het
+model hem daar toch neerzet, en `enforceCriticalTest` zet een vraag die alleen
+daarop rust op hoog. Het telt ook niet als vakkennis-stap. Sluit een merchant
+aan bij een aanvraag die al openstaat voor zijn markt, dan gaan zijn klantvragen
+niet mee — de generatie loopt al.
 
 ## De werkwijze van woontextiel v5 is de standaard — 11 oktober 2026
 

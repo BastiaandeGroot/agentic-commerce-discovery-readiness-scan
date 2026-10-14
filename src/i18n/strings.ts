@@ -1098,6 +1098,9 @@ export const STRINGS = {
       panelLabel: 'Welke webshops moeten we bekijken?',
       panelHint: 'Eén per regel, en dit mag leeg blijven. We onderzoeken acht winkels in jouw markt om te zien welke vragen kopers stellen. Ken jij de serieuze spelers, noem ze dan — we voegen ze toe aan wat we zelf vinden. Je krijgt altijd te zien welke sites we uiteindelijk hebben gebruikt.',
       panelPlaceholder: 'https://voorbeeld.nl',
+      supportGive: 'Geef mijn {aantal} klantvragen mee als aanwijzing',
+      supportGiveHint:
+        'Ze helpen ons onderwerpen te vinden die de acht winkels missen, maar ze leggen de meetlat niet: de vragenlijst geldt voor je hele markt. Een vraag die alleen uit jouw klantenservice komt, telt niet als bron en wordt nooit kritiek. Alleen de vraag, het thema en het aantal gaan mee.',
       submit: 'Zet de aanvraag klaar',
       submitBusy: 'Bezig…',
       submitFailed: 'De aanvraag kon niet worden vastgelegd',
@@ -2353,6 +2356,9 @@ export const STRINGS = {
       panelLabel: 'Which shops should we look at?',
       panelHint: 'One per line, and this may stay empty. We research eight shops in your market to see what questions buyers ask. If you know the serious players, name them — we add them to what we find ourselves. You will always be shown which sites we ended up using.',
       panelPlaceholder: 'https://example.com',
+      supportGive: 'Include my {aantal} customer questions as a hint',
+      supportGiveHint:
+        'They help us find topics the eight shops miss, but they do not set the yardstick: the question list applies to your whole market. A question that only comes from your customer service does not count as a source and never becomes critical. Only the question, the theme and the count are sent.',
       submit: 'Put the request in',
       submitBusy: 'Working…',
       submitFailed: 'The request could not be recorded',

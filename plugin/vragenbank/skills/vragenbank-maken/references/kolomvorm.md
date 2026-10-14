@@ -24,7 +24,7 @@ Scheidingsteken: puntkomma. Codering: UTF-8.
 | `benodigde_attributen` | Komma-gescheiden kenmerknamen die nodig zijn om te antwoorden, bijvoorbeeld `rolbreedte_cm, rapport_hoogte_cm`. |
 | `modus` | Altijd `alle`: de scan telt een vraag pas als beantwoord als élk genoemd attribuut er staat. `een` wordt niet gevolgd. Noem daarom alleen de attributen die het antwoord werkelijk dragen. |
 | `dekking` | Op hoeveel panelsites dit onderwerp voorkomt. **Laat leeg als je het niet hebt onderzocht.** Nul betekent iets anders: niemand behandelt dit, en dat is een vondst. |
-| `bron` | Waar de vraag vandaan komt: `faq`, `categorietekst`, `review`, `vakkennis`. |
+| `bron` | Waar de vraag vandaan komt: `faq`, `categorietekst`, `review`, `vakkennis`, of `klantenservice aanvrager` (dekking 0, nooit kritiek). |
 | `beslisregel` | Naam van de regel plus de drempel, als een site die publiceert: `martindale >= 30000`. Alleen met bron. |
 | `antwoordtype` | `getal`, `enum`, `boolean`, `tekst`, `lijst`, `relatie`, `proces`, of `afgeleid_*`. |
 | `telt_mee_in_score` | `nee` voor vragen die geen enkel attribuut kunnen dragen — procesvragen als "kan ik een staal krijgen". Die blijven in de bank om het advies, maar buiten de score. |

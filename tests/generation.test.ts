@@ -17,11 +17,13 @@ import {
   encodePhase,
   FIRST_PHASE,
   firstFreeNumber,
+  SUPPORT_SOURCE,
   type DraftQuestion,
   type Phase,
   type RunState,
 } from '../src/generation/state';
 import { importQuestionList } from '../src/questions/list';
+import { readSupportHints } from '../src/questions/support';
 
 const BRIEF = {
   vertical: 'woontextiel',
@@ -748,4 +750,97 @@ test('de categorienaam uit de catalogus van de aanvrager reist mee als alias, ma
   assert.ok(meubel?.aliases?.some((alias) => alias.site === 'Vijf' && alias.name === 'Eetkamerstoelen'));
   assert.deepEqual(meubel?.sites, ['Een', 'Twee'], 'de aanvrager voert het segment hier niet op zijn site');
   assert.equal(result.state.grouping.some((entry) => entry.category === 'Vergeten'), false);
+});
+
+// --- Klantvragen uit de klantenservice van de aanvrager -----------------------
+
+const KLANTVRAGEN = [
+  { question: 'Is deze stof geschikt voor een hond die op de bank ligt?', theme: 'Geschiktheid', count: 41 },
+  { question: 'Waar blijft mijn bestelling?', theme: 'Levering', count: 159 },
+];
+
+test('de klantvragen staan als aanwijzing in samenvoegen en nalopen, en nergens anders', async () => {
+  const { state } = await draai();
+  const met = { ...state, brief: { ...state.brief, support: KLANTVRAGEN } };
+  for (const kind of ['consolidate', 'recheck'] as const) {
+    const prompt = taskFor(met, { kind })?.prompt ?? '';
+    assert.ok(prompt.includes('Is deze stof geschikt voor een hond'), `${kind} krijgt de vraag`);
+    assert.ok(prompt.includes('41×'), `${kind} krijgt het aantal`);
+    assert.ok(/AANWIJZING en geen bron/.test(prompt), `${kind} zegt dat het geen bron is`);
+    assert.ok(prompt.includes(SUPPORT_SOURCE));
+    assert.ok(!(taskFor(state, { kind })?.prompt ?? '').includes(SUPPORT_SOURCE), 'zonder klantvragen geen spoor ervan');
+  }
+  for (const kind of ['structure', 'base', 'facets'] as const) {
+    assert.ok(!(taskFor(met, { kind })?.prompt ?? '').includes('hond die op de bank'), `${kind} krijgt de lijst niet`);
+  }
+});
+
+test('de klantenservice telt niet als site en verhoogt geen dekking bij het samenvoegen', async () => {
+  const { state } = await draai();
+  const met = { ...state, brief: { ...state.brief, support: KLANTVRAGEN } };
+  const topics = [
+    // Het model telt de klantenservice toch als site: terugdraaien.
+    { topic: 'huisdieren', question: 'Kan mijn hond erop liggen?', coverage: 1, coverageSites: ['Klantenservice aanvrager'], sources: ['klantenservice aanvrager'] },
+    // Ook panelsites behandelen het: alleen hun dekking telt.
+    { topic: 'wasbaar', question: 'Kan ik de hoes wassen?', coverage: 3, coverageSites: ['Een', 'Twee', 'klantenservice'], sources: ['faq', 'klantenservice aanvrager'] },
+    { topic: 'breedte', question: 'Hoe breed is de rol?', coverage: 2, coverageSites: ['Een', 'Twee'], sources: ['faq'] },
+  ];
+  const result = applyReply(met, { kind: 'consolidate' }, { json: { topics }, usage: { input: 0, output: 0, cached: 0 } }, '2026-10-14');
+  const [hond, was, breed] = result.state.topics;
+  assert.equal(hond.coverage, 0);
+  assert.deepEqual(hond.coverageSites, []);
+  assert.deepEqual(hond.sources, [SUPPORT_SOURCE]);
+  assert.equal(was.coverage, 2);
+  assert.deepEqual(was.coverageSites, ['Een', 'Twee']);
+  assert.deepEqual(breed.sources, ['faq'], 'een onderwerp zonder klantenservice blijft zoals het was');
+  assert.ok(result.state.findings.some((finding) => /2 vragen meegegeven als aanwijzing/.test(finding) && finding.includes('huisdieren')));
+  // Een onderwerp uit de klantenservice is geen vakkennis: de stap voor vragen
+  // die niemand beantwoordt heeft dan nog steeds niets opgeleverd.
+  assert.ok(result.state.findings.some((finding) => finding.startsWith('Geen enkel onderwerp heeft dekking 0')));
+});
+
+test('bij het nalopen krijgt een onderwerp uit de klantenservice dekking 0 en zijn eigen bron', async () => {
+  const { state } = await draai();
+  const met = { ...state, brief: { ...state.brief, support: KLANTVRAGEN } };
+  const topics = [
+    { topic: 'huisdier_krassen', question: 'Is deze stof bestand tegen krabbende katten?', coverageSites: ['Klantenservice'], sources: ['klantenservice aanvrager'] },
+    { topic: 'reinigen_vlek', question: 'Hoe krijg ik koffie eruit?', coverageSites: ['Een'], sources: ['faq', 'klantenservice aanvrager'] },
+  ];
+  const result = applyReply(met, { kind: 'recheck' }, { json: { topics }, usage: { input: 0, output: 0, cached: 0 } }, '2026-10-14');
+  const kat = result.state.topics.find((topic) => topic.topic === 'huisdier_krassen');
+  assert.equal(kat?.coverage, 0);
+  assert.deepEqual(kat?.sources, [SUPPORT_SOURCE]);
+  const vlek = result.state.topics.find((topic) => topic.topic === 'reinigen_vlek');
+  assert.equal(vlek?.coverage, 1);
+  assert.deepEqual(vlek?.coverageSites, ['Een']);
+  assert.ok(result.state.findings.some((finding) => /Nalopen: 1 onderwerp uit de klantenservice/.test(finding)));
+});
+
+test('een vraag die alleen uit de klantenservice komt kan niet kritiek zijn', () => {
+  const vraag = (id: string, sources: string[]) => ({
+    id, questionNl: 'x', questionEn: 'x', intent: 'geschiktheid', importance: 'kritiek' as const,
+    coverage: 0, coverageSites: [], sources, evidence: ['kenmerk'], synonyms: [],
+    answerType: 'boolean', answerable: 'true' as const,
+    criticalTest: { decisive: 'a', irreversible: 'b', product: 'c', catalogue: 'd' },
+  });
+  const uit = enforceCriticalTest([vraag('A', [SUPPORT_SOURCE]), vraag('B', ['vakkennis'])], 'Proef', 'Vijf');
+  assert.deepEqual(uit.questions.map((question) => question.importance), ['hoog', 'kritiek']);
+  assert.ok(uit.findings.some((finding) => finding.includes('klantenservice') && finding.includes('A')));
+});
+
+test('de klantvragen die meereizen houden alleen vraag, thema en aantal, gezeefd', () => {
+  const hints = readSupportHints([
+    { question: 'Bel me op 06 12345678 over mijn stof', theme: 'Contact', count: 3, answer: 'geheim antwoord', email: 'a@b.nl' },
+    { question: 'Mail naar klant@voorbeeld.nl of het gordijn verduistert', count: 12 },
+    { question: '' },
+    'geen object',
+    { question: 'Mail naar klant@voorbeeld.nl of het gordijn verduistert', count: 99 },
+    { question: 'Zonder aantal', count: -4 },
+  ]);
+  assert.deepEqual(hints, [
+    { question: 'Mail naar [e-mailadres] of het gordijn verduistert', count: 12 },
+    { question: 'Bel me op [telefoonnummer] over mijn stof', theme: 'Contact', count: 3 },
+    { question: 'Zonder aantal' },
+  ]);
+  assert.deepEqual(readSupportHints('geen lijst'), []);
 });

@@ -107,3 +107,16 @@ test('met een onderzochte bank is er niets meer aan te vragen', () => {
   assert.ok(bank);
   assert.equal(needsBank(generateQuestionSets(catalog, [bank])), false);
 });
+
+test('klantvragen reizen mee als aanwijzing, zonder dat ze een bron worden', () => {
+  const catalog = ingest('catalogus.csv', CATALOG);
+  const state = generateQuestionSets(catalog);
+  const aanvraag = buildBankRequest(state, deriveCategories(catalog), {
+    createdAt: VAST_TIJDSTIP,
+    support: [{ question: 'Kan mijn kat | erop krabben?', theme: 'Huisdieren', count: 7 }],
+  });
+  const tekst = renderBankRequest(aanvraag, 'nl');
+  assert.ok(tekst.includes('Kan mijn kat \\| erop krabben? | Huisdieren | 7 |'));
+  assert.ok(tekst.includes('niet als panelsite'));
+  assert.equal(request().request.support, undefined, 'zonder klantvragen geen veld');
+});

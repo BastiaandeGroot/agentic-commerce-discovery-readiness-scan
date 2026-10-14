@@ -11,6 +11,8 @@
 // hele reeks met vaste antwoorden na te spelen is in een test. Wat er wél naar
 // buiten praat staat in `src/server/generator.ts`.
 
+import type { SupportHint } from '../questions/support';
+
 /** Hoe zwaar het model voor deze stap mag zijn. */
 export type ModelChoice = 'reader' | 'judge';
 
@@ -104,6 +106,30 @@ export interface RunBrief {
    * nummer dat er al is; zie `firstFreeNumber`.
    */
   firstNumber?: number;
+  /**
+   * Wat kopers de klantenservice van de aanvrager vragen: vraag, thema, aantal.
+   *
+   * Een aanwijzing en geen bron. In het samenvoegen en het nalopen mag een vraag
+   * hieruit een onderwerp aandragen dat de oogst mist, maar hij telt niet als
+   * panelsite en verhoogt geen dekking: een onderwerp dat alleen hieruit komt
+   * krijgt dekking 0 en bron `SUPPORT_SOURCE`, en kan niet kritiek zijn — de
+   * aanvrager draagt bij maar draagt niet (zie `requesterSite`).
+   */
+  support?: SupportHint[];
+}
+
+/** De bron van een onderwerp dat alleen uit de klantenservice van de aanvrager komt. */
+export const SUPPORT_SOURCE = 'klantenservice aanvrager';
+
+/** Noemt deze bron de klantenservice, in welke schrijfwijze het model hem ook teruggeeft? */
+export const isSupportSource = (source: string) => /klantenservice|customer service/i.test(source);
+
+/**
+ * Rust dit onderwerp of deze vraag alleen op de klantenservice van de aanvrager?
+ * Geen panelsite, en de klantenservice als bron.
+ */
+export function supportOnly(entry: { coverageSites: string[]; sources: string[] }): boolean {
+  return entry.coverageSites.length === 0 && entry.sources.some(isSupportSource);
 }
 
 /**

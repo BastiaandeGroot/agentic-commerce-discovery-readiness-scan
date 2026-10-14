@@ -25,6 +25,7 @@ import { batchable, collectBatch, makeAsk, PhaseFailure, submitBatch } from '../
 import { deliverBank } from '../../../src/server/deliver';
 import { advance, applyReply, EmptyPhase, taskFor } from '../../../src/generation/pipeline';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { readSupportHints } from '../../../src/questions/support';
 import {
   decodePhase,
   emptyState,
@@ -62,6 +63,8 @@ interface RequestRow {
   segments: { name: string; count: number }[] | null;
   site_url: string | null;
   suggested_sites: string[] | null;
+  /** Klantvragen uit de klantenservice van de aanvrager; ontbreekt zonder migratie 0016. */
+  support_questions?: unknown;
 }
 
 interface RunRow {
@@ -79,13 +82,18 @@ interface RunRow {
   updated_at: string;
 }
 
-const briefOf = (row: RequestRow, firstNumber?: number): RunBrief => ({
-  ...(firstNumber === undefined ? {} : { firstNumber }),
-  vertical: row.vertical,
-  segments: Array.isArray(row.segments) ? row.segments : [],
-  merchantSite: row.site_url ?? undefined,
-  suggestedSites: Array.isArray(row.suggested_sites) ? row.suggested_sites : [],
-});
+function briefOf(row: RequestRow, firstNumber?: number): RunBrief {
+  // Opnieuw gezeefd: wat in de tabel staat kwam van de aanvrager.
+  const support = readSupportHints(row.support_questions);
+  return {
+    ...(firstNumber === undefined ? {} : { firstNumber }),
+    vertical: row.vertical,
+    segments: Array.isArray(row.segments) ? row.segments : [],
+    merchantSite: row.site_url ?? undefined,
+    suggestedSites: Array.isArray(row.suggested_sites) ? row.suggested_sites : [],
+    ...(support.length > 0 ? { support } : {}),
+  };
+}
 
 export async function POST(request: Request) {
   if (!isExecutor(request)) {
@@ -107,18 +115,23 @@ export async function POST(request: Request) {
 
   // De oudste aanvraag die nog werk heeft. `queued` is nieuw, `running` is een
   // generatie die al loopt en aan zijn volgende fase toe is.
-  const open = await supabase
+  // Met de klantvragen als de kolom er is. Zonder migratie 0016 loopt de
+  // wachtrij gewoon door, alleen zonder die aanwijzing.
+  const queue = (columns: string) => supabase
     .from('bank_requests')
-    .select('id, account_id, vertical, segments, site_url, suggested_sites')
+    .select(columns)
     .in('status', ['queued', 'running'])
     .order('requested_at', { ascending: true })
     .limit(5);
+  const columns = 'id, account_id, vertical, segments, site_url, suggested_sites';
+  let open = await queue(`${columns}, support_questions`);
+  if (open.error) open = await queue(columns);
 
   if (open.error) {
     return NextResponse.json({ error: 'De wachtrij is niet te lezen.' }, { status: 500 });
   }
 
-  for (const row of (open.data ?? []) as RequestRow[]) {
+  for (const row of (open.data ?? []) as unknown as RequestRow[]) {
     const existing = await supabase
       .from('bank_runs')
       .select('id, request_id, phase, state, attempts, leased_until, batch_id, input_tokens, output_tokens, cached_tokens, updated_at')

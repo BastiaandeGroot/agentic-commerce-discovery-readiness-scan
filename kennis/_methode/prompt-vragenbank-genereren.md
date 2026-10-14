@@ -91,6 +91,10 @@ Draai dit per site, of in groepjes van twee tot drie. Niet alle acht tegelijk: d
 > Geef de onderwerpen die **ontbreken**: een geoogste vraag die een koper werkelijk anders stelt dan elk onderwerp in de lijst. Een andere formulering van een bestaand onderwerp is geen nieuw onderwerp. Let vooral op vragen die onder één segment staan; die verdwijnen het eerst, en zonder hen krijgt dat segment straks geen eigen vragen.
 >
 > Noem bij elk onderwerp de sites die de vraag stellen. Tel de dekking uit de oogst; neem geen aantal over. Een vraag die elke koper in een segment heeft maar geen site stelt, mag erbij met `dekking: 0` en bron vakkennis.
+>
+> *Gaf de aanvrager klantvragen uit zijn klantenservice mee, dan krijgen prompt 1b en 1c ze erbij:*
+>
+> Dit is wat kopers de klantenservice van de aanvrager vragen. Het is een aanwijzing en geen bron: het telt niet als site en verhoogt de dekking van geen enkel onderwerp. Behandelt het panel het onderwerp al, dan verandert er niets. Mist de oogst een onderwerp dat hier staat en dat een koper vóór de aankoop heeft, voeg het dan toe met `dekking: 0` en bron `klantenservice aanvrager`. Zo'n vraag is nooit kritiek.
 
 ---
 

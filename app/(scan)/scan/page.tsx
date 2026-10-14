@@ -908,6 +908,7 @@ export default function Home() {
                 segments={segments}
                 accountId={accountId}
                 siteUrl={shopUrl}
+                support={support}
                 onQueued={(joined) => setQueued(joined ? 'joined' : 'new')}
                 onChoose={(id) => void handleChooseBank(id)}
               />

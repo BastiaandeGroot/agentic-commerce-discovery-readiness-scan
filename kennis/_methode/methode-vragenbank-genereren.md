@@ -117,6 +117,12 @@ Samenvoegen ontdubbelt op onderwerp, en daarbij vallen vragen weg: een vraag die
 
 Leg daarom na het samenvoegen de ruwe oogst naast de onderwerpenlijst en zet terug wat een koper werkelijk anders vraagt dan elk onderwerp dat er al staat. Tel de dekking van wat je terugzet opnieuw uit de oogst; neem geen aantal over.
 
+### De klantvragen van de aanvrager
+
+Een aanvrager kan meegeven wat kopers zijn klantenservice mailen: de vraag, het thema en hoe vaak. Dat is een **aanwijzing, geen bron**. Bij het samenvoegen en het nalopen mag een klantvraag een onderwerp aandragen dat de oogst mist; behandelt het panel het onderwerp al, dan verandert er niets. De klantenservice telt niet als panelsite en verhoogt geen dekking. Een onderwerp dat alleen hieruit komt krijgt `dekking: 0` en bron `klantenservice aanvrager`, en kan niet kritiek zijn — dezelfde regel als voor zijn site: de aanvrager draagt bij, maar draagt niet. Vragen over een lopende bestelling vallen af; het gaat om wat een koper vóór de aankoop wil weten.
+
+Het is ook geen vakkennis. Een onderwerp uit de klantenservice vervangt de stap voor vragen die niemand beantwoordt niet: dat heeft één winkel aangedragen, niet de branche.
+
 ### De namen uit de catalogus van de aanvrager
 
 De site van de aanvrager toont een categorie soms onder een andere naam dan zijn catalogus hem voert. De scan plaatst zijn producten op de naam uit de catalogus. Zet die naam daarom als extra alias bij het segment waar hij bij hoort. Alleen bij een segment dat het panel al kent: de lijst van de aanvrager maakt geen segmenten, en telt niet mee als site die het segment voert.
@@ -168,7 +174,7 @@ Leg daarom bij de bronoogst per site vast hoe zij de markt indeelt — haar cate
 - **Een segment bestaat pas als minstens twee panelsites het als categorie voeren.** Eén site is de menukeuze van één winkel. Het aantal sites staat bij het segment, zoals dekking bij een vraag. Wat maar één site voert, krijgt geen eigen vragenset; het is een bevinding voor de review.
 - **Het segment heet zoals de sites het samen noemen.** Gebruiken twee of meer sites dezelfde naam, dan is dat de naam; een andere schrijfwijze van dezelfde naam telt mee. Noemt elke site het anders, dan valt er niets te tellen en krijgt het segment de gewone soortnaam in de taal van de markt — zichtbaar als bevinding, want dat is een keuze en geen telling. De namen van de sites reizen mee als alias (`geldt_voor`), zodat de vragenset ook landt bij een winkel die het anders noemt.
 - **Tellen doet de methode, niet de schrijver.** Een naam telt alleen als die site die categorie werkelijk voert.
-- **De aanvrager draagt bij, maar draagt niet.** Zijn site zit in het panel, en is tegelijk de winkel die gemeten wordt. Een segment krijgt daarom alleen een eigen vragenset als een ándere site er minstens één vraag onder behandelt, en een vraag die alleen op de site van de aanvrager staat kan niet kritiek zijn. Wie gemeten wordt, legt niet zijn eigen meetlat. Een vraag uit vakkennis (dekking 0) valt hier niet onder; die bevestigt een vakexpert.
+- **De aanvrager draagt bij, maar draagt niet.** Zijn site zit in het panel, en is tegelijk de winkel die gemeten wordt. Een segment krijgt daarom alleen een eigen vragenset als een ándere site er minstens één vraag onder behandelt, en een vraag die alleen op de site of uit de klantenservice van de aanvrager komt kan niet kritiek zijn. Wie gemeten wordt, legt niet zijn eigen meetlat. Een vraag uit vakkennis (dekking 0) valt hier niet onder; die bevestigt een vakexpert.
 
 De boom van een merchant wordt daarna op dit skelet gelegd: op naam of alias, dan op voorstel, dan door zijn eigen keuze. Dat gaat voor de aanvrager precies zo als voor elke winkel die later komt.
 

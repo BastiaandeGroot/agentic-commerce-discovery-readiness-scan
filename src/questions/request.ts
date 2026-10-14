@@ -24,6 +24,7 @@
 import type { Bilingual, Locale, QuestionSetState } from '../domain/types';
 import type { PanelSiteType } from './bank';
 import type { CategoryStat } from './generate';
+import type { SupportHint } from './support';
 
 /** Het soort bron dat de methode in een panel wil zien, met hoeveel ervan. */
 /**
@@ -90,6 +91,11 @@ export interface BankRequest {
   totalProducts: number;
   /** Waarom deze aanvraag er is: welke sets nu op een voorlopige bank draaien. */
   provisionalSets: string[];
+  /**
+   * Wat kopers de klantenservice van de merchant vragen: vraag, thema, aantal.
+   * Een aanwijzing bij het samenvoegen, geen panelsite en geen dekking.
+   */
+  support?: SupportHint[];
 }
 
 function slugify(value: string): string {
@@ -109,7 +115,7 @@ export function needsBank(state: QuestionSetState): boolean {
 export function buildBankRequest(
   state: QuestionSetState,
   categories: CategoryStat[],
-  options: { createdAt: string; merchantSite?: string },
+  options: { createdAt: string; merchantSite?: string; support?: SupportHint[] },
 ): BankRequest {
   const provisional = state.banks.filter((bank) => bank.status === 'provisional');
   // De grootste voorlopige bank bepaalt de markt: daar zit het meeste volume en
@@ -127,6 +133,7 @@ export function buildBankRequest(
     provisionalSets: state.sets
       .filter((set) => set.bankStatus === 'provisional')
       .map((set) => set.category ?? set.label.nl),
+    ...(options.support && options.support.length > 0 ? { support: options.support } : {}),
   };
 }
 
@@ -200,6 +207,22 @@ export function renderBankRequest(request: BankRequest, locale: Locale = 'nl'): 
   lines.push('|---|---:|');
   for (const category of request.categories) lines.push(`| ${category.name} | ${category.count} |`);
   lines.push('');
+
+  if (request.support && request.support.length > 0) {
+    lines.push(nl ? '## Vragen uit de klantenservice van de merchant' : '## Questions from the merchant\'s customer service');
+    lines.push('');
+    lines.push(nl
+      ? 'Een **aanwijzing** voor prompt 1b en 1c, geen bron. Ze tellen niet als panelsite en verhogen geen dekking. Een onderwerp dat alleen hieruit komt krijgt `dekking: 0` en bron `klantenservice aanvrager`, en kan niet kritiek zijn.'
+      : 'A **hint** for prompts 1b and 1c, not a source. They do not count as a panel site and raise no coverage. A topic that only comes from here gets `dekking: 0` and source `klantenservice aanvrager`, and cannot be critical.');
+    lines.push('');
+    lines.push(nl ? '| Vraag | Thema | Mails |' : '| Question | Theme | Emails |');
+    lines.push('|---|---|---:|');
+    const cell = (value: string) => value.replace(/\|/g, '\\|');
+    for (const hint of request.support) {
+      lines.push(`| ${cell(hint.question)} | ${cell(hint.theme ?? '')} | ${hint.count ?? ''} |`);
+    }
+    lines.push('');
+  }
 
   lines.push(nl ? '## Wat er bewust niet in staat' : '## What is deliberately absent');
   lines.push('');

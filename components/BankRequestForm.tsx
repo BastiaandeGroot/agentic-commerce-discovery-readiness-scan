@@ -13,13 +13,16 @@
 // opgave gebeurt.
 //
 // Er gaat geen productdata mee: de markt, de segmenten met hun aantallen, en
-// een URL.
+// een URL. Heeft hij klantvragen uit zijn klantenservice aangeleverd, dan kan
+// hij die meegeven — vraag, thema en aantal — als aanwijzing voor de generatie.
+// Ze dragen een onderwerp aan, maar tellen niet als panelsite.
 
 import { useEffect, useState } from 'react';
 import { Send, TriangleAlert } from 'lucide-react';
 import { Button, Card, CardTitle, ErrorState, Input } from './ui';
 import { authHeader } from '../src/auth/client';
 import type { Strings } from '../src/i18n/strings';
+import { supportHints, type SupportList } from '../src/questions/support';
 
 export interface Segment {
   name: string;
@@ -47,7 +50,7 @@ export interface BankOffer {
   sample: { nl: string; en: string }[];
 }
 
-export function BankRequestForm({ s, locale, segments, accountId, siteUrl, onQueued, onChoose }: {
+export function BankRequestForm({ s, locale, segments, accountId, siteUrl, support, onQueued, onChoose }: {
   s: Strings;
   locale: 'nl' | 'en';
   /** De marktsegmenten uit het categoriescherm, facetten er al uit. */
@@ -56,6 +59,8 @@ export function BankRequestForm({ s, locale, segments, accountId, siteUrl, onQue
   accountId?: string;
   /** De winkel van de merchant, als hij hem op het categoriescherm gaf. */
   siteUrl?: string;
+  /** De klantvragen die hij bij het aanleveren gaf, als hij dat deed. */
+  support?: SupportList;
   onQueued: (joined: boolean) => void;
   /** De merchant herkent zijn markt in een lijst die er al ligt. */
   onChoose: (id: string) => void;
@@ -63,6 +68,9 @@ export function BankRequestForm({ s, locale, segments, accountId, siteUrl, onQue
   const [market, setMarket] = useState('');
   const [guessing, setGuessing] = useState(false);
   const [panel, setPanel] = useState('');
+  // Aan als hij ze aanleverde: hij gaf ze al, en ze leggen hier niets vast.
+  const [giveSupport, setGiveSupport] = useState(true);
+  const hints = supportHints(support);
   const [phase, setPhase] = useState<Phase>('idle');
   const [offers, setOffers] = useState<BankOffer[] | undefined>();
   /** De keuze: een bank-id, of `none` voor "geen van deze past". */
@@ -171,6 +179,7 @@ export function BankRequestForm({ s, locale, segments, accountId, siteUrl, onQue
           // Regel per regel; lege regels vallen weg. Wat hier staat is een
           // suggestie voor het panel en niet het panel zelf.
           suggestedSites: panel.split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 20),
+          ...(giveSupport && hints.length > 0 ? { supportQuestions: hints } : {}),
         }),
       });
       const result = await response.json().catch(() => undefined);
@@ -303,6 +312,24 @@ export function BankRequestForm({ s, locale, segments, accountId, siteUrl, onQue
           />
           <p id="bank-panel-hint" className="text-xs leading-relaxed text-muted">{s.waiting.panelHint}</p>
         </div>
+
+        {hints.length > 0 ? (
+          <label className="flex cursor-pointer gap-3">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={giveSupport}
+              onChange={(event) => setGiveSupport(event.target.checked)}
+              aria-describedby="bank-support-hint"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium">
+                {s.waiting.supportGive.replace('{aantal}', hints.length.toLocaleString(locale === 'nl' ? 'nl-NL' : 'en-GB'))}
+              </span>
+              <span id="bank-support-hint" className="block text-xs leading-relaxed text-muted">{s.waiting.supportGiveHint}</span>
+            </span>
+          </label>
+        ) : null}
 
         {looksLikeCategory ? (
           <div className="flex items-start gap-2.5 rounded-lg border border-warn/40 bg-warn-soft px-3 py-2.5">

@@ -15,7 +15,7 @@
 // nooit iets fase-eigens in — geen categorienaam, geen sitenaam, geen datum.
 
 import type { GroupingEntry, Phase, RunState, Topic } from './state';
-import { isStandaloneCategory, overlayCategories, PANEL_SIZE, requesterSite } from './state';
+import { isStandaloneCategory, overlayCategories, PANEL_SIZE, requesterSite, SUPPORT_SOURCE, supportOnly } from './state';
 
 /** Omhoog zodra een prompt de uitkomst op dezelfde markt kan verschuiven. */
 // 1.6.0 — kritiek volgt een toets van vier criteria, per vraag onderbouwd.
@@ -28,7 +28,11 @@ import { isStandaloneCategory, overlayCategories, PANEL_SIZE, requesterSite } fr
 //         samenvoegen wordt nagelopen op vragen die wegvielen, de categorienamen
 //         van de aanvrager reizen mee als alias, de nummers beginnen boven die
 //         van een eerdere bank, en een eigen stap haalt echte voorbeeldwaarden op.
-export const GENERATION_VERSION = '2.1.0';
+// 2.2.0 — de klantvragen uit de klantenservice van de aanvrager reizen mee als
+//         aanwijzing bij samenvoegen en nalopen. Ze mogen een onderwerp
+//         aandragen, maar tellen niet als panelsite: dekking 0, eigen bron, en
+//         nooit kritiek.
+export const GENERATION_VERSION = '2.2.0';
 
 /**
  * Wat een vraag moet bevatten, en in welke vorm.
@@ -199,9 +203,42 @@ const topicBlock = (topics: Topic[]) =>
     .map((topic) => {
       const coverage = `dekking ${topic.coverage} (${topic.coverageSites.join(', ') || 'geen sites'})`;
       const conflict = topic.conflict ? ` — tegenspraak: ${topic.conflict}` : '';
-      return `- ${topic.question} [${topic.topic}] ${coverage}${conflict}`;
+      // De bron moet mee de vraag in: alleen daaraan ziet de kritiek-toets dat
+      // de aanvrager deze vraag zelf aandroeg.
+      const own = supportOnly(topic) ? ` — bron "${SUPPORT_SOURCE}": neem die bron over, en zo'n vraag is nooit kritiek` : '';
+      return `- ${topic.question} [${topic.topic}] ${coverage}${conflict}${own}`;
     })
     .join('\n');
+
+/**
+ * Wat kopers de klantenservice van de aanvrager vragen, als aanwijzing.
+ *
+ * Eén winkel mag geen meetlat leggen, dus dit draagt alleen onderwerpen aan:
+ * het telt niet als site en verhoogt geen dekking. De app dwingt dat daarna
+ * zelf af (`withoutSupportCoverage`); deze tekst zegt het het model vooraf.
+ */
+const supportBlock = (state: RunState) => {
+  const hints = state.brief.support ?? [];
+  if (hints.length === 0) return '';
+  const lines = hints.map((hint) => {
+    const extra = [hint.theme, hint.count === undefined ? '' : `${hint.count}×`].filter(Boolean).join(', ');
+    return `- ${hint.question}${extra ? ` (${extra})` : ''}`;
+  });
+  return `
+De aanvrager gaf mee wat kopers zijn klantenservice vragen, met thema en aantal
+mails waar hij dat telde:
+${lines.join('\n')}
+
+Dit is een AANWIJZING en geen bron. Het is de mail van één winkel, en een bank
+hoort bij de markt:
+- Behandelt het panel het onderwerp al, dan verandert er niets: dekking en
+  bronnen blijven wat de oogst zegt. Noem de klantenservice nooit in
+  "coverageSites".
+- Mist de oogst een onderwerp dat hier staat en dat een koper vóór de aankoop
+  heeft, voeg het dan toe met lege "coverageSites", dekking 0 en bron
+  "${SUPPORT_SOURCE}". Vragen over een lopende bestelling vallen af.
+`;
+};
 
 /**
  * De oogst zonder de indeling per site. De samenvoegstap weegt onderwerpen, en de
@@ -436,12 +473,12 @@ Voeg samen tot één lijst onderwerpen.
    misgaat. Markeer ze met dekking 0 en bron "vakkennis". Zonder deze stap
    reproduceer je de blinde vlekken van de hele branche, en juist daar zit het
    onderscheidend vermogen.
-
+${supportBlock(state)}
 Sorteer op dekking, hoogste eerst.
 
 Antwoord met dit JSON-object:
 {
-  "topics": [{"topic": "korte sleutel", "question": "de klantvraag", "coverage": 0, "coverageSites": ["..."], "sources": ["faq|categorietekst|blog|productpagina|review|vakkennis"], "conflict": "alleen als sites elkaar tegenspreken"}],
+  "topics": [{"topic": "korte sleutel", "question": "de klantvraag", "coverage": 0, "coverageSites": ["..."], "sources": ["faq|categorietekst|blog|productpagina|review|vakkennis${state.brief.support?.length ? `|${SUPPORT_SOURCE}` : ''}"], "conflict": "alleen als sites elkaar tegenspreken"}],
   "findings": ["wat een mens moet weten"]
 }`,
       };
@@ -475,10 +512,10 @@ Noem bij elk onderwerp de sites die de vraag stellen, onder precies de naam uit
 de lijst hierboven; de app telt de dekking zelf. Zie je bij een segment een vraag
 die elke koper heeft maar geen site stelt, dan mag je die toevoegen met een lege
 "coverageSites" en bron "vakkennis".
-
+${supportBlock(state)}
 Antwoord met dit JSON-object:
 {
-  "topics": [{"topic": "korte sleutel", "question": "de klantvraag", "coverageSites": ["..."], "sources": ["faq|categorietekst|blog|productpagina|review|vakkennis"]}],
+  "topics": [{"topic": "korte sleutel", "question": "de klantvraag", "coverageSites": ["..."], "sources": ["faq|categorietekst|blog|productpagina|review|vakkennis${state.brief.support?.length ? `|${SUPPORT_SOURCE}` : ''}"]}],
   "findings": ["wat een mens moet weten"]
 }`,
       };

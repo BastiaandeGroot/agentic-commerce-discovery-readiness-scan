@@ -6,7 +6,8 @@
 // hij zijn browser sluit — en dat is de reden dat hij er een mail over krijgt.
 //
 // Wat er in de aanvraag gaat: de markt, de segmenten die een eigen overlay
-// verdienen, categorienamen met aantallen, en de URL van de winkel. Verder
+// verdienen, categorienamen met aantallen, de URL van de winkel, en als hij ze
+// meegeeft de vragen uit zijn klantenservice (vraag, thema, aantal). Verder
 // niets — geen kolomnamen, geen productrijen, geen prijzen. Dat is fase 3 van
 // de methode (bouw de bank vóórdat je de catalogus opent) en tegelijk de
 // privacybelofte; `tests/request.test.ts` bewaakt de vorm.
@@ -19,6 +20,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { supabaseConfig } from '../../../src/auth/config';
+import { readSupportHints } from '../../../src/questions/support';
 
 interface Payload {
   accountId: string;
@@ -29,6 +31,11 @@ interface Payload {
   siteUrl?: string;
   /** Webshops die de merchant aandroeg; suggestie, niet het panel. */
   suggestedSites?: string[];
+  /**
+   * Wat kopers zijn klantenservice vragen: vraag, thema, aantal. Een aanwijzing
+   * voor de generatie, geen panelsite; zie `RunBrief.support`.
+   */
+  supportQuestions?: unknown;
 }
 
 const LIMITS = {
@@ -95,6 +102,8 @@ export async function POST(request: Request) {
     .filter((one) => /^https?:\/\/[^\s]+$/i.test(one) || /^[a-z0-9-]+\.[a-z.]{2,}$/i.test(one))
     .slice(0, 20);
 
+  const support = readSupportHints(payload.supportQuestions);
+
   const open = await supabase
     .from('bank_requests')
     .select('id, status, requested_at, finished_at')
@@ -106,17 +115,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ request: open.data, joined: true });
   }
 
-  const inserted = await supabase
+  const row = {
+    account_id: payload.accountId,
+    vertical,
+    segments,
+    site_url: payload.siteUrl ?? null,
+    suggested_sites: suggested,
+  };
+  const insert = (values: Record<string, unknown>) => supabase
     .from('bank_requests')
-    .insert({
-      account_id: payload.accountId,
-      vertical,
-      segments,
-      site_url: payload.siteUrl ?? null,
-      suggested_sites: suggested,
-    })
+    .insert(values)
     .select('id, status, requested_at')
     .single();
+  let inserted = await insert(support.length > 0 ? { ...row, support_questions: support } : row);
+  // Zonder migratie 0016 bestaat de kolom niet. Dan gaat de aanvraag zonder de
+  // klantvragen: die zijn een aanwijzing, en de aanvraag is het werk.
+  if (inserted.error && support.length > 0 && /support_questions/.test(inserted.error.message ?? '')) {
+    console.error('bank-request: kolom support_questions ontbreekt; aanvraag zonder klantvragen vastgelegd');
+    inserted = await insert(row);
+  }
 
   if (inserted.error) {
     // Serverzijdig loggen: de merchant krijgt een leesbare zin, maar zonder de

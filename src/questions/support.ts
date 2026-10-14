@@ -218,3 +218,63 @@ function withoutMatch(question: SupportQuestion): SupportQuestion {
   const { match: _match, ...rest } = question;
   return rest;
 }
+
+// --- Als aanwijzing bij een nieuwe bank ----------------------------------------
+
+/**
+ * Een klantvraag zoals hij met een bankaanvraag meereist: de vraag, het thema
+ * en het aantal. Geen id, geen koppeling, geen antwoord.
+ *
+ * In de generatie is dit een aanwijzing en geen bron. De vragen mogen een
+ * onderwerp aandragen dat de oogst mist, maar ze komen van één winkel en tellen
+ * dus niet als panelsite: een onderwerp dat alleen hieruit komt krijgt dekking 0
+ * en kan niet kritiek zijn. Zie `SUPPORT_SOURCE` in `src/generation/state.ts`.
+ */
+export interface SupportHint {
+  question: string;
+  theme?: string;
+  count?: number;
+}
+
+/** Hoeveel klantvragen er hoogstens met een aanvraag meegaan; gelijk aan wat er gelezen wordt. */
+export const MAX_SUPPORT_HINTS = MAX_QUESTIONS;
+const MAX_HINT_LENGTH = 300;
+
+/** De gelezen lijst als aanwijzing: alleen vraag, thema en aantal, de grootste eerst. */
+export function supportHints(list: SupportList | undefined): SupportHint[] {
+  return readSupportHints(list?.questions ?? []);
+}
+
+/**
+ * Wat er binnenkomt, opnieuw gezeefd. Op de server is het vrije invoer: alleen
+ * tekst en een getal blijven over, ingekort, en een e-mailadres of
+ * telefoonnummer wordt alsnog weggepoetst.
+ */
+export function readSupportHints(raw: unknown): SupportHint[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: SupportHint[] = [];
+  for (const one of raw) {
+    if (typeof one !== 'object' || one === null) continue;
+    const entry = one as Record<string, unknown>;
+    const clean = (value: unknown) => (typeof value === 'string'
+      ? value.replace(EMAIL, '[e-mailadres]').replace(PHONE, '[telefoonnummer]').trim().slice(0, MAX_HINT_LENGTH)
+      : '');
+    const question = clean(entry.question);
+    if (question === '') continue;
+    const id = supportId(question);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const theme = clean(entry.theme);
+    const count = typeof entry.count === 'number' && Number.isFinite(entry.count) && entry.count > 0
+      ? Math.round(entry.count)
+      : undefined;
+    out.push({ question, ...(theme ? { theme } : {}), ...(count === undefined ? {} : { count }) });
+  }
+  // Vaakst gesteld eerst, en bij gelijk aantal de volgorde van het bestand.
+  return out
+    .map((hint, index) => ({ hint, index }))
+    .sort((a, b) => (b.hint.count ?? 0) - (a.hint.count ?? 0) || a.index - b.index)
+    .map(({ hint }) => hint)
+    .slice(0, MAX_SUPPORT_HINTS);
+}
