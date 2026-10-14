@@ -103,7 +103,7 @@ test('tekens die een pdf-letter niet kent worden omgezet of weggelaten', () => {
 test('van een rapport komt een pdf, in beide talen', () => {
   const palette = {
     text: '#221f1a', muted: '#6a6156', line: '#ddd2bd', surface2: '#ebe3d4',
-    ok: '#3a7637', warn: '#87610f', danger: '#a11f2a', warnSoft: '#faefd8',
+    ok: '#3a7637', warn: '#87610f', danger: '#a11f2a', warnSoft: '#faefd8', accent: '#a8451f',
   };
   for (const locale of ['nl', 'en'] as const) {
     const doc = buildReportPdf(rapport(), STRINGS[locale], locale, palette);
