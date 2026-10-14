@@ -17,7 +17,7 @@
 
 import type { Locale, ScanReport } from '../domain/types';
 import type { Strings } from '../i18n/strings';
-import type { ReadinessPlan } from './actions';
+import { openGroups, type ReadinessPlan } from './actions';
 import type { Cell, Sheet } from './xlsx';
 
 type Kind = 'fill' | 'add';
@@ -62,13 +62,13 @@ function productTasks(report: ScanReport, plan: ReadinessPlan, locale: Locale): 
       for (const question of product.questions) {
         if (!question.scored) continue;
         total += 1;
-        const missing = new Set(question.missing);
+        const open = new Set(openGroups(question).map((hint) => hint.attributeKey));
         for (const hint of question.evidence ?? []) {
           const columns = [...new Set(hint.fields.flatMap((field) => columnOf.get(field) ?? []))];
           const name = columns.length > 0 ? columns.join(' / ') : hint.label[locale];
           const kind: Kind = columns.length > 0 ? 'fill' : 'add';
           relevant.add(taskKey(kind, name));
-          if (question.answered || !hint.fields.some((field) => missing.has(field))) continue;
+          if (!open.has(hint.attributeKey)) continue;
           const held = tasks.get(taskKey(kind, name)) ?? { kind, name, critical: false, questions: [] };
           if (question.importance === 'critical') held.critical = true;
           if (!held.questions.includes(question.label[locale])) held.questions.push(question.label[locale]);

@@ -62,3 +62,23 @@ test('eerst wat basisgeschikt oplevert, dan wat de meeste producten raakt', () =
   const actions = topActions(readinessPlan(rapport(), 'nl'));
   assert.deepEqual(actions.map((action) => action.kind), ['add', 'fill']);
 });
+
+test('een kenmerk zonder kolom is werk: toevoegen, ook in de export', async () => {
+  const { openGroups } = await import('../src/report/actions');
+  const base = { questionId: 'Q', label: { nl: 'Q', en: 'Q' }, state: 'absent', answered: false, found: [], scored: true, importance: 'high' };
+  // De merchant koos "geen kolom": het kenmerk heeft geen velden, en dus ook niets in `missing`.
+  const zonderKolom = { ...base, missing: [], evidence: [{ attributeKey: 'vleug', label: { nl: 'Vleug', en: 'Nap' }, fields: [] }] };
+  assert.deepEqual(openGroups(zonderKolom as never).map((hint) => hint.attributeKey), ['vleug']);
+  // Twee kolommen voor één kenmerk, één gevuld: dan is dit kenmerk niet open.
+  const eenGevuld = { ...base, missing: ['attr:b', 'attr:c'], evidence: [
+    { attributeKey: 'gewicht', label: { nl: 'Gewicht', en: 'Weight' }, fields: ['attr:a', 'attr:b'] },
+    { attributeKey: 'dikte', label: { nl: 'Dikte', en: 'Thickness' }, fields: ['attr:c'] },
+  ] };
+  assert.deepEqual(openGroups(eenGevuld as never).map((hint) => hint.attributeKey), ['dikte']);
+  // Toepassing zonder kolom naast een ander open kenmerk: of de boom hem droeg is niet te zien, dus geen werk verzinnen.
+  const metBoom = { ...base, missing: ['attr:c'], evidence: [
+    { attributeKey: 'toepassing', label: { nl: 'Toepassing', en: 'Use' }, fields: [] },
+    { attributeKey: 'dikte', label: { nl: 'Dikte', en: 'Thickness' }, fields: ['attr:c'] },
+  ] };
+  assert.deepEqual(openGroups(metBoom as never).map((hint) => hint.attributeKey), ['dikte']);
+});
