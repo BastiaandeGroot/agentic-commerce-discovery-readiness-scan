@@ -14,7 +14,8 @@
 //
 // Puur: alles komt binnen als argument.
 
-import type { Bilingual, Locale, ScanReport } from '../domain/types';
+import type { Bilingual, EvidenceHint, Locale, QuestionOutcome, ScanReport } from '../domain/types';
+import { isPlacementAttribute } from '../spec/placement';
 import type { AttributeExample } from '../questions/bank';
 import { isStockQuestion, type SiteAnswerStatus, type SiteCheck } from '../collect/answers';
 import type { SupportList } from '../questions/support';
@@ -97,14 +98,36 @@ export interface ReadinessPlan {
   banks: { label: Bilingual; version: string; status: string }[];
 }
 
-/** Hoeveel producten basisgeschikt worden als precies deze velden gevuld zijn. */
-function gainOf(report: ScanReport, fields: Set<string>): number {
+/**
+ * De kenmerken waar een onbeantwoorde vraag op wacht.
+ *
+ * Een kenmerk is open als geen van zijn kolommen een waarde heeft: al zijn
+ * velden staan bij `missing`. Een kenmerk zonder kolom — de merchant koos "geen
+ * kolom" — heeft geen velden en is dus altijd open; zonder die regel viel juist
+ * het modelwerk weg. Uitzondering: waar een product voor bedoeld is mag uit de
+ * categorieboom komen (`spec/placement.ts`). Dat telt alleen als open als het de
+ * enige reden is dat de vraag openstaat, want of de boom het droeg is hier niet
+ * meer te zien; bij twijfel geen werk verzinnen.
+ */
+export function openGroups(question: QuestionOutcome): EvidenceHint[] {
+  if (question.answered) return [];
+  const missing = new Set(question.missing);
+  const open = (question.evidence ?? []).filter((hint) => hint.fields.length === 0 || hint.fields.every((field) => missing.has(field)));
+  const placed = open.filter((hint) => hint.fields.length === 0 && isPlacementAttribute(hint.attributeKey));
+  return placed.length > 0 && placed.length < open.length ? open.filter((hint) => !placed.includes(hint)) : open;
+}
+
+/** Hoeveel producten basisgeschikt worden als precies deze kenmerken er zijn. */
+function gainOf(report: ScanReport, keys: Set<string>): number {
   let gain = 0;
   for (const product of report.products) {
     if (product.qualified || product.unmatched || product.facetOnly) continue;
     const open = product.questions.filter((question) => question.scored && question.importance === 'critical' && !question.answered);
     if (open.length === 0) continue;
-    if (open.every((question) => question.missing.length > 0 && question.missing.every((field) => fields.has(field)))) gain += 1;
+    if (open.every((question) => {
+      const groups = openGroups(question);
+      return groups.length > 0 && groups.every((hint) => keys.has(hint.attributeKey));
+    })) gain += 1;
   }
   return gain;
 }
@@ -141,13 +164,23 @@ export function readinessPlan(report: ScanReport, locale: Locale, siteCheck?: Si
       examples: gap.expect?.examples ?? [],
     });
   }
+  // Van veld naar het kenmerk dat erop leunt, om de winst per kenmerk te tellen.
+  const keysOfField = new Map<string, Set<string>>();
+  for (const row of report.questionCoverage) {
+    for (const hint of row.evidence ?? []) {
+      for (const field of hint.fields) {
+        const keys = keysOfField.get(field) ?? new Set<string>();
+        keys.add(hint.attributeKey);
+        keysOfField.set(field, keys);
+      }
+    }
+  }
   const fill = [...groups.values()]
-    .map((row) => ({ ...row, gain: row.critical ? gainOf(report, new Set(row.fields)) : 0 }))
+    .map((row) => ({ ...row, gain: row.critical ? gainOf(report, new Set(row.fields.flatMap((field) => [...(keysOfField.get(field) ?? [])]))) : 0 }))
     .sort((a, b) => b.gain - a.gain || b.empty - a.empty);
 
   // --- Toevoegen: kenmerken die de catalogus niet heeft ----------------------
   const perQuestion = new Map<string, { label: string; importance: string; applicable: number; open: number; keys: Set<string> }>();
-  const fieldsOf = new Map<string, Set<string>>();
   const examplesOf = new Map<string, AttributeExample[]>();
   const expectOf = new Map<string, { kind?: string; unit?: string }>();
   for (const row of report.questionCoverage) {
@@ -158,9 +191,6 @@ export function readinessPlan(report: ScanReport, locale: Locale, siteCheck?: Si
     if ((WEIGHT[row.importance] ?? 9) < (WEIGHT[held.importance] ?? 9)) held.importance = row.importance;
     for (const hint of row.evidence ?? []) {
       held.keys.add(hint.attributeKey);
-      const fields = fieldsOf.get(hint.attributeKey) ?? new Set<string>();
-      for (const field of hint.fields) fields.add(field);
-      fieldsOf.set(hint.attributeKey, fields);
       if (hint.examples?.length && !examplesOf.has(hint.attributeKey)) examplesOf.set(hint.attributeKey, hint.examples);
       const kind = hint.shape?.kind ?? (hint.answerType === 'enum' ? 'list' : hint.answerType);
       if (kind && !expectOf.has(hint.attributeKey)) expectOf.set(hint.attributeKey, { kind, unit: hint.shape?.unit });
@@ -180,7 +210,7 @@ export function readinessPlan(report: ScanReport, locale: Locale, siteCheck?: Si
       key, label, products: Math.max(...questions.map((question) => question.open)), questions: labels, importance, critical,
       examples: examplesOf.get(key) ?? [],
       ...(expectOf.has(key) ? { expect: expectOf.get(key) } : {}),
-      gain: critical ? gainOf(report, fieldsOf.get(key) ?? new Set<string>()) : 0,
+      gain: critical ? gainOf(report, new Set([key])) : 0,
     });
   }
   addAll.sort((a, b) => (WEIGHT[a.importance] ?? 9) - (WEIGHT[b.importance] ?? 9) || b.products - a.products);
