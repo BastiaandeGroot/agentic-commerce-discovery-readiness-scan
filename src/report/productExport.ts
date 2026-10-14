@@ -125,9 +125,12 @@ export function productWorkbook(report: ScanReport, plan: ReadinessPlan, s: Stri
       counts.set(taskKey(task.kind, task.name), held);
     }
   }
+  // Kritiek eerst, dan op aantal producten. Invullen en toevoegen door elkaar:
+  // met invullen voorop begon het modelwerk pas bij kolom W en leek het te
+  // ontbreken, terwijl het het meeste werk is.
   const attributes = [...counts.values()].sort((a, b) => Number(b.critical) - Number(a.critical)
-    || (a.kind === b.kind ? 0 : a.kind === 'fill' ? -1 : 1)
-    || b.products - a.products);
+    || b.products - a.products
+    || a.name.localeCompare(b.name));
 
   const kindLabel = (kind: Kind) => (kind === 'fill' ? x.xlsxFill : x.xlsxAdd);
   const header = (labels: string[]): Cell[] => labels.map((label) => ({ value: label, style: 'header' }));
@@ -139,13 +142,16 @@ export function productWorkbook(report: ScanReport, plan: ReadinessPlan, s: Stri
   const overview: Sheet = {
     name: x.xlsxSheetOverview,
     widths: [12, 34, 10, 12, 48, 60],
-    freeze: { rows: 6, columns: 0 },
-    filterRow: 6,
+    freeze: { rows: 9, columns: 0 },
+    filterRow: 9,
     rows: [
       [{ value: report.sources.catalog.filename.split(/[\\/]/).pop() ?? '', style: 'title' }],
       [{ value: x.planSub.replace('{datum}', new Date(report.stamp.scannedAt).toLocaleDateString(tag, { dateStyle: 'long' })).replace('{producten}', n(products.length)), style: 'note' }],
       [{ value: `${n(qualified)} ${x.planOf} ${n(products.length)} ${x.planGainQualified}`, style: 'title' }],
       [{ value: x.xlsxTaskTotal.replace('{taken}', n(taskCount)).replace('{attributen}', n(attributes.length)), style: 'title' }],
+      [{ value: x.xlsxFill, style: 'fill' }, { value: x.xlsxFillMeans, style: 'note' }],
+      [{ value: x.xlsxAdd, style: 'add' }, { value: x.xlsxAddMeans, style: 'note' }],
+      [{ value: x.xlsxYes, style: 'critical' }, { value: x.xlsxCriticalMeans, style: 'note' }],
       [],
       header([x.xlsxColAction, x.planColAttribute, x.planCritical, x.planColProducts, x.planColExpect, x.planColQuestion]),
       ...attributes.map((attribute) => [
