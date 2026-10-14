@@ -54,6 +54,11 @@ const TOKENS: Record<keyof PdfPalette, string> = {
  * krijgen. Lukt het lezen van de stylesheet niet, dan de berekende stijl.
  */
 export function lightPalette(): PdfPalette {
+  return readLightTokens(TOKENS) as unknown as PdfPalette;
+}
+
+/** De lichte waarde van elk token, op naam; zie `lightPalette`. */
+export function readLightTokens(tokens: Record<string, string>): Record<string, string> {
   let root: CSSStyleDeclaration | undefined;
   for (const sheet of Array.from(document.styleSheets)) {
     let rules: CSSRuleList;
@@ -72,8 +77,8 @@ export function lightPalette(): PdfPalette {
   const computed = getComputedStyle(document.documentElement);
   const read = (token: string) => (root?.getPropertyValue(token) || computed.getPropertyValue(token)).trim();
   const palette = Object.fromEntries(
-    Object.entries(TOKENS).map(([name, token]) => [name, read(token)]),
-  ) as unknown as PdfPalette;
+    Object.entries(tokens).map(([name, token]) => [name, read(token)]),
+  );
   const missing = Object.entries(palette).filter(([, value]) => !value).map(([name]) => name);
   if (missing.length > 0) throw new Error(`Kleurtokens ontbreken: ${missing.join(', ')}`);
   return palette;

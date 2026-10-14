@@ -24,6 +24,7 @@ import { Badge, Bar, Button, Card, CardTitle, ErrorState, InfoButton, InfoPanel,
 import { Explorer } from './Explorer';
 import { AdvisoryCard } from './AdvisoryCard';
 import { SupportCard } from './SupportCard';
+import { canExportProducts } from '../src/report/productExport';
 import { unmatchedSupport, type SupportList } from '../src/questions/support';
 import type { SiteCheck } from '../src/collect/answers';
 
@@ -1063,6 +1064,19 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
   const [detailFailed, setDetailFailed] = useState(false);
   /** Het pdf-bestand: bezig, of mislukt met de weg eromheen. */
   const [pdf, setPdf] = useState<'idle' | 'busy' | 'failed'>('idle');
+  /** Het Excel-bestand per product: alleen na een verse scan, want alleen dan zijn de producten er. */
+  const [xlsx, setXlsx] = useState<'idle' | 'busy' | 'failed'>('idle');
+  const productsHere = useMemo(() => canExportProducts(report), [report]);
+  async function saveXlsx() {
+    setXlsx('busy');
+    try {
+      const { saveProductXlsx } = await import('./productXlsx');
+      await saveProductXlsx(report, s, locale, siteCheck, support);
+      setXlsx('idle');
+    } catch {
+      setXlsx('failed');
+    }
+  }
 
   /**
    * Het rapport als pdf-bestand downloaden.
@@ -1190,6 +1204,12 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
             <Download className="size-4" aria-hidden />
             {pdf === 'busy' ? s.report.savingPdf : s.report.savePdf}
           </Button>
+          {productsHere ? (
+            <Button variant="secondary" onClick={() => void saveXlsx()} loading={xlsx === 'busy'}>
+              <Download className="size-4" aria-hidden />
+              {xlsx === 'busy' ? s.report.savingXlsx : s.report.saveXlsx}
+            </Button>
+          ) : null}
           <Button variant="quiet" onClick={onRestart}>{restartLabel ?? s.report.startOver}</Button>
         </div>
         {detailFailed ? (
@@ -1197,6 +1217,12 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
         ) : null}
         {saveState === 'failed' && target.where === 'account' ? (
           <p className="mt-2 text-sm text-warn">{s.report.saveAccountFailed}</p>
+        ) : null}
+        {productsHere ? <p className="mt-2 text-xs leading-relaxed text-muted">{s.report.xlsxNote}</p> : null}
+        {xlsx === 'failed' ? (
+          <div className="mt-3">
+            <ErrorState title={s.report.xlsxFailed} body={s.report.xlsxFailedBody} next={s.report.xlsxFailedNext} />
+          </div>
         ) : null}
         {pdf === 'failed' ? (
           <div className="mt-3">

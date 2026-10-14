@@ -39,3 +39,4 @@ import './inherit.test';
 import './examples.test';
 import './support.test';
 import './actions.test';
+import './xlsx.test';
