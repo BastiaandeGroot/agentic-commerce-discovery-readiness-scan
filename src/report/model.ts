@@ -142,7 +142,7 @@ function answeredDetail(report: ScanReport): Map<string, { fields: Map<string, n
 /** De volgorde waarin vragen bij een gat staan: wat het zwaarst weegt eerst. */
 const WEIGHT_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
-export function modelFromReport(report: ScanReport, locale: Locale, allLabel: string): ReportModel {
+export function modelFromReport(report: ScanReport, locale: Locale, allLabel: string, options: { gapLimit?: number } = {}): ReportModel {
   // Een vraag-id wijst in elke set dezelfde vraag aan; het zwaarste belang telt,
   // zoals bij het product zelf.
   const questionById = new Map<string, { questionId: string; label: Bilingual; importance: string }>();
@@ -215,7 +215,7 @@ export function modelFromReport(report: ScanReport, locale: Locale, allLabel: st
       };
     }),
     blockers: topBlockers(report, locale),
-    gaps: mergedGaps(report).map(gapRow),
+    gaps: mergedGaps(report, options.gapLimit).map(gapRow),
     gapsBySet: Object.fromEntries(report.categories.map((category) => [
       category.setId,
       aggregateGaps(report.products.filter((product) => !product.unmatched && product.setId === category.setId))

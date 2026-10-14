@@ -16,12 +16,9 @@
 import { jsPDF } from 'jspdf';
 import type { Locale, ScanReport } from '../src/domain/types';
 import type { Strings } from '../src/i18n/strings';
-import { isStockQuestion, siteCheckTotals, type SiteCheck } from '../src/collect/answers';
+import type { SiteCheck } from '../src/collect/answers';
 import type { SupportList } from '../src/questions/support';
-import {
-  adviceKey, advisoryItems, categoryLabel, mergedGaps, scoreRows, unansweredQuestions,
-  type AdviceKey, type Average,
-} from '../src/report/derive';
+import { readinessPlan, topActions } from '../src/report/actions';
 
 /** De kleuren van het document, als hex. Uit de ontwerptokens, nooit hier verzonnen. */
 export interface PdfPalette {
@@ -33,6 +30,7 @@ export interface PdfPalette {
   warn: string;
   danger: string;
   warnSoft: string;
+  accent: string;
 }
 
 /** Welk token welke kleur levert. Een pdf is papier, dus altijd de lichte stand. */
@@ -45,6 +43,7 @@ const TOKENS: Record<keyof PdfPalette, string> = {
   warn: '--warn',
   danger: '--danger',
   warnSoft: '--warn-soft',
+  accent: '--accent',
 };
 
 /**
@@ -111,6 +110,8 @@ const PT_TO_MM = 0.3528;
 
 interface Column { label: string; width: number; align?: 'left' | 'right' }
 
+interface Kpi { value: string; of: string; share: number; label: string }
+
 class Writer {
   y = PAGE.top;
   readonly width = PAGE.width - PAGE.margin * 2;
@@ -128,7 +129,7 @@ class Writer {
     }
   }
 
-  private lines(text: string, size: number, width: number): string[] {
+  lines(text: string, size: number, width: number): string[] {
     this.doc.setFontSize(size);
     return this.doc.splitTextToSize(pdfText(text), width) as string[];
   }
@@ -180,6 +181,143 @@ class Writer {
     this.text(title, { size: 10, bold: true, color: 'warn', indent: 4, after: 0.5 });
     for (const part of body) this.text(part, { size, indent: 4, after: 0.5 });
     this.y = start + height + 3;
+  }
+
+  /** Een nieuwe pagina voor het volgende deel; het document is in delen opgebouwd. */
+  page() {
+    this.doc.addPage();
+    this.y = PAGE.top;
+  }
+
+  /** Twee vlakken naast elkaar met een kop en tekst: de begrippen bovenaan. */
+  boxes(items: { title: string; body: string[] }[]) {
+    const gap = 4;
+    const width = (this.width - gap * (items.length - 1)) / items.length;
+    const size = 8.5;
+    const prepared = items.map((item) => ({
+      title: item.title,
+      lines: item.body.filter(Boolean).flatMap((part) => this.lines(part, size, width - 6)),
+    }));
+    const height = Math.max(...prepared.map((item) => this.lineHeight(10) + item.lines.length * this.lineHeight(size))) + 7;
+    this.ensure(height);
+    prepared.forEach((item, index) => {
+      const x = PAGE.margin + index * (width + gap);
+      this.doc.setFillColor(this.palette.surface2);
+      this.doc.roundedRect(x, this.y, width, height, 1.5, 1.5, 'F');
+      let y = this.y + 3.5;
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.setFontSize(10);
+      this.doc.setTextColor(this.palette.text);
+      this.doc.text(pdfText(item.title), x + 3, y + this.lineHeight(10) * 0.75);
+      y += this.lineHeight(10) + 0.5;
+      this.doc.setFont('helvetica', 'normal');
+      this.doc.setFontSize(size);
+      for (const line of item.lines) {
+        this.doc.text(line, x + 3, y + this.lineHeight(size) * 0.75);
+        y += this.lineHeight(size);
+      }
+    });
+    this.y += height + 5;
+  }
+
+  /** De kerncijfers naast elkaar, elk met een balk. */
+  kpis(items: Kpi[]) {
+    const gap = 4;
+    const width = (this.width - gap * (items.length - 1)) / items.length;
+    const size = 8.5;
+    const labels = items.map((item) => this.lines(item.label, size, width - 6));
+    const height = 9 + 5 + Math.max(...labels.map((lines) => lines.length)) * this.lineHeight(size) + 6;
+    this.ensure(height);
+    items.forEach((item, index) => {
+      const x = PAGE.margin + index * (width + gap);
+      this.doc.setDrawColor(this.palette.line);
+      this.doc.roundedRect(x, this.y, width, height, 1.5, 1.5, 'S');
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.setFontSize(18);
+      this.doc.setTextColor(this.palette.text);
+      const big = pdfText(item.value);
+      this.doc.text(big, x + 3, this.y + 9);
+      const bigWidth = this.doc.getTextWidth(big);
+      this.doc.setFont('helvetica', 'normal');
+      this.doc.setFontSize(9);
+      this.doc.setTextColor(this.palette.muted);
+      this.doc.text(pdfText(item.of), x + 4 + bigWidth, this.y + 9);
+      this.doc.setFillColor(this.palette.surface2);
+      this.doc.rect(x + 3, this.y + 11.5, width - 6, 1.6, 'F');
+      this.doc.setFillColor(this.palette.accent);
+      this.doc.rect(x + 3, this.y + 11.5, (width - 6) * Math.max(0, Math.min(item.share, 1)), 1.6, 'F');
+      this.doc.setFontSize(size);
+      this.doc.setTextColor(this.palette.text);
+      labels[index].forEach((line, lineIndex) => {
+        this.doc.text(line, x + 3, this.y + 16.5 + lineIndex * this.lineHeight(size));
+      });
+    });
+    this.y += height + 4;
+  }
+
+  /** Eén actie: nummer, wat te doen, waarom, en rechts wat het oplevert. */
+  action(index: number, item: { title: string; flag?: string; why: string; gain: string; gainLabel: string }) {
+    const gainWidth = 34;
+    const textWidth = this.width - 9 - gainWidth;
+    const titleLines = this.lines(item.title, 10, textWidth);
+    const whyLines = this.lines(item.why, 8.5, textWidth);
+    const height = titleLines.length * this.lineHeight(10) + whyLines.length * this.lineHeight(8.5) + 5;
+    this.ensure(height);
+    this.doc.setDrawColor(this.palette.line);
+    this.doc.line(PAGE.margin, this.y, PAGE.margin + this.width, this.y);
+    const top = this.y + 2.5;
+    this.doc.setFillColor(this.palette.accent);
+    this.doc.circle(PAGE.margin + 3, top + 2.2, 2.6, 'F');
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.setFontSize(9);
+    this.doc.setTextColor('#ffffff');
+    this.doc.text(String(index), PAGE.margin + 3, top + 3.3, { align: 'center' });
+    let y = top;
+    this.doc.setFontSize(10);
+    this.doc.setTextColor(this.palette.text);
+    titleLines.forEach((line, lineIndex) => {
+      this.doc.text(line, PAGE.margin + 9, y + this.lineHeight(10) * 0.75);
+      if (item.flag && lineIndex === titleLines.length - 1) {
+        this.doc.setFontSize(8);
+        this.doc.setTextColor(this.palette.danger);
+        this.doc.text(pdfText(item.flag), PAGE.margin + 11 + this.doc.setFontSize(10).getTextWidth(line), y + this.lineHeight(10) * 0.75);
+        this.doc.setFontSize(10);
+        this.doc.setTextColor(this.palette.text);
+      }
+      y += this.lineHeight(10);
+    });
+    this.doc.setFont('helvetica', 'normal');
+    this.doc.setFontSize(8.5);
+    this.doc.setTextColor(this.palette.muted);
+    for (const line of whyLines) {
+      this.doc.text(line, PAGE.margin + 9, y + this.lineHeight(8.5) * 0.75);
+      y += this.lineHeight(8.5);
+    }
+    const right = PAGE.margin + this.width;
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.setFontSize(12);
+    this.doc.setTextColor(this.palette.text);
+    this.doc.text(pdfText(item.gain), right, top + 4, { align: 'right' });
+    this.doc.setFont('helvetica', 'normal');
+    this.doc.setFontSize(7.5);
+    this.doc.setTextColor(this.palette.muted);
+    this.doc.text(pdfText(item.gainLabel), right, top + 8, { align: 'right' });
+    this.y += height;
+  }
+
+  /** De stempel en het paginanummer onderaan elke pagina. */
+  footer(stamp: string) {
+    const pages = this.doc.getNumberOfPages();
+    for (let page = 1; page <= pages; page++) {
+      this.doc.setPage(page);
+      this.doc.setDrawColor(this.palette.line);
+      this.doc.line(PAGE.margin, PAGE.bottom + 4, PAGE.margin + this.width, PAGE.bottom + 4);
+      this.doc.setFont('helvetica', 'normal');
+      this.doc.setFontSize(7.5);
+      this.doc.setTextColor(this.palette.muted);
+      this.doc.text(pdfText(stamp), PAGE.margin, PAGE.bottom + 8);
+      this.doc.text(`${page}/${pages}`, PAGE.margin + this.width, PAGE.bottom + 8, { align: 'right' });
+    }
   }
 
   /** Een tabel die tussen rijen afbreekt en de kop op elke pagina herhaalt. */
@@ -239,275 +377,208 @@ class Writer {
 // --- Inhoud -----------------------------------------------------------------
 
 /**
- * Het rapport als pdf-document.
+ * Het rapport als pdf-document: alleen bevindingen en wat eraan te doen is.
  *
- * Dezelfde volgorde als het scherm. Wat op het scherm achter een keuzelijst of
- * een uitklapper zit, staat hier voluit: een bestand kun je niet aanklikken.
- * De productverkenner staat er niet in; dat is een zoekscherm, geen verslag.
+ * Vier delen, elk op een eigen pagina: een samenvatting met de acties die het
+ * meeste opleveren, de attributen, de categorieën en de website. Uitleg over de
+ * meting, citaten van wat al goed staat en de versiestempel staan er niet in;
+ * de stempel is één regel onderaan. Lijsten worden nooit ingekort. Wat erin
+ * staat komt uit `src/report/actions.ts`.
  */
 export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, palette: PdfPalette, siteCheck?: SiteCheck, support?: SupportList): jsPDF {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const w = new Writer(doc, palette);
   const tag = locale === 'nl' ? 'nl-NL' : 'en-GB';
-  const n = (value: number) => value.toLocaleString(tag);
+  const n = (value: number) => Math.round(value).toLocaleString(tag);
   const one = (value: number) => value.toLocaleString(tag, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  const average = (value: Average) => `${one(value.answered)} ${s.report.scoreOf} ${one(value.total)}`;
+  const r = s.report;
+  const plan = readinessPlan(report, locale, siteCheck, support);
+  const host = (url: string) => url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+  const short = (value: string) => (value.length > 40 ? `${value.slice(0, 38)}…` : value);
 
-  // Kop
-  w.text(s.report.heading, { size: 20, bold: true, after: 1 });
-  w.text(
-    `${s.report.pdfCatalog}: ${report.sources.catalog.filename} · ${s.report.scannedAt}: ${new Date(report.stamp.scannedAt).toLocaleString(tag)}`,
-    { size: 9, color: 'muted', after: 4 },
-  );
+  /** Wat erin hoort: het soort waarde, wat er bij hem staat, en hoe een andere winkel het invult. */
+  const expectation = (kind: string | undefined, unit: string | undefined, own: string[], examples: { value: string; url: string }[]) => [
+    kind ? `${r.expectKinds[kind] ?? kind}${unit ? ` (${unit})` : ''}` : '',
+    own.length > 0 ? r.planOwn.replace('{waarden}', own.slice(0, 3).map(short).join(' · ')) : '',
+    ...examples.slice(0, 1).map((example) => r.planExampleFrom.replace('{waarde}', short(example.value)).replace('{site}', host(example.url))),
+  ].filter(Boolean).join('\n');
 
-  // Dezelfde twee mededelingen bovenaan als op het scherm.
-  if (report.stamp.banks.length > 0) {
-    const unfrozen = report.stamp.banks.filter((bank) => bank.status !== 'frozen');
-    w.notice(
-      s.report.bankMeasured.replace('{naam}', report.stamp.banks.map((bank) => bank.label[locale]).join(', ')),
-      unfrozen.map((bank) => `${bank.label[locale]}: ${s.bank.status[bank.status as keyof typeof s.bank.status] ?? bank.status}`),
-    );
-  }
-  if (report.stamp.blindAttributes.length > 0) {
-    w.notice(
-      s.report.blindHeading,
-      [s.report.blindBody, report.stamp.blindAttributes.map((attribute) => attribute.key).join(', ')],
-    );
-  }
+  // --- 1. Samenvatting -------------------------------------------------------
+  w.text(r.planKicker, { size: 8.5, bold: true, color: 'accent', after: 0.5 });
+  w.text(report.sources.catalog.filename.split(/[\\/]/).pop()!.replace(/\.[a-z0-9]+$/i, ''), { size: 18, bold: true, after: 1 });
+  const sub = r.planSub
+    .replace('{datum}', new Date(report.stamp.scannedAt).toLocaleDateString(tag, { dateStyle: 'long' }))
+    .replace('{producten}', n(plan.total));
+  w.text(plan.site ? `${sub} · ${host(plan.site.site)}` : sub, { size: 9, color: 'muted', after: 4 });
 
-  // De trechter
-  const { funnel } = report;
-  const hasCritical = report.questionCoverage.some((row) => row.scored && row.importance === 'critical');
-  w.heading(s.report.funnelHeading);
-  const steps: { value: number; label: string; explain?: string }[] = [
-    { value: funnel.total, label: s.report.total },
-    { value: funnel.qualified, label: s.report.qualified, explain: hasCritical ? s.report.qualifiedExplain : s.report.qualifiedNoCritical },
-    { value: funnel.findable, label: s.report.findable, explain: s.report.findableExplain },
+  w.boxes([
+    { title: r.planCriticalTitle, body: [r.planCriticalBody, plan.exampleCritical ? r.planExample.replace('{vraag}', plan.exampleCritical) : ''] },
+    { title: r.planOtherTitle, body: [r.planOtherBody, plan.exampleOther ? r.planExample.replace('{vraag}', plan.exampleOther) : ''] },
+  ]);
+
+  const kpis: Kpi[] = [
+    { value: n(plan.qualified), of: `${r.planOf} ${n(plan.total)}`, share: plan.total > 0 ? plan.qualified / plan.total : 0, label: r.planKpiQualified },
+    {
+      value: n(plan.avgAnswered), of: `${r.planOf} ${n(plan.avgApplicable)}`,
+      share: plan.avgApplicable > 0 ? plan.avgAnswered / plan.avgApplicable : 0,
+      label: `${r.planKpiAnswered} ${plan.complete > 0 ? r.planKpiComplete.replace('{aantal}', n(plan.complete)) : r.planKpiNoneComplete}`,
+    },
   ];
-  for (const step of steps) {
-    w.text(`${n(step.value)} ${step.label}`, { size: 11, bold: true, after: 0.5 });
-    w.bar(step.value, funnel.total, 'ok');
-    if (step.explain) w.text(step.explain, { size: 8.5, color: 'muted', after: 2 });
+  if (plan.site && plan.site.checked > 0) {
+    kpis.push({ value: n(plan.site.answered), of: `${r.planOf} ${n(plan.site.checked)}`, share: plan.site.answered / plan.site.checked, label: r.planKpiSite });
   }
-  const status = funnel.avgApplicable <= 0 ? 'early'
-    : funnel.avgAnswered >= funnel.avgApplicable ? 'complete'
-      : funnel.avgAnswered / funnel.avgApplicable >= 0.5 ? 'partial' : 'early';
-  const statusColor = status === 'complete' ? 'ok' : status === 'partial' ? 'warn' : 'danger';
-  w.text(s.report.status[status], { size: 10, bold: true, color: statusColor, after: 0.5 });
-  w.text(
-    `${one(funnel.avgAnswered)} ${s.report.statusScale} ${n(Math.round(funnel.avgApplicable))} ${s.report.statusAnswered} · ${s.report.avgPointsLine} ${one(funnel.avgEarned)} ${s.report.statusScale} ${n(Math.round(funnel.avgWeight))} ${s.report.points}`,
-    { size: 9, color: 'muted', after: 1 },
-  );
-  w.text(s.report.statusExplain[status], { size: 9, after: 2 });
+  w.kpis(kpis);
 
-  // Waar sta je per categorie
-  if (report.categories.length > 0) {
-    w.heading(s.report.scoreHeading, s.report.scoreIntro);
-    w.table(
-      [
-        { label: s.report.filterCategory, width: 0.28 },
-        { label: s.report.gapAffected, width: 0.12, align: 'right' },
-        { label: s.report.scoreCritical, width: 0.2, align: 'right' },
-        { label: s.report.scoreGeneral, width: 0.2, align: 'right' },
-        { label: s.report.scoreAll, width: 0.2, align: 'right' },
-      ],
-      scoreRows(report, s.report.scoreAllCategories).map((row) => [
-        row.sub ? `   ${row.label}` : row.label,
-        n(row.total),
-        average(row.critical),
-        average(row.general),
-        average(row.all),
-      ]),
-    );
-    for (const goal of [s.report.scoreCriticalGoal, s.report.scoreGeneralGoal, s.report.scoreAllGoal]) {
-      w.text(goal, { size: 8.5, color: 'muted', after: 0.8 });
-    }
-  }
-
-  if (report.unmatchedCount > 0) {
-    const one = report.unmatchedCount === 1;
-    w.heading(s.report.otherFindingsHeading);
-    w.notice(
-      `${n(report.unmatchedCount)} ${one ? s.report.unmatchedOne : s.report.unmatched}`,
-      [one ? s.report.unmatchedExplainOne : s.report.unmatchedExplain],
-    );
+  const actions = topActions(plan);
+  if (actions.length > 0) {
+    w.heading(r.planTopHeading);
+    actions.forEach((action, index) => {
+      if (action.kind === 'fill') {
+        const row = action.row;
+        w.action(index + 1, {
+          title: r.planFillTitle.replace('{kolom}', row.columns.join(` ${r.planAnd} `)),
+          flag: row.critical ? r.planCritical : undefined,
+          why: r.planFillWhy.replace('{aantal}', n(row.empty)).replace('{vraag}', row.questions[0] ?? ''),
+          gain: row.gain > 0 ? `+${n(row.gain)}` : n(row.empty),
+          gainLabel: row.gain > 0 ? r.planGainQualified : r.planGainProducts,
+        });
+      } else if (action.kind === 'add') {
+        const row = action.row;
+        w.action(index + 1, {
+          title: r.planAddTitle.replace('{kenmerk}', row.label),
+          flag: row.critical ? r.planCritical : undefined,
+          why: r.planAddWhy.replace('{vraag}', row.questions[0] ?? ''),
+          gain: `+${n(row.gain)}`,
+          gainLabel: r.planGainQualified,
+        });
+      } else {
+        w.action(index + 1, {
+          title: action.groups.length > 0
+            ? r.planSiteTitle.replace('{themas}', action.groups.map((group) => group.name.toLowerCase()).join(', '))
+            : r.planSiteTitleBank.replace('{aantal}', n(action.questions)),
+          why: r.planSiteWhy.replace('{aantal}', n(action.questions)),
+          gain: action.mails > 0 ? n(action.mails) : n(action.questions),
+          gainLabel: action.mails > 0 ? r.planGainMails : r.planGainQuestions,
+        });
+      }
+    });
   }
 
-  // Welke vragen blijven onbeantwoord
-  const categoryName = new Map(report.categories.map((row) => [row.setId, categoryLabel(row)]));
-  const open = unansweredQuestions(report);
-  w.heading(s.report.questionsHeading, `${s.report.questionsIntro} ${s.report.pdfAllUnanswered}`);
-  if (open.length === 0) {
-    w.text(s.report.allAnswered, { color: 'muted' });
+  // --- 2. Attributen ----------------------------------------------------------
+  w.page();
+  w.heading(r.planFillHeading, r.planFillIntro);
+  if (plan.fill.length === 0) {
+    w.text(r.planNothingFill, { size: 9, color: 'muted' });
   } else {
     w.table(
       [
-        { label: s.report.pdfQuestion, width: 0.4 },
-        { label: s.report.filterCategory, width: 0.16 },
-        { label: s.report.pdfAnswered, width: 0.12, align: 'right' },
-        { label: s.report.pdfStuck, width: 0.17 },
-        { label: s.report.pdfAction, width: 0.15 },
+        { label: r.planColColumn, width: 0.2 },
+        { label: r.planColExpect, width: 0.34 },
+        { label: r.planColEmpty, width: 0.1, align: 'right' },
+        { label: r.planColQuestion, width: 0.36 },
       ],
-      open.map((row) => {
-        const stuck = [
-          row.empty > 0 ? `${n(row.empty)} ${s.report.enrichable}` : '',
-          row.unusable > 0 ? `${n(row.unusable)} ${s.report.states.unusable.toLowerCase()}` : '',
-          row.incomplete > 0 ? `${n(row.incomplete)} ${s.report.states.incomplete.toLowerCase()}` : '',
-          row.absent > 0 ? `${n(row.absent)} ${s.report.neither}` : '',
-          (row.fromTree ?? 0) > 0 ? `${n(row.fromTree ?? 0)} ${s.report.fromTree}` : '',
-        ].filter(Boolean).join(', ');
-        return [
-          row.label[locale],
-          categoryName.get(row.setId) ?? row.setId,
-          `${n(row.answered)}/${n(row.applicable)}`,
-          stuck,
-          s.report.pdfActions[adviceKey(row)],
-        ];
-      }),
-    );
-    w.text(s.report.pdfActionsLegend, { size: 9, bold: true, color: 'muted', after: 0.5 });
-    const keys: AdviceKey[] = ['qNextUnlinked', 'qNextEmpty', 'qNextAbsent', 'qNextWeak', 'qNextTree'];
-    for (const key of keys) {
-      w.text(`${s.report.pdfActions[key]}: ${s.report[key]}`, { size: 8.5, color: 'muted', after: 0.8 });
-    }
-  }
-
-  // Waar komt elk gat vandaan
-  const gaps = mergedGaps(report);
-  if (gaps.length > 0) {
-    w.heading(s.report.gapsHeading);
-    const why = ['unfilled', 'unmodelled', 'no-source']
-      .filter((cause) => cause !== 'no-source' || report.gaps.some((gap) => gap.cause === 'no-source'));
-    why.forEach((cause, at) => {
-      w.text(s.report.gapsWhy[cause], { size: 8.5, color: 'muted', after: at === why.length - 1 ? 2 : 0.5 });
-    });
-    w.table(
-      [
-        { label: s.report.gapField, width: 0.34 },
-        { label: s.report.gapQuestions, width: 0.1, align: 'right' },
-        { label: s.report.gapCause, width: 0.42 },
-        { label: s.report.gapAffected, width: 0.14, align: 'right' },
-      ],
-      gaps.map((gap) => [
-        gap.label[locale],
-        n(gap.questions.length),
-        `${s.report.causes[gap.cause]}: ${s.report.causeMeaning[gap.cause]}`,
-        n(gap.affected),
+      plan.fill.map((row) => [
+        `${row.columns.join('\n')}${row.critical ? `\n${r.planCritical}` : ''}`,
+        expectation(row.expect?.kind, row.expect?.unit, row.own, row.examples),
+        n(row.empty),
+        row.questions.join('\n'),
       ]),
     );
   }
 
-  // Buiten de score
-  // Zonder de voorraadvragen, zoals op het scherm.
-  const advisory = advisoryItems(report, locale).filter((item) => !isStockQuestion(item.label));
-  if (advisory.length > 0) {
-    w.heading(s.report.advisoryHeading, s.report.advisoryIntro);
-    // De sitetoets, als die gedaan is: dezelfde uitkomst en dezelfde uitleg als
-    // op het scherm.
-    const answerOf = new Map((siteCheck?.answers ?? []).map((answer) => [answer.questionId, answer]));
-    if (siteCheck) {
-      const listed = new Set(advisory.map((item) => item.id));
-      const totals = siteCheckTotals({ ...siteCheck, answers: siteCheck.answers.filter((answer) => answer.skipped !== 'stock' && listed.has(answer.questionId)) });
-      w.text(
-        s.report.siteSummary
-          .replace('{datum}', new Date(siteCheck.checkedAt).toLocaleDateString(tag, { dateStyle: 'long' }))
-          .replace('{site}', siteCheck.site.replace(/^https?:\/\//, ''))
-          .replace('{paginas}', n(siteCheck.pages.length)),
-        { size: 9.5, bold: true, after: 0.5 },
+  if (plan.add.length > 0 || plan.addLater.length > 0) {
+    w.heading(r.planAddHeading, r.planAddIntro);
+    if (plan.add.length > 0) {
+      w.table(
+        [
+          { label: r.planColAttribute, width: 0.24 },
+          { label: r.planColExpect, width: 0.3 },
+          { label: r.planColProducts, width: 0.1, align: 'right' },
+          { label: r.planColQuestion, width: 0.36 },
+        ],
+        plan.add.map((row) => [
+          `${row.label}${row.critical ? `\n${r.planCritical}` : ''}`,
+          expectation(row.expect?.kind, row.expect?.unit, [], row.examples),
+          n(row.products),
+          row.questions.join('\n'),
+        ]),
       );
-      w.text(
-        (['answered', 'partial', 'not-found', 'not-checked'] as const)
-          .filter((status) => totals[status] > 0)
-          .map((status) => `${n(totals[status])} ${s.report.siteCount[status]}`)
-          .join(' · '),
-        { size: 9, color: 'muted', after: 1.5 },
-      );
-      for (const line of s.report.siteHow) w.text(line, { size: 8.5, color: 'muted', after: 0.8 });
     }
-    for (const item of advisory) {
-      const answer = answerOf.get(item.id);
-      w.text(`• ${item.label}`, { size: 9.5, after: answer ? 0 : 1 });
-      if (answer) {
-        w.text(s.report.siteStatus[answer.status], { size: 8.5, color: 'muted', indent: 3, after: answer.quote ? 0 : 1 });
-      }
-      if (answer?.quote) {
-        w.text(`"${answer.quote}"`, { size: 8.5, indent: 3, after: 0 });
-        const where = [
-          answer.url,
-          answer.position !== undefined ? s.report.sitePosition.replace('{pct}', String(answer.position)) : '',
-          answer.opener === undefined ? '' : answer.opener === '' ? s.report.siteCollapsedUnknown : s.report.siteCollapsed.replace('{regel}', answer.opener),
-          answer.note ?? '',
-        ].filter(Boolean).join(' · ');
-        w.text(where, { size: 8, color: 'muted', indent: 3, after: 1 });
-      }
+    if (plan.addLater.length > 0) {
+      w.text(`${r.planAddLater} ${plan.addLater.map((row) => row.label).join(' · ')}`, { size: 8.5, color: 'muted', after: 2 });
     }
   }
 
-  // Vragen uit de klantenservice: dezelfde regels als het blok op het scherm.
-  const supportQuestions = (support?.questions ?? []).filter((question) => !isStockQuestion(question.question));
-  if (supportQuestions.length > 0) {
-    w.heading(s.report.supportHeading, s.report.supportIntro.replace('{bestand}', support?.name ?? ''));
-    const answerOf = new Map((siteCheck?.answers ?? []).map((answer) => [answer.questionId, answer]));
-    for (const question of supportQuestions) {
-      const fromCatalog = question.match?.scored === true;
-      const mails = question.count === undefined ? ''
-        : question.group
-          ? s.report.supportGroupMails.replace('{groep}', question.group).replace('{aantal}', n(question.count))
-          : s.report.supportMails.replace('{aantal}', n(question.count));
-      w.text(`• ${question.question}`, { size: 9.5, after: 0 });
-      const where = question.match
-        ? `${fromCatalog ? s.report.supportInBank : s.report.supportInBankAdvisory} ${question.match.label}`
-        : s.report.supportNotInBank;
-      w.text([question.theme ?? '', mails, where].filter(Boolean).join(' · '), { size: 8.5, color: 'muted', indent: 3, after: 0 });
-      if (fromCatalog && question.match) {
-        const rows = report.questionCoverage.filter((row) => row.questionId === question.match?.questionId);
-        const answered = rows.reduce((sum, row) => sum + row.answered, 0);
-        const applicable = rows.reduce((sum, row) => sum + row.applicable, 0);
-        w.text(applicable > 0 ? s.report.supportShare.replace('{beantwoord}', n(answered)).replace('{totaal}', n(applicable)) : '', { size: 8.5, color: 'muted', indent: 3, after: 1 });
-        continue;
-      }
-      const answer = answerOf.get(question.match ? question.match.questionId : question.id);
-      w.text(answer ? s.report.siteStatus[answer.status] : s.report.supportNoCheck, { size: 8.5, color: 'muted', indent: 3, after: answer?.quote ? 0 : 1 });
-      if (answer?.quote) {
-        w.text(`"${answer.quote}"`, { size: 8.5, indent: 3, after: 0 });
-        w.text(answer.url ?? '', { size: 8, color: 'muted', indent: 3, after: 1 });
-      }
-    }
-  }
-
-  // Versiestempel
-  w.heading(s.report.stampHeading, s.report.stampExplain);
-  const stamp: [string, string][] = [
-    [s.report.scanVersion, `v${report.stamp.scanVersion}`],
-    [s.report.specSnapshot, report.stamp.fieldRegister],
-    [s.report.bankVersion, report.stamp.banks.length === 0 ? '—'
-      : report.stamp.banks.map((bank) => `${bank.label[locale]} ${bank.version}`).join(', ')],
-    [s.report.questionVersion, `v${report.stamp.questionSetVersion}`],
-    [s.report.scannedAt, new Date(report.stamp.scannedAt).toLocaleString(tag)],
-  ];
-  for (const [label, value] of stamp) w.text(`${label}: ${value}`, { size: 9, after: 0.6 });
-  w.y += 3;
-  w.text(s.report.disclaimer, { size: 8.5, color: 'muted' });
-
-  // Paginanummers, als laatste: pas nu is het aantal bekend.
-  const pages = doc.getNumberOfPages();
-  for (let page = 1; page <= pages; page++) {
-    doc.setPage(page);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(palette.muted);
-    doc.text(pdfText(report.sources.catalog.filename), PAGE.margin, PAGE.height - 10);
-    doc.text(
-      pdfText(s.report.pdfPage.replace('{n}', String(page)).replace('{totaal}', String(pages))),
-      PAGE.width - PAGE.margin,
-      PAGE.height - 10,
-      { align: 'right' },
+  // --- 3. Per categorie -------------------------------------------------------
+  if (plan.categories.length > 0) {
+    w.page();
+    w.heading(r.planCategoryHeading);
+    w.table(
+      [
+        { label: r.planColCategory, width: 0.3 },
+        { label: r.planColProducts, width: 0.11, align: 'right' },
+        { label: r.planColQualified, width: 0.15, align: 'right' },
+        { label: r.planColAnswered, width: 0.16, align: 'right' },
+        { label: r.planColFirst, width: 0.28 },
+      ],
+      plan.categories.map((row) => [
+        row.label,
+        n(row.total),
+        `${row.total > 0 ? Math.round((row.qualified / row.total) * 100) : 0}%`,
+        `${one(row.answered)} / ${one(row.applicable)}`,
+        row.first ? (row.first.cause === 'unfilled' ? r.planFirstFill : r.planFirstAdd).replace('{kenmerk}', row.first.label) : '',
+      ]),
     );
+    w.text(r.planCategoryNote, { size: 8.5, color: 'muted' });
   }
+
+  // --- 4. Website -------------------------------------------------------------
+  w.page();
+  w.heading(r.planSiteHeading, plan.site
+    ? r.planSiteIntro.replace('{site}', host(plan.site.site)).replace('{paginas}', n(plan.site.pages))
+    : undefined);
+  if (!plan.site) {
+    w.text(r.planNoSite, { size: 9, color: 'muted' });
+  } else {
+    const status = (value: 'not-found' | 'partial') => (value === 'not-found' ? r.planNotFound : r.planPartial);
+    if (plan.siteSupport.length > 0) {
+      w.text(r.planSiteSupport, { size: 10, bold: true, after: 0.5 });
+      w.table(
+        [
+          { label: r.pdfQuestion, width: 0.64 },
+          { label: r.planColSite, width: 0.2 },
+          { label: r.planColMails, width: 0.16, align: 'right' },
+        ],
+        plan.siteSupport.map((line) => [line.label, status(line.status), line.mails === undefined ? '' : `${n(line.mails)}${line.group ? '*' : ''}`]),
+      );
+      if (plan.siteSupport.some((line) => line.group && line.mails !== undefined)) w.text(r.planMailsGroup, { size: 8, color: 'muted', after: 3 });
+    }
+    if (plan.siteBank.length > 0) {
+      w.text(r.planSiteBank, { size: 10, bold: true, after: 0.5 });
+      w.table(
+        [
+          { label: r.pdfQuestion, width: 0.8 },
+          { label: r.planColSite, width: 0.2 },
+        ],
+        plan.siteBank.map((line) => [line.label, status(line.status)]),
+      );
+    }
+    w.text(r.planSiteAnswered.replace('{aantal}', n(plan.site.answered)), { size: 8.5, color: 'muted' });
+  }
+
+  // --- Voettekst: de stempel in één regel, en de paginanummers -------------------
+  const stamp = [
+    plan.banks.length > 0
+      ? r.planFooterBank.replace('{naam}', plan.banks.map((bank) => `${bank.label[locale]} ${bank.version}${bank.status !== 'frozen' ? ` (${s.bank.status[bank.status as keyof typeof s.bank.status] ?? bank.status})` : ''}`).join(', '))
+      : '',
+    `scan v${report.stamp.scanVersion}`,
+    plan.unmatched > 0 ? (plan.unmatched === 1 ? r.planFooterUnmatchedOne : r.planFooterUnmatched.replace('{aantal}', n(plan.unmatched))) : '',
+  ].filter(Boolean).join(' · ');
+  w.footer(stamp);
+
   return doc;
 }
 
-/** De bestandsnaam: de catalogus en de scandatum, zonder tekens die een bestandssysteem weigert. */
 export function pdfFilename(report: ScanReport): string {
   const base = report.sources.catalog.filename.replace(/\.[a-z0-9]+$/i, '');
   const safe = base.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase();
