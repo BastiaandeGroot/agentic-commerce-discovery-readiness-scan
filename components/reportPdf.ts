@@ -17,6 +17,7 @@ import { jsPDF } from 'jspdf';
 import type { Locale, ScanReport } from '../src/domain/types';
 import type { Strings } from '../src/i18n/strings';
 import { isStockQuestion, siteCheckTotals, type SiteCheck } from '../src/collect/answers';
+import type { SupportList } from '../src/questions/support';
 import {
   adviceKey, advisoryItems, categoryLabel, mergedGaps, scoreRows, unansweredQuestions,
   type AdviceKey, type Average,
@@ -244,7 +245,7 @@ class Writer {
  * een uitklapper zit, staat hier voluit: een bestand kun je niet aanklikken.
  * De productverkenner staat er niet in; dat is een zoekscherm, geen verslag.
  */
-export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, palette: PdfPalette, siteCheck?: SiteCheck): jsPDF {
+export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, palette: PdfPalette, siteCheck?: SiteCheck, support?: SupportList): jsPDF {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const w = new Writer(doc, palette);
   const tag = locale === 'nl' ? 'nl-NL' : 'en-GB';
@@ -405,7 +406,8 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
     // op het scherm.
     const answerOf = new Map((siteCheck?.answers ?? []).map((answer) => [answer.questionId, answer]));
     if (siteCheck) {
-      const totals = siteCheckTotals({ ...siteCheck, answers: siteCheck.answers.filter((answer) => answer.skipped !== 'stock') });
+      const listed = new Set(advisory.map((item) => item.id));
+      const totals = siteCheckTotals({ ...siteCheck, answers: siteCheck.answers.filter((answer) => answer.skipped !== 'stock' && listed.has(answer.questionId)) });
       w.text(
         s.report.siteSummary
           .replace('{datum}', new Date(siteCheck.checkedAt).toLocaleDateString(tag, { dateStyle: 'long' }))
@@ -437,6 +439,38 @@ export function buildReportPdf(report: ScanReport, s: Strings, locale: Locale, p
           answer.note ?? '',
         ].filter(Boolean).join(' · ');
         w.text(where, { size: 8, color: 'muted', indent: 3, after: 1 });
+      }
+    }
+  }
+
+  // Vragen uit de klantenservice: dezelfde regels als het blok op het scherm.
+  const supportQuestions = (support?.questions ?? []).filter((question) => !isStockQuestion(question.question));
+  if (supportQuestions.length > 0) {
+    w.heading(s.report.supportHeading, s.report.supportIntro.replace('{bestand}', support?.name ?? ''));
+    const answerOf = new Map((siteCheck?.answers ?? []).map((answer) => [answer.questionId, answer]));
+    for (const question of supportQuestions) {
+      const fromCatalog = question.match?.scored === true;
+      const mails = question.count === undefined ? ''
+        : question.group
+          ? s.report.supportGroupMails.replace('{groep}', question.group).replace('{aantal}', n(question.count))
+          : s.report.supportMails.replace('{aantal}', n(question.count));
+      w.text(`• ${question.question}`, { size: 9.5, after: 0 });
+      const where = question.match
+        ? `${fromCatalog ? s.report.supportInBank : s.report.supportInBankAdvisory} ${question.match.label}`
+        : s.report.supportNotInBank;
+      w.text([question.theme ?? '', mails, where].filter(Boolean).join(' · '), { size: 8.5, color: 'muted', indent: 3, after: 0 });
+      if (fromCatalog && question.match) {
+        const rows = report.questionCoverage.filter((row) => row.questionId === question.match?.questionId);
+        const answered = rows.reduce((sum, row) => sum + row.answered, 0);
+        const applicable = rows.reduce((sum, row) => sum + row.applicable, 0);
+        w.text(applicable > 0 ? s.report.supportShare.replace('{beantwoord}', n(answered)).replace('{totaal}', n(applicable)) : '', { size: 8.5, color: 'muted', indent: 3, after: 1 });
+        continue;
+      }
+      const answer = answerOf.get(question.match ? question.match.questionId : question.id);
+      w.text(answer ? s.report.siteStatus[answer.status] : s.report.supportNoCheck, { size: 8.5, color: 'muted', indent: 3, after: answer?.quote ? 0 : 1 });
+      if (answer?.quote) {
+        w.text(`"${answer.quote}"`, { size: 8.5, indent: 3, after: 0 });
+        w.text(answer.url ?? '', { size: 8, color: 'muted', indent: 3, after: 1 });
       }
     }
   }
@@ -481,7 +515,7 @@ export function pdfFilename(report: ScanReport): string {
 }
 
 /** Het rapport opbouwen en als bestand downloaden. */
-export async function saveReportPdf(report: ScanReport, s: Strings, locale: Locale, siteCheck?: SiteCheck): Promise<void> {
-  const doc = buildReportPdf(report, s, locale, lightPalette(), siteCheck);
+export async function saveReportPdf(report: ScanReport, s: Strings, locale: Locale, siteCheck?: SiteCheck, support?: SupportList): Promise<void> {
+  const doc = buildReportPdf(report, s, locale, lightPalette(), siteCheck, support);
   doc.save(pdfFilename(report));
 }

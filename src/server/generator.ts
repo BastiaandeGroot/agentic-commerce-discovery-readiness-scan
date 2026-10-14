@@ -8,6 +8,7 @@
 // Alleen serverzijdig. Nooit importeren vanuit een component.
 
 import Anthropic from '@anthropic-ai/sdk';
+import { fetchExamplePages } from './examplePages';
 import type { Ask, AskReply, AskTask } from '../generation/pipeline';
 import { extractJson } from '../generation/json';
 
@@ -16,7 +17,7 @@ import { extractJson } from '../generation/json';
  *
  * `reader` leest panelsites: FAQ's uitlezen, specificatietabellen overnemen,
  * beslisregels letterlijk overschrijven. Dat is leeswerk, en het is verreweg het
- * grootste deel van de tokens — vijf sites tegen één basislaag.
+ * grootste deel van de tokens — acht sites tegen één basislaag.
  *
  * `judge` weegt en schrijft: de basislaag, de overlays, de groepering. Daar hangt
  * de kwaliteit van de hele bank aan, en daar staat het zware model. Dit is de
@@ -84,7 +85,7 @@ export { extractJson };
  * Eén fase uitvoeren.
  *
  * Het systeemdeel draagt een cachemarkering en is voor élke fase gelijk. Een
- * generatie doet twaalf tot vijftien aanroepen op diezelfde regels; zonder die
+ * generatie doet een kleine dertig aanroepen op diezelfde regels; zonder die
  * markering betaal je ze vijftien keer vol.
  */
 /** Een sleutel die niet aan een workspace hangt moet die in een header meesturen. */
@@ -127,7 +128,7 @@ export function makeAsk(): Ask {
         .map((block) => block.text)
         .join('\n');
 
-      // Een fase die vijf sites afloopt komt terug met `pause_turn`: het model is
+      // Een fase die het web afloopt komt terug met `pause_turn`: het model is
       // nog niet klaar maar de beurt is op. Doorgaan is dan geen herkansing maar
       // hetzelfde werk voortzetten, dus de tokens tellen door en de inhoud gaat
       // ongewijzigd terug.
@@ -142,7 +143,13 @@ export function makeAsk(): Ask {
           throw new PhaseFailure('Het antwoord liep tegen de tokenlimiet aan en is daarmee afgekapt.', usage);
         }
         try {
-          return { json: extractJson(text), usage };
+          const json = extractJson(text);
+          // De voorbeeldenstap gelooft het model niet op zijn woord: de pagina's
+          // die het noemt worden opgehaald, en de generatie houdt alleen wat er
+          // letterlijk op staat.
+          return task.phase === 'examples'
+            ? { json, usage, pages: await fetchExamplePages(json) }
+            : { json, usage };
         } catch (caught) {
           throw new PhaseFailure(caught instanceof Error ? caught.message : 'Onleesbaar antwoord.', usage);
         }

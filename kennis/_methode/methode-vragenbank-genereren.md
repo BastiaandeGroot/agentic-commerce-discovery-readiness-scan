@@ -4,7 +4,7 @@ Bestemming: `/kennis/_methode/methode-vragenbank-genereren.md`
 
 Dit is de herbruikbare kant van het project. De engine is generiek, de kennis is dat niet: per vertical is dit handwerk met modelondersteuning. Deze methode beschrijft de volgorde. De losse prompt staat in `prompt-vragenbank-genereren.md`.
 
-Reken op één tot twee dagen per vertical bij een panel van vijf sites, plus de doorlooptijd van de domeinreview. De bronoogst is het meeste werk; de rest gaat snel zodra die ligt.
+Reken op één tot twee dagen per vertical bij een panel van acht sites, plus de doorlooptijd van de domeinreview. De bronoogst is het meeste werk; de rest gaat snel zodra die ligt.
 
 De uitkomst is een asset op **vertical-niveau**, herbruikbaar over al je merchants heen. Dat is de reden om het panel breed te trekken in plaats van bij één klant te blijven.
 
@@ -61,21 +61,22 @@ Leg per kritieke vraag in `kritiek_toets` vast waarom elk van de vier criteria g
 
 ## Fase 1 — Sitepanel samenstellen
 
-De vragenbank hoort bij de **vertical**, niet bij één merchant. Eén site geeft je de vragen die die ene merchant belangrijk vindt, plus zijn blinde vlekken. Vijf tot acht sites geven je de vragen van de markt, en bovendien een meetbare frequentie.
+De vragenbank hoort bij de **vertical**, niet bij één merchant. Eén site geeft je de vragen die die ene merchant belangrijk vindt, plus zijn blinde vlekken. Acht sites geven je de vragen van de markt, en bovendien een meetbare frequentie.
 
 Stel een panel samen met bewust verschillende soorten bronnen, want ze leveren verschillende dingen op:
 
 | Type | Aantal | Wat het bijdraagt |
 |---|---|---|
-| Categorieleiders in de thuismarkt | 2 | Vragen, FAQ's, gepubliceerde beslisregels |
+| Categorieleiders in de thuismarkt | 4 | Vragen, FAQ's, gepubliceerde beslisregels |
 | Specialisten of nichespelers | 1 | Diepere technische vragen, randtoepassingen |
 | Merk- of fabrikantsites | 1 | Testnormen, attribuutnamen, datasheets |
-| Buitenlandse spelers (DE, UK) | 1 | Vaak veel technischer, andere wetgeving |
+| Buitenlandse spelers (DE, UK) | 2 | Vaak veel technischer, andere wetgeving |
 
-Vijf en niet acht: het onderzoek per site is het meeste werk, en acht sites maakt
-een bank per markt een dagtaak. Wat je inlevert is de fijnheid van de
-frequentiemaat — dekking 3 van 5 is grover dan 5 van 8 — en dat hoort bij de
-dekking vermeld te worden, niet verstopt. De marketplace-categoriepagina is
+Acht, en dat is de standaard sinds woontextiel v5. Met vijf hing de dekking van
+een vraag aan één of twee sites, en een segment moet door twee sites gevoerd
+worden om een eigen vragenset te krijgen; die lat haalden te veel segmenten niet.
+De winkel van de aanvrager is één van de acht. Haal je de acht niet, dan staat
+dat bij de dekking vermeld, niet verstopt. De marketplace-categoriepagina is
 eruit: die bracht verplichte feedvelden, en daar meet deze scan niet tegen.
 
 Duitse webshops publiceren in vrijwel elke vertical meer technische data dan Nederlandse. Ze zijn daarom onevenredig waardevol voor het attribuutdeel, ook als de vragen in het Duits staan.
@@ -109,6 +110,22 @@ Per site dezelfde volgorde aflopen. De volgorde is niet willekeurig: elke bron l
 Voeg bewust een stap toe voor vragen die op **geen enkele** site beantwoord worden maar die klanten wel hebben. Bronnen: reviews, fora, en vakkennis over wat er in de praktijk misgaat.
 
 Zonder die stap convergeer je op het marktgemiddelde en reproduceer je de blinde vlekken van de hele branche. Juist deze vragen zijn commercieel het interessantst, want daar kan je advies zeggen: niemand doet dit, wees de eerste. Markeer ze met `dekking: 0` en een aparte bron.
+
+### Het samenvoegen nalopen
+
+Samenvoegen ontdubbelt op onderwerp, en daarbij vallen vragen weg: een vraag die maar één site stelt, of die onder één segment staat, verdwijnt in een breder onderwerp of verdwijnt helemaal. Bij woontextiel v5 waren dat er achttien, vooral bij garen, voering, tassen en onderhoud — precies de segmenten die daarna geen eigen vragen hadden.
+
+Leg daarom na het samenvoegen de ruwe oogst naast de onderwerpenlijst en zet terug wat een koper werkelijk anders vraagt dan elk onderwerp dat er al staat. Tel de dekking van wat je terugzet opnieuw uit de oogst; neem geen aantal over.
+
+### De klantvragen van de aanvrager
+
+Een aanvrager kan meegeven wat kopers zijn klantenservice mailen: de vraag, het thema en hoe vaak. Dat is een **aanwijzing, geen bron**. Bij het samenvoegen en het nalopen mag een klantvraag een onderwerp aandragen dat de oogst mist; behandelt het panel het onderwerp al, dan verandert er niets. De klantenservice telt niet als panelsite en verhoogt geen dekking. Een onderwerp dat alleen hieruit komt krijgt `dekking: 0` en bron `klantenservice aanvrager`, en kan niet kritiek zijn — dezelfde regel als voor zijn site: de aanvrager draagt bij, maar draagt niet. Vragen over een lopende bestelling vallen af; het gaat om wat een koper vóór de aankoop wil weten.
+
+Het is ook geen vakkennis. Een onderwerp uit de klantenservice vervangt de stap voor vragen die niemand beantwoordt niet: dat heeft één winkel aangedragen, niet de branche.
+
+### De namen uit de catalogus van de aanvrager
+
+De site van de aanvrager toont een categorie soms onder een andere naam dan zijn catalogus hem voert. De scan plaatst zijn producten op de naam uit de catalogus. Zet die naam daarom als extra alias bij het segment waar hij bij hoort. Alleen bij een segment dat het panel al kent: de lijst van de aanvrager maakt geen segmenten, en telt niet mee als site die het segment voert.
 
 ---
 
@@ -152,12 +169,12 @@ Een overlay mag een basisvraag **herwegen** of uitschakelen, maar niet herschrij
 
 Welke vragensets er bestaan en hoe ze heten, volgt uit hoe de panelsites de markt indelen. Niet uit de categorieboom van de winkel die de bank aanvroeg: dan draagt de bank zijn menu, tot op zijn spelfouten, en landt een tweede winkel in dezelfde markt nergens.
 
-Leg daarom bij de bronoogst per site vast hoe zij de markt indeelt — haar categorieën, onder haar eigen namen — en bij elke vraag onder welke categorie hij stond. Leg daarna de vijf indelingen op elkaar tot marktsegmenten. Drie regels, alle drie na te rekenen:
+Leg daarom bij de bronoogst per site vast hoe zij de markt indeelt — haar categorieën, onder haar eigen namen — en bij elke vraag onder welke categorie hij stond. Leg daarna de indelingen van het panel op elkaar tot marktsegmenten. Drie regels, alle drie na te rekenen:
 
 - **Een segment bestaat pas als minstens twee panelsites het als categorie voeren.** Eén site is de menukeuze van één winkel. Het aantal sites staat bij het segment, zoals dekking bij een vraag. Wat maar één site voert, krijgt geen eigen vragenset; het is een bevinding voor de review.
 - **Het segment heet zoals de sites het samen noemen.** Gebruiken twee of meer sites dezelfde naam, dan is dat de naam; een andere schrijfwijze van dezelfde naam telt mee. Noemt elke site het anders, dan valt er niets te tellen en krijgt het segment de gewone soortnaam in de taal van de markt — zichtbaar als bevinding, want dat is een keuze en geen telling. De namen van de sites reizen mee als alias (`geldt_voor`), zodat de vragenset ook landt bij een winkel die het anders noemt.
 - **Tellen doet de methode, niet de schrijver.** Een naam telt alleen als die site die categorie werkelijk voert.
-- **De aanvrager draagt bij, maar draagt niet.** Zijn site zit in het panel, en is tegelijk de winkel die gemeten wordt. Een segment krijgt daarom alleen een eigen vragenset als een ándere site er minstens één vraag onder behandelt, en een vraag die alleen op de site van de aanvrager staat kan niet kritiek zijn. Wie gemeten wordt, legt niet zijn eigen meetlat. Een vraag uit vakkennis (dekking 0) valt hier niet onder; die bevestigt een vakexpert.
+- **De aanvrager draagt bij, maar draagt niet.** Zijn site zit in het panel, en is tegelijk de winkel die gemeten wordt. Een segment krijgt daarom alleen een eigen vragenset als een ándere site er minstens één vraag onder behandelt, en een vraag die alleen op de site of uit de klantenservice van de aanvrager komt kan niet kritiek zijn. Wie gemeten wordt, legt niet zijn eigen meetlat. Een vraag uit vakkennis (dekking 0) valt hier niet onder; die bevestigt een vakexpert.
 
 De boom van een merchant wordt daarna op dit skelet gelegd: op naam of alias, dan op voorstel, dan door zijn eigen keuze. Dat gaat voor de aanvrager precies zo als voor elke winkel die later komt.
 
@@ -190,6 +207,10 @@ Het aantal facetcategorieën is zelf een meetwaarde en over merchants heen verge
 ---
 
 ## Fase 5 — Vragen schrijven
+
+**Nummers.** Een nieuwe versie van een bank begint te nummeren boven het hoogste nummer van elke eerdere bank voor dezelfde markt: bij het eerstvolgende honderdtal plus één (101, 201, …). Het werk van een merchant hangt aan markt en nummer; hergebruik je `MEU-02` voor een andere vraag, dan staat die uit bij een merchant die hem nooit zag.
+
+**Synoniemen.** Een synoniem is een extra naam waarop de scan een kolom zoekt. Eén algemeen woord (lengte, breedte, gewicht) is geen synoniem van een smaller kenmerk: "lengte" bij de looplengte van garen legde het kenmerk op de rollengte van stof, en dan verdwijnt een gat dat er is.
 
 Per vraag leg je vast:
 
@@ -224,6 +245,18 @@ Vijf regels die de kwaliteit bepalen:
 **Markeer wat niet uit attributen te beantwoorden is.** Procesvragen ("kan ik een staal krijgen"), structuurvragen ("welke kleuren bestaan er nog meer in deze kwaliteit") en levenscyclusvragen. Die blijven in de bank staan omdat ze advies opleveren, maar ze gaan uit de score. Anders vertekenen ze de meting.
 
 **Onderscheid gepubliceerde van beredeneerde drempels.** Als een site zegt dat 30.000 Martindale de bankgrens is, noteer je de bron. Als jij 40.000 kiest voor huisdieren, markeer je dat als beredeneerd en zet je het bij de open punten. Ongemarkeerde eigen getallen zijn de snelste manier om vertrouwen te verliezen bij de domeinexpert.
+
+---
+
+## Fase 5b — Voorbeelden ophalen
+
+Bij een kenmerk mag de bank laten zien hoe het gevuld hoort te zijn: één echte waarde van een productpagina van een panelsite, met het adres van die pagina (kolommen `voorbeeld` en `voorbeeld_bron`). Het rapport toont hem aan een merchant die het kenmerk nog niet vastlegt.
+
+Drie regels, alle drie hard:
+
+- **Letterlijk van de pagina.** De waarde wordt overgenomen zoals hij er staat. De pagina wordt daarna opnieuw opgehaald, en een voorbeeld dat er niet letterlijk op staat vervalt.
+- **De waarde beantwoordt de vraag.** "Brandvertragend: ja" beantwoordt niet welke brandnorm; een gewicht per strekkende meter is geen gewicht per m². Dat ziet geen controle op letterlijkheid, dus een mens loopt de voorbeelden na.
+- **Geen voorbeeld is beter dan een verzonnen voorbeeld.** Een kenmerk zonder vondst blijft zonder.
 
 ---
 

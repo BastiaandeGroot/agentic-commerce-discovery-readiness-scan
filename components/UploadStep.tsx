@@ -22,6 +22,7 @@ import type { Dataset } from '../src/domain/types';
 import type { Strings } from '../src/i18n/strings';
 import { ScanClient, type Progress } from '../src/worker/client';
 import { recallCatalogFile, rememberCatalogFile } from '../src/storage/catalogFile';
+import { readSupportQuestions, type SupportList } from '../src/questions/support';
 import { Badge, Button, Card, CardTitle, ErrorState, FileDropzone, SkeletonLines } from './ui';
 
 /**
@@ -54,6 +55,12 @@ interface Props {
    * `src/storage/catalogFile.ts`. Zonder naam wordt er niets onthouden.
    */
   owner?: string;
+  /**
+   * De klantvragen uit de klantenservice, als hij die aanleverde of als ze bij
+   * zijn vorige analyse hoorden. Optioneel; zie `src/questions/support.ts`.
+   */
+  support?: SupportList;
+  onSupport?: (list: SupportList | undefined) => void;
 }
 
 interface Source {
@@ -110,7 +117,7 @@ function Preview({ s, dataset }: { s: Strings; dataset: Dataset }) {
   );
 }
 
-export function UploadStep({ s, onReady, resume = false, owner }: Props) {
+export function UploadStep({ s, onReady, resume = false, owner, support, onSupport }: Props) {
   // Eén client voor de hele stap; hij houdt de worker en de datasets vast.
   const clientRef = useRef<ScanClient>(undefined);
   if (!clientRef.current) clientRef.current = new ScanClient();
@@ -272,6 +279,7 @@ export function UploadStep({ s, onReady, resume = false, owner }: Props) {
         )}
       </div>
 
+      {onSupport && !resume ? <SupportFile s={s} support={support} onSupport={onSupport} /> : null}
 
       {/* De waarschuwing staat hier en niet bovenaan de kaart: hij blokkeert de
           knop hieronder, en met de voorbeeldtabel ertussen was hij uit beeld —
@@ -319,5 +327,81 @@ export function UploadStep({ s, onReady, resume = false, owner }: Props) {
         {offMainThread === undefined ? null : offMainThread ? s.upload.workerOn : s.upload.workerOff}
       </p>
     </Card>
+  );
+}
+
+/**
+ * De klantvragen uit de klantenservice, naast de catalogus en optioneel.
+ *
+ * Ze gaan niet de vragenbank in maar werken alleen in zijn eigen rapport: wat ook
+ * in de bank staat krijgt het aantal mails erbij, wat er niet in staat gaat door
+ * de sitetoets. Het bestand wordt in de browser gelezen; alleen vraag, thema en
+ * aantal blijven over.
+ */
+function SupportFile({ s, support, onSupport }: {
+  s: Strings;
+  support?: SupportList;
+  onSupport: (list: SupportList | undefined) => void;
+}) {
+  const [error, setError] = useState<string>();
+  const [notes, setNotes] = useState<string[]>([]);
+
+  async function handle(file: File) {
+    setError(undefined);
+    setNotes([]);
+    if (!/\.(csv|tsv|txt)$/i.test(file.name)) {
+      setError(s.upload.supportWrongType);
+      return;
+    }
+    const read = readSupportQuestions(await file.text(), file.name);
+    if (!read.list) {
+      setError(read.error === 'no-question-column' ? s.upload.supportNoColumn : s.upload.supportEmpty);
+      return;
+    }
+    setNotes(read.warnings.map((warning) => (warning.kind === 'redacted'
+      ? s.upload.supportRedacted.replace('{aantal}', String(warning.count))
+      : s.upload.supportCapped.replace('{max}', String(warning.max)))));
+    onSupport(read.list);
+  }
+
+  return (
+    <div className="mt-4 rounded-lg border border-line p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="font-medium">{s.upload.supportLabel}</h3>
+        <span className="text-xs text-muted">{s.upload.supportOptional}</span>
+      </div>
+      <p className="mt-1 text-sm leading-relaxed text-muted">{s.upload.supportHint}</p>
+      {error ? (
+        <div className="mt-3">
+          <ErrorState title={error} body="" next={s.upload.supportErrorNext} />
+        </div>
+      ) : null}
+      {support ? (
+        <div className="mt-3 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone="ok">{support.name}</Badge>
+            <span className="tnum text-xs text-muted">
+              {s.upload.supportRead.replace('{aantal}', support.questions.length.toLocaleString('nl-NL'))}
+            </span>
+            <Button variant="quiet" onClick={() => { setNotes([]); onSupport(undefined); }}>{s.upload.remove}</Button>
+          </div>
+          <ul className="space-y-0.5 text-xs text-muted">
+            {support.questions.slice(0, 3).map((question) => <li key={question.id}>{question.question}</li>)}
+          </ul>
+          {notes.map((note) => <p key={note} className="text-xs text-warn">{note}</p>)}
+        </div>
+      ) : (
+        <div className="mt-3">
+          <FileDropzone
+            id="klantvragen"
+            label={s.upload.choose}
+            hint={s.upload.drop}
+            accept=".csv,.tsv,.txt"
+            onFile={(files) => void handle(files[0])}
+          />
+        </div>
+      )}
+      <p className="mt-2 text-xs leading-relaxed text-muted">{s.upload.supportPrivacy}</p>
+    </div>
   );
 }

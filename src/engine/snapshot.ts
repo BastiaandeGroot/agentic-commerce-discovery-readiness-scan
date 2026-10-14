@@ -9,6 +9,7 @@
 // categorienamen en veldnamen; de productdata zelf blijft waar hij was. Wordt dit
 // later serverzijdig bewaard, dan gaat er dus geen catalogus mee de deur uit.
 
+import type { SupportList } from '../questions/support';
 import type { Bilingual, GapCause, QuestionSetState, ScanReport, EvidenceHint } from '../domain/types';
 import { topBlockers } from '../report/derive';
 import type { SiteCheck } from '../collect/answers';
@@ -83,6 +84,12 @@ export interface ScanSnapshot {
    * Reist mee zodat het rapport er niet opnieuw om hoeft te vragen.
    */
   siteUrl?: string;
+  /**
+   * De klantvragen uit zijn klantenservice, als hij die aanleverde: vraag, thema
+   * en aantal, met de bankvraag die hetzelfde vraagt. Geen mails, geen antwoorden.
+   * Zie `src/questions/support.ts`.
+   */
+  support?: SupportList;
   id: string;
   /** Elke rij met merchantdata draagt een account, ook nu er nog geen login is. */
   accountId: string;

@@ -9,18 +9,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { advance, EmptyPhase, enforceCriticalTest, taskFor, type Ask } from '../src/generation/pipeline';
+import { advance, applyReply, EmptyPhase, enforceCriticalTest, taskFor, type Ask } from '../src/generation/pipeline';
 import { extractJson } from '../src/generation/json';
 import {
   decodePhase,
   emptyState,
   encodePhase,
   FIRST_PHASE,
+  firstFreeNumber,
+  SUPPORT_SOURCE,
   type DraftQuestion,
   type Phase,
   type RunState,
 } from '../src/generation/state';
 import { importQuestionList } from '../src/questions/list';
+import { readSupportHints } from '../src/questions/support';
 
 const BRIEF = {
   vertical: 'woontextiel',
@@ -142,6 +145,28 @@ function antwoord(phase: string): unknown {
       findings: [],
     };
   }
+  if (phase === 'recheck') {
+    return {
+      topics: [
+        // Twee sites uit het panel en één die er niet in zit: de app telt zelf.
+        { topic: 'tas_draagkracht', question: 'Hoeveel gewicht kan een tas van deze stof dragen?', coverage: 9, coverageSites: ['Vijf', 'een', 'Verzonnen site'], sources: ['faq'] },
+        { topic: 'garen_looplengte', question: 'Hoeveel meter garen zit er op de klos?', coverageSites: [], sources: ['vakkennis'] },
+      ],
+      findings: [],
+    };
+  }
+  if (phase === 'examples') {
+    return {
+      examples: [
+        { attribute: 'schuurweerstand_martindale', value: '40.000  toeren', url: 'https://een.nl/product/velours-blauw' },
+        // Staat niet op de pagina, is van een site buiten het panel, kenmerk onbekend.
+        { attribute: 'baanbreedte_cm', value: '140 cm', url: 'https://een.nl/product/velours-blauw' },
+        { attribute: 'patroonrapport_cm', value: '64 cm', url: 'https://elders.nl/product/x' },
+        { attribute: 'bestaat_niet', value: 'Martindale', url: 'https://een.nl/product/velours-blauw' },
+      ],
+      findings: [],
+    };
+  }
   if (phase === 'facets') {
     return {
       facets: [{ category: 'Vlekwerend', count: 64, attribute: 'vlekwerend', condition: 'behandeling aanwezig', panelSites: 4, priority: 'hoog' }],
@@ -153,14 +178,20 @@ function antwoord(phase: string): unknown {
 }
 
 /** De hele reeks draaien, met een teller zodat de test de volgorde kan nakijken. */
-async function draai(): Promise<{ state: RunState; phases: string[] }> {
+async function draai(brief: typeof BRIEF & { firstNumber?: number } = BRIEF): Promise<{ state: RunState; phases: string[] }> {
   const phases: string[] = [];
   const ask: Ask = async (task) => {
     phases.push(task.phase);
-    return { json: antwoord(task.phase), usage: { input: 100, output: 50, cached: 0 } };
+    return {
+      json: antwoord(task.phase),
+      usage: { input: 100, output: 50, cached: 0 },
+      pages: task.phase === 'examples'
+        ? { 'https://een.nl/product/velours-blauw': 'Velours blauw\nMartindale: 40.000 Toeren\nBreedte: 145 cm' }
+        : undefined,
+    };
   };
 
-  let state = emptyState(BRIEF);
+  let state = emptyState(brief);
   let phase: Phase = FIRST_PHASE;
 
   for (let stap = 0; stap < 40 && phase.kind !== 'done'; stap++) {
@@ -184,10 +215,12 @@ test('de reeks loopt van panel tot tabel en stuurt zichzelf', async () => {
     'panel',
     'harvest:0', 'harvest:1', 'harvest:2', 'harvest:3', 'harvest:4',
     'consolidate',
+    'recheck',
     'structure',
     'base',
     'overlay:0', 'overlay:1',
     'facets',
+    'examples',
   ]);
 
   assert.ok(state.csv, 'de reeks levert een tabel op');
@@ -650,4 +683,164 @@ test('kritiek zonder volledige toets, of over beleid of voorraad, wordt hoog', (
   assert.deepEqual(questions.map((q) => q.importance), ['kritiek', 'hoog', 'hoog', 'hoog', 'hoog']);
   assert.equal(questions[3].criticalTest, undefined);
   assert.match(findings[0], /B, C, E/);
+});
+
+test('het samenvoegen wordt nagelopen, en de app telt de dekking zelf', async () => {
+  const { state } = await draai();
+  const tas = state.topics.find((topic) => topic.topic === 'tas_draagkracht');
+  assert.deepEqual(tas?.coverageSites, ['Vijf', 'Een'], 'alleen sites uit het panel, onder hun eigen naam');
+  assert.equal(tas?.coverage, 2, 'geteld, niet overgenomen');
+  const garen = state.topics.find((topic) => topic.topic === 'garen_looplengte');
+  assert.equal(garen?.coverage, 0);
+  assert.deepEqual(garen?.sources, ['vakkennis']);
+  assert.ok(state.findings.some((finding) => /Samenvoegen nagelopen: 2 onderwerpen/.test(finding)));
+});
+
+test('een voorbeeld telt alleen als het letterlijk op een pagina van een panelsite staat', async () => {
+  const { state } = await draai();
+  assert.deepEqual(state.examples, [
+    { attribute: 'schuurweerstand_martindale', value: '40.000 toeren', url: 'https://een.nl/product/velours-blauw' },
+  ]);
+  assert.ok(state.findings.some((finding) => /1 aangewezen voorbeeld stond niet letterlijk/.test(finding)));
+
+  // En het komt als echte waarde met bron door de lezer van de vragenlijst.
+  const read = importQuestionList([{ name: 'woontextiel.csv', text: state.csv ?? '' }]);
+  const martindale = read.bank?.attributes.find((attribute) => attribute.key === 'schuurweerstand_martindale');
+  assert.deepEqual(martindale?.examples, [{ value: '40.000 toeren', url: 'https://een.nl/product/velours-blauw' }]);
+});
+
+test('de nummers beginnen boven die van een eerdere bank', async () => {
+  assert.equal(firstFreeNumber([]), 101);
+  assert.equal(firstFreeNumber(['BAS-01', 'MEU-30', 'GOR-07-2']), 101);
+  assert.equal(firstFreeNumber(['BAS-101', 'MEU-134']), 201);
+
+  const { state } = await draai({ ...BRIEF, firstNumber: 201 });
+  assert.deepEqual(state.base?.questions.map((question) => question.id), ['BAS-201', 'BAS-202']);
+  assert.ok(state.overlays.every((overlay) => overlay.questions.every((question) => /-201$/.test(question.id))));
+});
+
+test('een los algemeen woord is geen synoniem van een smaller kenmerk', () => {
+  const vraag = (evidence: string[], synonyms: string[]) => ({
+    questionNl: 'Hoeveel meter garen zit er op de klos?', questionEn: 'How many metres are on the spool?',
+    intent: 'hoeveelheid', importance: 'middel', coverage: 0, coverageSites: [], sources: ['vakkennis'],
+    evidence, synonyms, answerType: 'getal', answerable: 'true',
+  });
+  const result = applyReply(
+    emptyState(BRIEF),
+    { kind: 'base' },
+    { json: { questions: [vraag(['looplengte_m'], ['lengte', 'klosinhoud']), vraag(['lengte_cm'], ['lengte'])] }, usage: { input: 0, output: 0, cached: 0 } },
+    '2026-10-11',
+  );
+  const [garen, lengte] = result.state.base?.questions ?? [];
+  assert.deepEqual(garen.synonyms, ['klosinhoud'], '"lengte" zou de looplengte op de rollengte leggen');
+  assert.deepEqual(lengte.synonyms, ['lengte'], 'bij het kenmerk lengte zelf mag het blijven');
+  assert.ok(result.state.findings.some((finding) => /te algemeen/.test(finding)));
+});
+
+test('de categorienaam uit de catalogus van de aanvrager reist mee als alias, maar telt niet als site', async () => {
+  const { state } = await draai();
+  const segments = [
+    { category: 'Meubelstoffen', kind: 'overlay', reason: 'eigen vragen', distinct: ['Is dit sterk genoeg voor mijn bank?'],
+      aliases: [{ site: 'Een', name: 'Meubelstoffen' }, { site: 'Twee', name: 'Meubelstoffen' }, { site: 'Vijf', name: 'Eetkamerstoelen' }] },
+    // Alleen de catalogusnaam van de aanvrager: dat is geen vondst op een site.
+    { category: 'Vergeten', kind: 'overlay', reason: 'staat alleen in zijn catalogus', aliases: [{ site: 'Vijf', name: 'Vergeten categorie' }] },
+  ];
+  const result = applyReply(state, { kind: 'structure' }, { json: { segments }, usage: { input: 0, output: 0, cached: 0 } }, '2026-10-11');
+  const meubel = result.state.grouping.find((entry) => entry.category === 'Meubelstoffen');
+  assert.ok(meubel?.aliases?.some((alias) => alias.site === 'Vijf' && alias.name === 'Eetkamerstoelen'));
+  assert.deepEqual(meubel?.sites, ['Een', 'Twee'], 'de aanvrager voert het segment hier niet op zijn site');
+  assert.equal(result.state.grouping.some((entry) => entry.category === 'Vergeten'), false);
+});
+
+// --- Klantvragen uit de klantenservice van de aanvrager -----------------------
+
+const KLANTVRAGEN = [
+  { question: 'Is deze stof geschikt voor een hond die op de bank ligt?', theme: 'Geschiktheid', count: 41 },
+  { question: 'Waar blijft mijn bestelling?', theme: 'Levering', count: 159 },
+];
+
+test('de klantvragen staan als aanwijzing in samenvoegen en nalopen, en nergens anders', async () => {
+  const { state } = await draai();
+  const met = { ...state, brief: { ...state.brief, support: KLANTVRAGEN } };
+  for (const kind of ['consolidate', 'recheck'] as const) {
+    const prompt = taskFor(met, { kind })?.prompt ?? '';
+    assert.ok(prompt.includes('Is deze stof geschikt voor een hond'), `${kind} krijgt de vraag`);
+    assert.ok(prompt.includes('41×'), `${kind} krijgt het aantal`);
+    assert.ok(/AANWIJZING en geen bron/.test(prompt), `${kind} zegt dat het geen bron is`);
+    assert.ok(prompt.includes(SUPPORT_SOURCE));
+    assert.ok(!(taskFor(state, { kind })?.prompt ?? '').includes(SUPPORT_SOURCE), 'zonder klantvragen geen spoor ervan');
+  }
+  for (const kind of ['structure', 'base', 'facets'] as const) {
+    assert.ok(!(taskFor(met, { kind })?.prompt ?? '').includes('hond die op de bank'), `${kind} krijgt de lijst niet`);
+  }
+});
+
+test('de klantenservice telt niet als site en verhoogt geen dekking bij het samenvoegen', async () => {
+  const { state } = await draai();
+  const met = { ...state, brief: { ...state.brief, support: KLANTVRAGEN } };
+  const topics = [
+    // Het model telt de klantenservice toch als site: terugdraaien.
+    { topic: 'huisdieren', question: 'Kan mijn hond erop liggen?', coverage: 1, coverageSites: ['Klantenservice aanvrager'], sources: ['klantenservice aanvrager'] },
+    // Ook panelsites behandelen het: alleen hun dekking telt.
+    { topic: 'wasbaar', question: 'Kan ik de hoes wassen?', coverage: 3, coverageSites: ['Een', 'Twee', 'klantenservice'], sources: ['faq', 'klantenservice aanvrager'] },
+    { topic: 'breedte', question: 'Hoe breed is de rol?', coverage: 2, coverageSites: ['Een', 'Twee'], sources: ['faq'] },
+  ];
+  const result = applyReply(met, { kind: 'consolidate' }, { json: { topics }, usage: { input: 0, output: 0, cached: 0 } }, '2026-10-14');
+  const [hond, was, breed] = result.state.topics;
+  assert.equal(hond.coverage, 0);
+  assert.deepEqual(hond.coverageSites, []);
+  assert.deepEqual(hond.sources, [SUPPORT_SOURCE]);
+  assert.equal(was.coverage, 2);
+  assert.deepEqual(was.coverageSites, ['Een', 'Twee']);
+  assert.deepEqual(breed.sources, ['faq'], 'een onderwerp zonder klantenservice blijft zoals het was');
+  assert.ok(result.state.findings.some((finding) => /2 vragen meegegeven als aanwijzing/.test(finding) && finding.includes('huisdieren')));
+  // Een onderwerp uit de klantenservice is geen vakkennis: de stap voor vragen
+  // die niemand beantwoordt heeft dan nog steeds niets opgeleverd.
+  assert.ok(result.state.findings.some((finding) => finding.startsWith('Geen enkel onderwerp heeft dekking 0')));
+});
+
+test('bij het nalopen krijgt een onderwerp uit de klantenservice dekking 0 en zijn eigen bron', async () => {
+  const { state } = await draai();
+  const met = { ...state, brief: { ...state.brief, support: KLANTVRAGEN } };
+  const topics = [
+    { topic: 'huisdier_krassen', question: 'Is deze stof bestand tegen krabbende katten?', coverageSites: ['Klantenservice'], sources: ['klantenservice aanvrager'] },
+    { topic: 'reinigen_vlek', question: 'Hoe krijg ik koffie eruit?', coverageSites: ['Een'], sources: ['faq', 'klantenservice aanvrager'] },
+  ];
+  const result = applyReply(met, { kind: 'recheck' }, { json: { topics }, usage: { input: 0, output: 0, cached: 0 } }, '2026-10-14');
+  const kat = result.state.topics.find((topic) => topic.topic === 'huisdier_krassen');
+  assert.equal(kat?.coverage, 0);
+  assert.deepEqual(kat?.sources, [SUPPORT_SOURCE]);
+  const vlek = result.state.topics.find((topic) => topic.topic === 'reinigen_vlek');
+  assert.equal(vlek?.coverage, 1);
+  assert.deepEqual(vlek?.coverageSites, ['Een']);
+  assert.ok(result.state.findings.some((finding) => /Nalopen: 1 onderwerp uit de klantenservice/.test(finding)));
+});
+
+test('een vraag die alleen uit de klantenservice komt kan niet kritiek zijn', () => {
+  const vraag = (id: string, sources: string[]) => ({
+    id, questionNl: 'x', questionEn: 'x', intent: 'geschiktheid', importance: 'kritiek' as const,
+    coverage: 0, coverageSites: [], sources, evidence: ['kenmerk'], synonyms: [],
+    answerType: 'boolean', answerable: 'true' as const,
+    criticalTest: { decisive: 'a', irreversible: 'b', product: 'c', catalogue: 'd' },
+  });
+  const uit = enforceCriticalTest([vraag('A', [SUPPORT_SOURCE]), vraag('B', ['vakkennis'])], 'Proef', 'Vijf');
+  assert.deepEqual(uit.questions.map((question) => question.importance), ['hoog', 'kritiek']);
+  assert.ok(uit.findings.some((finding) => finding.includes('klantenservice') && finding.includes('A')));
+});
+
+test('de klantvragen die meereizen houden alleen vraag, thema en aantal, gezeefd', () => {
+  const hints = readSupportHints([
+    { question: 'Bel me op 06 12345678 over mijn stof', theme: 'Contact', count: 3, answer: 'geheim antwoord', email: 'a@b.nl' },
+    { question: 'Mail naar klant@voorbeeld.nl of het gordijn verduistert', count: 12 },
+    { question: '' },
+    'geen object',
+    { question: 'Mail naar klant@voorbeeld.nl of het gordijn verduistert', count: 99 },
+    { question: 'Zonder aantal', count: -4 },
+  ]);
+  assert.deepEqual(hints, [
+    { question: 'Mail naar [e-mailadres] of het gordijn verduistert', count: 12 },
+    { question: 'Bel me op [telefoonnummer] over mijn stof', theme: 'Contact', count: 3 },
+    { question: 'Zonder aantal' },
+  ]);
+  assert.deepEqual(readSupportHints('geen lijst'), []);
 });

@@ -40,6 +40,8 @@ const HEADER = [
   'markt',
   'onomkeerbare_fout',
   'kritiek_toets',
+  'voorbeeld',
+  'voorbeeld_bron',
 ];
 
 /** Eén veld, met aanhalingstekens zodra het een scheidingsteken draagt. */
@@ -124,8 +126,25 @@ function row(
     state.brief.vertical,
     state.shape?.irreversibleMistake ?? '',
     criticalTestText(question.criticalTest),
+    ...exampleCells(question, state),
   ];
   return cells.map((cell) => escape(String(cell ?? ''))).join(',');
+}
+
+/**
+ * De voorbeelden bij de kenmerken van deze vraag, als `kenmerk: waarde` met
+ * puntkomma's ertussen, en in de tweede cel `kenmerk: adres`. Eén voorbeeld per
+ * kenmerk: de lezer koppelt de bron op de kenmerknaam.
+ */
+function exampleCells(question: DraftQuestion, state: RunState): [string, string] {
+  const picked = question.evidence.flatMap((key) => {
+    const found = (state.examples ?? []).find((example) => example.attribute === key);
+    return found ? [found] : [];
+  });
+  return [
+    picked.map((example) => `${example.attribute}: ${example.value.replace(/[;\n]+/g, ' ')}`).join('; '),
+    picked.map((example) => `${example.attribute}: ${example.url}`).join('; '),
+  ];
 }
 
 /**

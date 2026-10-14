@@ -23,6 +23,8 @@ import type { Strings } from '../src/i18n/strings';
 import { Badge, Bar, Button, Card, CardTitle, ErrorState, InfoButton, InfoPanel, Select, TrafficLight, statusOf } from './ui';
 import { Explorer } from './Explorer';
 import { AdvisoryCard } from './AdvisoryCard';
+import { SupportCard } from './SupportCard';
+import { unmatchedSupport, type SupportList } from '../src/questions/support';
 import type { SiteCheck } from '../src/collect/answers';
 
 /** Waarom de toets op de achtergrond niet liep; zie `SiteCheckRefused`. */
@@ -860,7 +862,7 @@ function GapTable({ s, model, locale }: { s: Strings; model: ReportModel; locale
  * hetzelfde uitzien. Wat alleen met de producten kan — de verkenner, bewaren en
  * de pdf — komt van buiten binnen.
  */
-export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestion, onLinkAttributes, siteCheck, onSiteCheck, defaultSite, siteSaveHint, sitePending, siteFailed }: {
+export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestion, onLinkAttributes, siteCheck, onSiteCheck, defaultSite, siteSaveHint, sitePending, siteFailed, support }: {
   s: Strings;
   locale: Locale;
   model: ReportModel;
@@ -882,6 +884,8 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
   /** De toets die het rapport zelf startte: loopt hij nog, of mislukte hij. */
   sitePending?: boolean;
   siteFailed?: SiteCheckFailure;
+  /** De klantvragen uit zijn klantenservice, als hij die aanleverde. */
+  support?: SupportList;
 }) {
   // De status staat als label naast de zin en niet in de zin zelf: een cijfer
   // langs een voorlopige lat mag er niet hetzelfde uitzien als een cijfer langs
@@ -976,7 +980,10 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
         saveHint={siteSaveHint}
         pending={sitePending}
         pendingFailed={siteFailed}
+        extraQuestions={unmatchedSupport(support)}
       />
+
+      <SupportCard s={s} model={model} support={support} siteCheck={siteCheck} pending={sitePending} />
 
       <Card>
         <CardTitle sub={s.report.stampExplain}>{s.report.stampHeading}</CardTitle>
@@ -1026,7 +1033,7 @@ export function ReportBody({ s, locale, model, explorer, footer, onReviewQuestio
   );
 }
 
-export function ReportView({ s, locale, report, onRestart, restartLabel, canSave = true, onReviewQuestion, onLinkAttributes, pristine, siteUrl, siteProgress }: {
+export function ReportView({ s, locale, report, onRestart, restartLabel, canSave = true, onReviewQuestion, onLinkAttributes, pristine, siteUrl, siteProgress, support }: {
   s: Strings;
   locale: Locale;
   report: ScanReport;
@@ -1044,6 +1051,8 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
   siteUrl?: string;
   /** De sitetoets die de scanpagina op de achtergrond startte. */
   siteProgress?: SiteCheckProgress;
+  /** De klantvragen uit zijn klantenservice, met de bankvraag die hetzelfde vraagt. */
+  support?: SupportList;
 }) {
   const { accountId } = useAuth();
   const router = useRouter();
@@ -1067,7 +1076,7 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
     setPdf('busy');
     try {
       const { saveReportPdf } = await import('./reportPdf');
-      await saveReportPdf(report, s, locale, siteCheck);
+      await saveReportPdf(report, s, locale, siteCheck, support);
       setPdf('idle');
     } catch {
       setPdf('failed');
@@ -1086,6 +1095,7 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
     }),
     ...(check ? { siteCheck: check } : {}),
     ...(siteUrl ? { siteUrl } : {}),
+    ...(support ? { support } : {}),
   });
 
   /** Een nieuwe sitetoets: tonen, en bijschrijven als de analyse al bewaard is. */
@@ -1141,6 +1151,7 @@ export function ReportView({ s, locale, report, onRestart, restartLabel, canSave
       siteSaveHint={siteCheck !== undefined && saveState !== 'saved'}
       sitePending={siteProgress?.status === 'busy'}
       siteFailed={siteProgress?.status === 'failed' ? siteProgress.reason : undefined}
+      support={support}
       // Bewaren zonder dat er data weggaat: de pdf wordt in de browser gemaakt
       // en rechtstreeks gedownload.
       footer={

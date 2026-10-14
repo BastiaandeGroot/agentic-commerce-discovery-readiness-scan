@@ -257,6 +257,19 @@ export const STRINGS = {
 
     upload: {
       heading: 'Lever je productdata aan',
+      supportLabel: 'Klantvragen uit je klantenservice',
+      supportOptional: 'Optioneel · CSV',
+      supportHint:
+        'Een analyse van je klantenservicemails: welke vragen klanten stellen, en hoe vaak. Eén regel per vraag, met een kolom Vraag en eventueel Thema en Aantal.',
+      supportRead: '{aantal} klantvragen gelezen',
+      supportPrivacy:
+        'Alleen de vraag, het thema en het aantal worden gelezen; antwoorden en andere kolommen niet. Ze komen niet in de vragenbank: ze tellen alleen in jouw rapport, en wat de bank niet kent toetsen we op je website.',
+      supportWrongType: 'Dit is geen CSV-bestand',
+      supportNoColumn: 'In dit bestand staat geen kolom met de vraag',
+      supportEmpty: 'In dit bestand staan geen vragen',
+      supportErrorNext: 'Zorg voor één regel per vraag en een kolom met de naam Vraag, en kies het bestand opnieuw.',
+      supportRedacted: 'In {aantal} vragen stond een e-mailadres of telefoonnummer; dat is weggehaald.',
+      supportCapped: 'Alleen de eerste {max} vragen worden gebruikt.',
       resumeHeading: 'Kies eerst je catalogus opnieuw',
       resumeIntro:
         'Om kenmerken te koppelen is je catalogus nodig, en die staat niet meer in deze browser. Zodra hij is ingelezen sta je op het koppelscherm; je eerdere keuzes staan er nog.',
@@ -547,6 +560,18 @@ export const STRINGS = {
       } as Record<string, string>,
       advisoryHeading: 'Buiten de score: waar je attributen niets over kunnen zeggen maar FAQ\'s belangrijk zijn',
       advisoryNone: 'In deze categorie stelt de vragenbank geen vragen buiten de score.',
+      supportHeading: 'Vragen uit je klantenservice',
+      supportIntro:
+        'Uit {bestand}. Ze tellen niet mee in de score en komen niet in de vragenbank. Per vraag zie je waar het antwoord vandaan komt: uit je catalogus, of van je website.',
+      supportMails: '{aantal} mails',
+      supportGroupMails: '{groep}: {aantal} mails',
+      supportInBank: 'In de vragenbank:',
+      supportInBankAdvisory: 'In de vragenbank, buiten de score:',
+      supportNotInBank: 'Niet in de vragenbank; getoetst op je website',
+      supportShare: '{beantwoord} van {totaal} producten beantwoorden dit uit je catalogus',
+      supportChecking: 'Wordt op je website getoetst…',
+      supportNotChecked: 'Niet meegenomen in de laatste toets. Toets opnieuw om hem mee te nemen.',
+      supportNoCheck: 'Nog niet op je website getoetst.',
       siteHeading: 'Beantwoordt je website deze vragen?',
       siteIntro: 'Een AI-agent leest ook je website. Deze toets leest een deel van je site zoals een agent dat doet, en zoekt per vraag de zin die het antwoord geeft.',
       siteUrlLabel: 'Adres van je webwinkel',
@@ -819,7 +844,7 @@ export const STRINGS = {
     nodes: {
       heading: 'Categorieknopen voor de vragenbank',
       intro:
-        'Wat elke merchant op zijn categoriescherm als categorie heeft aangemerkt. Dit is de opdracht voor het onderzoek: per knoop wordt er een panel van vijf sites langsgegaan die díé subcategorie werkelijk voeren.',
+        'Wat elke merchant op zijn categoriescherm als categorie heeft aangemerkt. Dit is de opdracht voor het onderzoek: per knoop wordt er een panel van acht sites langsgegaan die díé subcategorie werkelijk voeren.',
       rule:
         'Alleen categorieën staan hier. Een pad dat de merchant een kenmerk noemde — een materiaal, een collectie, een kleur — krijgt nooit een vragenset en wordt dus ook niet onderzocht. Dat scheelt het meeste werk: van een boom van zestig knopen blijft ongeveer de helft over.',
       nodeCount: 'categorieknopen',
@@ -1071,8 +1096,11 @@ export const STRINGS = {
       marketTooMany: 'Geef \u00e9\u00e9n markt op, zonder komma of schuine streep. Verkoop je in twee markten, doe dan eerst de ene en daarna de andere.',
       marketBusy: 'Markt bepalen…',
       panelLabel: 'Welke webshops moeten we bekijken?',
-      panelHint: 'Eén per regel, en dit mag leeg blijven. We onderzoeken vijf winkels in jouw markt om te zien welke vragen kopers stellen. Ken jij de serieuze spelers, noem ze dan — we voegen ze toe aan wat we zelf vinden. Je krijgt altijd te zien welke sites we uiteindelijk hebben gebruikt.',
+      panelHint: 'Eén per regel, en dit mag leeg blijven. We onderzoeken acht winkels in jouw markt om te zien welke vragen kopers stellen. Ken jij de serieuze spelers, noem ze dan — we voegen ze toe aan wat we zelf vinden. Je krijgt altijd te zien welke sites we uiteindelijk hebben gebruikt.',
       panelPlaceholder: 'https://voorbeeld.nl',
+      supportGive: 'Geef mijn {aantal} klantvragen mee als aanwijzing',
+      supportGiveHint:
+        'Ze helpen ons onderwerpen te vinden die de acht winkels missen, maar ze leggen de meetlat niet: de vragenlijst geldt voor je hele markt. Een vraag die alleen uit jouw klantenservice komt, telt niet als bron en wordt nooit kritiek. Alleen de vraag, het thema en het aantal gaan mee.',
       submit: 'Zet de aanvraag klaar',
       submitBusy: 'Bezig…',
       submitFailed: 'De aanvraag kon niet worden vastgelegd',
@@ -1085,7 +1113,7 @@ export const STRINGS = {
         'De vragen komen niet uit je eigen kolommen maar uit onderzoek naar jouw markt: wat kopers vragen voordat ze bestellen, verzameld over meerdere webshops. Dat is werk dat één keer per markt gebeurt — en jij bent de eerste in de jouwe.',
       what: 'Wat er nu gebeurt',
       whatBody:
-        'We nemen vijf webshops in jouw markt door. De webshops die je hierboven opgaf horen daar altijd bij, net als je eigen winkel; de rest zoeken wij erbij. Van elke site lezen we de veelgestelde vragen, de categorieteksten en de productpagina\u2019s. Daaruit komt de vragenlijst waarmee we jouw data meten.',
+        'We nemen acht webshops in jouw markt door. De webshops die je hierboven opgaf horen daar altijd bij, net als je eigen winkel; de rest zoeken wij erbij. Van elke site lezen we de veelgestelde vragen, de categorieteksten en de productpagina\u2019s. Daaruit komt de vragenlijst waarmee we jouw data meten.',
       when: 'Hoe lang dit duurt',
       whenBody:
         'Reken op één tot twee werkdagen. Je hoeft niet te wachten: sluit dit venster gerust. Je krijgt een mail zodra je scan klaarstaat, en je gegevens blijven bewaard.',
@@ -1490,6 +1518,19 @@ export const STRINGS = {
 
     upload: {
       heading: 'Supply your product data',
+      supportLabel: 'Questions from your customer service',
+      supportOptional: 'Optional · CSV',
+      supportHint:
+        'An analysis of your customer service emails: which questions customers ask, and how often. One row per question, with a Question column and optionally Theme and Count.',
+      supportRead: '{aantal} customer questions read',
+      supportPrivacy:
+        'Only the question, the theme and the count are read; answers and other columns are not. They do not go into the question bank: they only count in your report, and what the bank does not know we check on your website.',
+      supportWrongType: 'This is not a CSV file',
+      supportNoColumn: 'This file has no column with the question',
+      supportEmpty: 'This file contains no questions',
+      supportErrorNext: 'Make sure there is one row per question and a column named Question, then choose the file again.',
+      supportRedacted: 'In {aantal} questions there was an email address or phone number; it has been removed.',
+      supportCapped: 'Only the first {max} questions are used.',
       resumeHeading: 'First choose your catalogue again',
       resumeIntro:
         'Linking characteristics needs your catalogue, and it is no longer in this browser. As soon as it is read you are on the linking screen; your earlier choices are still there.',
@@ -1777,6 +1818,18 @@ export const STRINGS = {
       } as Record<string, string>,
       advisoryHeading: 'Outside the score: what your attributes cannot speak to but FAQs matter for',
       advisoryNone: 'The question bank asks no questions outside the score in this category.',
+      supportHeading: 'Questions from your customer service',
+      supportIntro:
+        'From {bestand}. They do not count in the score and do not go into the question bank. For each question you see where the answer comes from: your catalogue, or your website.',
+      supportMails: '{aantal} emails',
+      supportGroupMails: '{groep}: {aantal} emails',
+      supportInBank: 'In the question bank:',
+      supportInBankAdvisory: 'In the question bank, outside the score:',
+      supportNotInBank: 'Not in the question bank; checked on your website',
+      supportShare: '{beantwoord} of {totaal} products answer this from your catalogue',
+      supportChecking: 'Being checked on your website…',
+      supportNotChecked: 'Not included in the last check. Check again to include it.',
+      supportNoCheck: 'Not checked on your website yet.',
       siteHeading: 'Does your website answer these questions?',
       siteIntro: 'An AI agent reads your website too. This check reads part of your site the way an agent does, and looks for the sentence that answers each question.',
       siteUrlLabel: 'Address of your shop',
@@ -2049,7 +2102,7 @@ export const STRINGS = {
     nodes: {
       heading: 'Category nodes for the question bank',
       intro:
-        'What each merchant marked as a category on their category screen. This is the research brief: per node a panel of five sites that actually carry that subcategory.',
+        'What each merchant marked as a category on their category screen. This is the research brief: per node a panel of eight sites that actually carry that subcategory.',
       rule:
         'Only categories appear here. A path the merchant called a characteristic — a material, a collection, a colour — never gets a question set and is therefore never researched. That saves most of the work: of a sixty-node tree, roughly half remains.',
       nodeCount: 'category nodes',
@@ -2301,8 +2354,11 @@ export const STRINGS = {
       marketTooMany: 'Give one market, without a comma or slash. If you trade in two markets, do one first and the other after.',
       marketBusy: 'Determining the market…',
       panelLabel: 'Which shops should we look at?',
-      panelHint: 'One per line, and this may stay empty. We research five shops in your market to see what questions buyers ask. If you know the serious players, name them — we add them to what we find ourselves. You will always be shown which sites we ended up using.',
+      panelHint: 'One per line, and this may stay empty. We research eight shops in your market to see what questions buyers ask. If you know the serious players, name them — we add them to what we find ourselves. You will always be shown which sites we ended up using.',
       panelPlaceholder: 'https://example.com',
+      supportGive: 'Include my {aantal} customer questions as a hint',
+      supportGiveHint:
+        'They help us find topics the eight shops miss, but they do not set the yardstick: the question list applies to your whole market. A question that only comes from your customer service does not count as a source and never becomes critical. Only the question, the theme and the count are sent.',
       submit: 'Put the request in',
       submitBusy: 'Working…',
       submitFailed: 'The request could not be recorded',
@@ -2315,7 +2371,7 @@ export const STRINGS = {
         'The questions do not come from your own columns but from research into your market: what buyers ask before they order, gathered across several shops. That is work done once per market — and you are the first in yours.',
       what: 'What is happening now',
       whatBody:
-        'We are going through five shops in your market. The ones you named above are always included, as is your own shop; we find the rest ourselves. For each site we read the FAQs, the category texts and the product pages. That produces the list of questions we measure your data against.',
+        'We are going through eight shops in your market. The ones you named above are always included, as is your own shop; we find the rest ourselves. For each site we read the FAQs, the category texts and the product pages. That produces the list of questions we measure your data against.',
       when: 'How long this takes',
       whenBody:
         'Expect one to two working days. You do not have to wait: feel free to close this window. You will get an email as soon as your scan is ready, and your details are kept.',

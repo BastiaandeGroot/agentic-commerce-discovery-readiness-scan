@@ -12,7 +12,8 @@
 // Puur: het modelantwoord komt binnen via `ask` en de tijd via `at`. Zo is de
 // hele reeks met vaste antwoorden na te spelen zonder netwerk en zonder klok.
 
-import { promptFor, SYSTEM } from './prompts';
+import { isGenericWord, meaningfulWords } from '../spec/lexicon';
+import { exampleTargets, promptFor, SYSTEM } from './prompts';
 import { checkDraft, toCsv } from './csv';
 import {
   addUsage,
@@ -20,7 +21,12 @@ import {
   nextPhase,
   NO_USAGE,
   overlayCategories,
+  PANEL_SIZE,
   requesterSite,
+  isSupportSource,
+  SUPPORT_SOURCE,
+  supportOnly,
+  type HarvestedExample,
   type CriticalTest,
   type DraftQuestion,
   type FacetEntry,
@@ -47,6 +53,12 @@ export interface AskTask {
 export interface AskReply {
   /** Het geparseerde JSON-object. De uitvoerder faalt liever dan half te raden. */
   json: unknown;
+  /**
+   * Bij de voorbeeldenstap: de tekst van elke pagina die het antwoord noemt, op
+   * adres. De uitvoerder haalt ze op; een voorbeeld telt alleen als zijn waarde
+   * er letterlijk op staat. Zonder pagina's telt er geen.
+   */
+  pages?: Record<string, string>;
   usage: Usage;
 }
 
@@ -98,9 +110,10 @@ function isAttributeName(raw: string): boolean {
 }
 
 /** Eén vraag zoals het model hem aanlevert. */
-function readQuestion(raw: unknown, fallbackId: string): DraftQuestion | null {
+function readQuestion(raw: unknown, id: string): DraftQuestion | null {
+  // Het nummer zet de app en niet het model: het moet boven de nummers van een
+  // eerdere bank liggen, en dat weet alleen de aanroeper.
   const source = asObject(raw);
-  const id = asString(source.id) || fallbackId;
   const nl = asString(source.questionNl) || asString(source.question);
   const en = asString(source.questionEn) || nl;
   if (nl === '') return null;
@@ -171,10 +184,13 @@ export function enforceCriticalTest(
   const ownBar: string[] = [];
   // Alleen de aanvrager behandelt dit: dan is het zijn eigen lat. Dekking 0 valt
   // hier niet onder — dat is vakkennis, en die legt een vakexpert vast.
+  // Hetzelfde voor een vraag die alleen uit zijn klantenservice komt: dat is
+  // zijn eigen mail, geen panelsite en geen vakkennis.
   const onlyRequester = (question: DraftQuestion) =>
-    requester !== undefined
-    && question.coverageSites.length > 0
-    && question.coverageSites.every((site) => site.toLowerCase() === requester.toLowerCase());
+    supportOnly(question)
+    || (requester !== undefined
+      && question.coverageSites.length > 0
+      && question.coverageSites.every((site) => site.toLowerCase() === requester.toLowerCase()));
   const out = questions.map((question) => {
     if (question.importance !== 'kritiek') return { ...question, criticalTest: undefined };
     if (onlyRequester(question)) {
@@ -192,7 +208,7 @@ export function enforceCriticalTest(
         `${where}: ${lowered.length} vra${lowered.length === 1 ? 'ag' : 'gen'} kwam${lowered.length === 1 ? '' : 'en'} als kritiek terug zonder de volledige toets, ${lowered.length === 1 ? 'gaat' : 'gaan'} over beleid, levering of voorraad, of ${lowered.length === 1 ? 'is een berekening' : 'zijn berekeningen'}. Die staan op hoog: ${lowered.join(', ')}.`,
       ]),
       ...(ownBar.length === 0 ? [] : [
-        `${where}: ${ownBar.length} vra${ownBar.length === 1 ? 'ag wordt' : 'gen worden'} alleen op de site van de aanvrager behandeld en ${ownBar.length === 1 ? 'kan' : 'kunnen'} daarom niet kritiek zijn: wie gemeten wordt, legt niet zijn eigen poort. ${ownBar.length === 1 ? 'Die staat' : 'Die staan'} op hoog: ${ownBar.join(', ')}.`,
+        `${where}: ${ownBar.length} vra${ownBar.length === 1 ? 'ag wordt' : 'gen worden'} alleen op de site of in de klantenservice van de aanvrager behandeld en ${ownBar.length === 1 ? 'kan' : 'kunnen'} daarom niet kritiek zijn: wie gemeten wordt, legt niet zijn eigen poort. ${ownBar.length === 1 ? 'Die staat' : 'Die staan'} op hoog: ${ownBar.join(', ')}.`,
       ]),
     ],
   };
@@ -207,10 +223,10 @@ export function enforceCriticalTest(
  * zou een hele generatie weggooien op de laatste stap, en dus wordt het hier
  * hernoemd in plaats van daar afgekeurd.
  */
-function readQuestions(raw: unknown, prefix: string, taken: Set<string>): DraftQuestion[] {
+function readQuestions(raw: unknown, prefix: string, taken: Set<string>, first = 1): DraftQuestion[] {
   const out: DraftQuestion[] = [];
   for (const [index, one] of asArray(raw).entries()) {
-    const question = readQuestion(one, `${prefix}-${String(index + 1).padStart(2, '0')}`);
+    const question = readQuestion(one, `${prefix}-${String(index + first).padStart(2, '0')}`);
     if (!question) continue;
 
     let id = question.id;
@@ -308,7 +324,7 @@ function agreedName(aliases: { site: string; name: string }[]): string | undefin
 }
 
 /**
- * De marktsegmenten zoals het model ze uit de vijf indelingen haalde, door de
+ * De marktsegmenten zoals het model ze uit de indelingen van het panel haalde, door de
  * poorten van de app.
  *
  * Het model legt categorieën van verschillende sites op elkaar; dat is een
@@ -327,6 +343,17 @@ function readStructure(raw: unknown, state: RunState): { grouping: GroupingEntry
       names: new Map((harvest.segments ?? []).map((segment) => [segment.name.toLowerCase(), segment.name])),
     });
   }
+  // De categorienamen uit de catalogus van de aanvrager mogen als alias mee: de
+  // scan plaatst zijn producten op die naam, ook als zijn site hem anders toont.
+  // Ze dragen geen segment — zie `catalogOnly` hieronder.
+  const own = requesterSite(state);
+  const ownNames = own ? carried.get(own.toLowerCase()) : undefined;
+  const fromSite = new Set(ownNames ? [...ownNames.names.keys()] : []);
+  for (const segment of ownNames ? state.brief.segments : []) {
+    if (!ownNames?.names.has(segment.name.toLowerCase())) ownNames?.names.set(segment.name.toLowerCase(), segment.name);
+  }
+  const catalogOnly = (alias: { site: string; name: string }) =>
+    alias.site === own && !fromSite.has(alias.name.toLowerCase());
 
   const claimed = new Set<string>();
   const invented: string[] = [];
@@ -359,7 +386,8 @@ function readStructure(raw: unknown, state: RunState): { grouping: GroupingEntry
     // Een segment dat op geen enkele site terug te vinden is, komt niet uit het
     // panel. Het wordt genoemd en niet meegenomen.
     .filter((one) => {
-      if (one.aliases.length > 0) return true;
+      // Een naam uit de catalogus van de aanvrager alleen is geen vondst op een site.
+      if (one.aliases.some((alias) => !catalogOnly(alias))) return true;
       invented.push(one.working);
       return false;
     });
@@ -369,11 +397,11 @@ function readStructure(raw: unknown, state: RunState): { grouping: GroupingEntry
   const taken = new Set<string>();
   const ownName: string[] = [];
   const named = read.map((one) => {
-    const agreed = agreedName(one.aliases);
+    const agreed = agreedName(one.aliases.filter((alias) => !catalogOnly(alias)));
     const name = agreed !== undefined && !taken.has(agreed.toLowerCase()) ? agreed : one.working;
     // Alleen melden waar sites elkaar tegenspreken. Bij één site is er niemand
     // om het mee oneens te zijn.
-    const sites = new Set(one.aliases.map((alias) => alias.site)).size;
+    const sites = new Set(one.aliases.filter((alias) => !catalogOnly(alias)).map((alias) => alias.site)).size;
     if (agreed === undefined && sites >= SEGMENT_SITES) ownName.push(one.working);
     taken.add(name.toLowerCase());
     return { ...one, name };
@@ -396,7 +424,7 @@ function readStructure(raw: unknown, state: RunState): { grouping: GroupingEntry
   const single: string[] = [];
   const ownOnly: string[] = [];
   const grouping = named.map((one): GroupingEntry => {
-    const sites = [...new Set(one.aliases.map((alias) => alias.site))];
+    const sites = [...new Set(one.aliases.filter((alias) => !catalogOnly(alias)).map((alias) => alias.site))];
     const ownSet = one.kind === 'overlay' || one.kind === 'losstaand';
     const tooFew = ownSet && sites.length < SEGMENT_SITES;
     // De aanvrager zit in het panel, maar draagt geen vragenset: er moet een
@@ -432,6 +460,8 @@ function readStructure(raw: unknown, state: RunState): { grouping: GroupingEntry
   const unplaced = [...carried.values()].flatMap((site) =>
     [...site.names.entries()]
       .filter(([key]) => !claimed.has(`${site.site.toLowerCase()}|${key}`))
+      // Een catalogusnaam van de aanvrager is geen categorie die zijn site toont.
+      .filter(([key]) => !(site.site === own && !fromSite.has(key)))
       .map(([, name]) => `${name} (${site.site})`));
   const silent = state.harvest.filter((harvest) => (harvest.segments ?? []).length === 0).map((harvest) => harvest.site);
 
@@ -526,6 +556,36 @@ function readTopics(raw: unknown): Topic[] {
     .filter((one): one is Topic => one !== null);
 }
 
+/**
+ * De klantenservice van de aanvrager telt niet als site.
+ *
+ * Het model zou hem in `coverageSites` kunnen zetten, of een onderwerp dat
+ * alleen daaruit komt een dekking kunnen geven. Allebei terugdraaien: wat de
+ * klantenservice aandroeg staat met dekking 0 en bron `SUPPORT_SOURCE`, en een
+ * onderwerp dat ook panelsites behandelen houdt alleen de dekking van die sites.
+ */
+function withoutSupportCoverage(topic: Topic): Topic {
+  const fromSupport = topic.sources.some(isSupportSource) || topic.coverageSites.some(isSupportSource);
+  if (!fromSupport) return topic;
+  const coverageSites = topic.coverageSites.filter((site) => !isSupportSource(site));
+  const sources = [...topic.sources.filter((source) => !isSupportSource(source)), SUPPORT_SOURCE];
+  return coverageSites.length === 0
+    ? { ...topic, coverage: 0, coverageSites, sources: [SUPPORT_SOURCE] }
+    : { ...topic, coverage: Math.min(topic.coverage, coverageSites.length), coverageSites, sources };
+}
+
+/** Wat de klantenservice in deze stap aandroeg, zodat de beheerder het kan nakijken. */
+function supportFindings(state: RunState, topics: Topic[], step: 'samenvoegen' | 'nalopen'): string[] {
+  const given = state.brief.support?.length ?? 0;
+  if (given === 0) return [];
+  const own = topics.filter(supportOnly);
+  if (step === 'nalopen' && own.length === 0) return [];
+  const names = own.slice(0, 8).map((topic) => topic.topic).join(', ') + (own.length > 8 ? ', …' : '');
+  return [step === 'samenvoegen'
+    ? `Klantenservice van de aanvrager: ${given} vra${given === 1 ? 'ag' : 'gen'} meegegeven als aanwijzing, niet als panelsite. ${own.length === 0 ? 'Geen onderwerp komt alleen daaruit.' : `${own.length} onderwerp${own.length === 1 ? ' komt' : 'en komen'} alleen daaruit en ${own.length === 1 ? 'staat' : 'staan'} op dekking 0 (${names}).`}`
+    : `Nalopen: ${own.length} onderwerp${own.length === 1 ? '' : 'en'} uit de klantenservice van de aanvrager erbij, op dekking 0 (${names}).`];
+}
+
 function readFacets(raw: unknown): FacetEntry[] {
   return asArray(raw)
     .map((one): FacetEntry | null => {
@@ -574,6 +634,76 @@ export class EmptyPhase extends Error {
  * argument en niet uit een klok, om dezelfde reden als bij de motor: anders
  * geeft dezelfde invoer twee keer een andere uitkomst.
  */
+/**
+ * Synoniemen die te algemeen zijn voor het kenmerk eruit.
+ *
+ * Een synoniem is een extra naam waarop de matcher een kolom zoekt. "lengte" bij
+ * de looplengte van garen legde het kenmerk op de rollengte van stof — een gat
+ * dat verdwijnt terwijl het er is. Eén los woord uit de generieke woordenlijst
+ * blijft alleen staan als het kenmerk zelf niets anders zegt dan dat woord.
+ */
+function withoutGenericSynonyms(questions: DraftQuestion[]): { questions: DraftQuestion[]; findings: string[] } {
+  const dropped: string[] = [];
+  const cleaned = questions.map((question) => {
+    const plain = new Set(question.evidence.filter((key) => meaningfulWords(key).length === 1).map((key) => meaningfulWords(key)[0]));
+    const kept = question.synonyms.filter((synonym) => {
+      if (!isGenericWord(synonym) || plain.has(meaningfulWords(synonym)[0])) return true;
+      dropped.push(`${question.id}: ${synonym}`);
+      return false;
+    });
+    return kept.length === question.synonyms.length ? question : { ...question, synonyms: kept };
+  });
+  return {
+    questions: cleaned,
+    findings: dropped.length > 0
+      ? [`Synoniemen weggelaten omdat ze te algemeen zijn voor het kenmerk en het op een verkeerde kolom zouden leggen: ${dropped.join('; ')}.`]
+      : [],
+  };
+}
+
+/** Tekst vergelijkbaar maken: kleine letters, één spatie, geen harde spaties. */
+const flat = (text: string) => text.toLowerCase().replace(/[\s\u00a0]+/g, ' ').trim();
+
+/**
+ * De voorbeelden die het model aanwees, en alleen die letterlijk op de pagina staan.
+ *
+ * Een voorbeeld is altijd een echte waarde: het kenmerk moet in de bank staan,
+ * het adres moet van een panelsite zijn, en de waarde moet op de opgehaalde
+ * pagina te vinden zijn. Wat één van de drie mist, vervalt — en wordt geteld,
+ * zodat de beheerder ziet hoeveel het model erbij verzon.
+ */
+function readExamples(raw: unknown, state: RunState, pages: Record<string, string>): { examples: HarvestedExample[]; findings: string[] } {
+  const host = (url: string) => url.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split(/[/?#]/)[0];
+  const panel = new Set(state.panel.map((site) => host(site.url)));
+  const wanted = new Set(exampleTargets(state).map((target) => target.attribute));
+  const text = new Map(Object.entries(pages).map(([url, body]) => [url, flat(body)]));
+
+  const examples: HarvestedExample[] = [];
+  let offered = 0;
+  let unread = 0;
+  let absent = 0;
+  for (const one of asArray(raw)) {
+    const source = asObject(one);
+    const attribute = asString(source.attribute);
+    const value = asString(source.value).trim();
+    const url = asString(source.url);
+    if (!wanted.has(attribute) || value === '' || !/^https?:\/\//i.test(url) || !panel.has(host(url))) continue;
+    offered += 1;
+    if (examples.some((example) => example.attribute === attribute)) continue;
+    const page = text.get(url);
+    if (page === undefined) { unread += 1; continue; }
+    if (!page.includes(flat(value))) { absent += 1; continue; }
+    examples.push({ attribute, value: value.replace(/[\s\u00a0]+/g, ' '), url });
+  }
+
+  const findings = [
+    `Voorbeelden: ${examples.length} van de ${wanted.size} kenmerken hebben een waarde die letterlijk op een productpagina van een panelsite staat. Loop ze na: een waarde kan er staan en de vraag toch niet beantwoorden.`,
+  ];
+  if (absent > 0) findings.push(`${absent} aangewezen voorbeeld${absent === 1 ? '' : 'en'} stond${absent === 1 ? '' : 'en'} niet letterlijk op de genoemde pagina en ${absent === 1 ? 'is' : 'zijn'} weggelaten.`);
+  if (unread > 0) findings.push(`${unread} voorbeeld${unread === 1 ? '' : 'en'} ${unread === 1 ? 'is' : 'zijn'} weggelaten omdat de pagina niet op te halen was${offered === unread ? ' — geen enkele pagina is gelezen' : ''}.`);
+  return { examples, findings };
+}
+
 /**
  * Wat deze fase aan het model zou vragen, zonder het te vragen.
  *
@@ -638,7 +768,7 @@ export function applyReply(
           };
         })
         .filter((one): one is NonNullable<typeof one> => one !== null)
-        .slice(0, 8);
+        .slice(0, PANEL_SIZE);
 
       updated = {
         ...state,
@@ -654,8 +784,8 @@ export function applyReply(
         findings: [
           ...state.findings,
           ...findingsOf(answer),
-          ...(panel.length < 5
-            ? [`Het panel telt ${panel.length} sites in plaats van vijf. De dekking per vraag is daarmee grover dan de methode aanneemt.`]
+          ...(panel.length < PANEL_SIZE
+            ? [`Het panel telt ${panel.length} sites in plaats van ${PANEL_SIZE}. De dekking per vraag is daarmee grover dan de methode aanneemt.`]
             : []),
           ...(asString(shape.irreversibleMistake) === ''
             ? ['De onomkeerbare fout is niet vastgesteld. Zonder die fout is "kritiek" een mening en niet een maat.']
@@ -675,17 +805,66 @@ export function applyReply(
     }
 
     case 'consolidate': {
-      const topics = readTopics(answer.topics);
+      const topics = readTopics(answer.topics).map(withoutSupportCoverage);
       updated = {
         ...state,
         topics,
         findings: [
           ...state.findings,
           ...findingsOf(answer),
-          ...(topics.some((topic) => topic.coverage === 0)
+          ...supportFindings(state, topics, 'samenvoegen'),
+          // Een onderwerp uit de klantenservice is geen vakkennis: dat heeft één
+          // winkel aangedragen, niet de stap die de hele branche naloopt.
+          ...(topics.some((topic) => topic.coverage === 0 && !supportOnly(topic))
             ? []
             : ['Geen enkel onderwerp heeft dekking 0. De stap voor vragen die niemand beantwoordt heeft niets opgeleverd, en dan meet de bank het marktgemiddelde.']),
         ],
+      };
+      break;
+    }
+
+    case 'recheck': {
+      // De dekking wordt hier geteld en niet overgenomen: alleen sites uit het
+      // panel tellen, en een onderwerp dat er al staat komt er niet nog eens bij.
+      const sites = new Map(state.panel.map((site) => [site.name.toLowerCase(), site.name]));
+      const known = new Set(state.topics.map((topic) => topic.topic.toLowerCase()));
+      const added: Topic[] = [];
+      for (const topic of readTopics(answer.topics)) {
+        if (known.has(topic.topic.toLowerCase())) continue;
+        known.add(topic.topic.toLowerCase());
+        const coverageSites = [...new Set(topic.coverageSites.flatMap((name) => sites.get(name.toLowerCase()) ?? []))];
+        const fromSupport = topic.sources.some(isSupportSource);
+        added.push({
+          ...topic,
+          coverage: coverageSites.length,
+          coverageSites,
+          sources: coverageSites.length === 0
+            ? [fromSupport ? SUPPORT_SOURCE : 'vakkennis']
+            : [...topic.sources.filter((source) => !isSupportSource(source)), 'nagelopen na het samenvoegen', ...(fromSupport ? [SUPPORT_SOURCE] : [])],
+          conflict: undefined,
+        });
+      }
+      updated = {
+        ...state,
+        topics: [...state.topics, ...added],
+        findings: [
+          ...state.findings,
+          ...findingsOf(answer),
+          ...supportFindings(state, added, 'nalopen'),
+          added.length > 0
+            ? `Samenvoegen nagelopen: ${added.length} onderwerp${added.length === 1 ? '' : 'en'} die bij het samenvoegen ${added.length === 1 ? 'was' : 'waren'} weggevallen, ${added.length === 1 ? 'staat' : 'staan'} er weer bij (${added.slice(0, 8).map((topic) => topic.topic).join(', ')}${added.length > 8 ? ', …' : ''}).`
+            : 'Samenvoegen nagelopen: geen geoogste vraag is weggevallen.',
+        ],
+      };
+      break;
+    }
+
+    case 'examples': {
+      const read = readExamples(answer.examples, state, reply.pages ?? {});
+      updated = {
+        ...state,
+        examples: read.examples,
+        findings: [...state.findings, ...findingsOf(answer), ...read.findings],
       };
       break;
     }
@@ -701,7 +880,9 @@ export function applyReply(
     }
 
     case 'base': {
-      const tested = enforceCriticalTest(readQuestions(answer.questions, 'BAS', takenIds(state)), 'Basislaag', requesterSite(state));
+      const cleaned = withoutGenericSynonyms(readQuestions(answer.questions, 'BAS', takenIds(state), state.brief.firstNumber));
+      const tested = enforceCriticalTest(cleaned.questions, 'Basislaag', requesterSite(state));
+      tested.findings.push(...cleaned.findings);
       const questions = tested.questions;
       if (questions.length === 0) {
         throw new EmptyPhase('De basislaag kwam terug zonder één vraag.', reply.usage);
@@ -750,7 +931,9 @@ export function applyReply(
 
       // Een overlay bestaat omdat hij eigen vragen heeft; dat is de lat die hij
       // bij het panel haalde. Zonder één vraag is de stap mislukt.
-      const tested = enforceCriticalTest(readQuestions(answer.questions, prefix, takenIds(state)), category, requesterSite(state));
+      const cleaned = withoutGenericSynonyms(readQuestions(answer.questions, prefix, takenIds(state), state.brief.firstNumber));
+      const tested = enforceCriticalTest(cleaned.questions, category, requesterSite(state));
+      tested.findings.push(...cleaned.findings);
       const questions = tested.questions;
       if (questions.length === 0) {
         throw new EmptyPhase(`De categorie ${category} kwam terug zonder één eigen vraag.`, reply.usage);

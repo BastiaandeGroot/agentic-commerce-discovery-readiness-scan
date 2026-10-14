@@ -11,11 +11,11 @@
 //
 // **Het systeemdeel is voor elke fase gelijk.** Dat is geen netheid maar de
 // grootste kostenknop die er is: een gelijk voorvoegsel wordt gecachet, en een
-// generatie doet twaalf tot vijftien aanroepen op dezelfde regels. Zet er dus
+// generatie doet een kleine dertig aanroepen op dezelfde regels. Zet er dus
 // nooit iets fase-eigens in — geen categorienaam, geen sitenaam, geen datum.
 
 import type { GroupingEntry, Phase, RunState, Topic } from './state';
-import { isStandaloneCategory, overlayCategories } from './state';
+import { isStandaloneCategory, overlayCategories, PANEL_SIZE, requesterSite, SUPPORT_SOURCE, supportOnly } from './state';
 
 /** Omhoog zodra een prompt de uitkomst op dezelfde markt kan verschuiven. */
 // 1.6.0 — kritiek volgt een toets van vier criteria, per vraag onderbouwd.
@@ -24,7 +24,15 @@ import { isStandaloneCategory, overlayCategories } from './state';
 // 2.0.0 — de indeling komt uit het panel en niet van de aanvrager: een eigen fase
 //         maakt uit de indeling van de vijf sites de marktsegmenten, en de
 //         vragensets worden per segment geschreven (ontwerp 3d).
-export const GENERATION_VERSION = '2.0.0';
+// 2.1.0 — de werkwijze van woontextiel v5 als standaard: een panel van acht, het
+//         samenvoegen wordt nagelopen op vragen die wegvielen, de categorienamen
+//         van de aanvrager reizen mee als alias, de nummers beginnen boven die
+//         van een eerdere bank, en een eigen stap haalt echte voorbeeldwaarden op.
+// 2.2.0 — de klantvragen uit de klantenservice van de aanvrager reizen mee als
+//         aanwijzing bij samenvoegen en nalopen. Ze mogen een onderwerp
+//         aandragen, maar tellen niet als panelsite: dekking 0, eigen bron, en
+//         nooit kritiek.
+export const GENERATION_VERSION = '2.2.0';
 
 /**
  * Wat een vraag moet bevatten, en in welke vorm.
@@ -93,7 +101,7 @@ stelt, en je leidt daar het benodigde bewijs uit af. Een attribuutlijst is een
 mening; een vragenlijst met per vraag het benodigde bewijs is een meetinstrument.
 
 De bank hoort bij de markt en niet bij één winkel. Eén site geeft je de vragen
-die die ene merchant belangrijk vindt, inclusief zijn blinde vlekken. Vijf sites
+die die ene merchant belangrijk vindt, inclusief zijn blinde vlekken. Acht sites
 geven je de vragen van de markt plus een meetbare frequentie.
 
 Deze regels gelden altijd:
@@ -195,13 +203,46 @@ const topicBlock = (topics: Topic[]) =>
     .map((topic) => {
       const coverage = `dekking ${topic.coverage} (${topic.coverageSites.join(', ') || 'geen sites'})`;
       const conflict = topic.conflict ? ` — tegenspraak: ${topic.conflict}` : '';
-      return `- ${topic.question} [${topic.topic}] ${coverage}${conflict}`;
+      // De bron moet mee de vraag in: alleen daaraan ziet de kritiek-toets dat
+      // de aanvrager deze vraag zelf aandroeg.
+      const own = supportOnly(topic) ? ` — bron "${SUPPORT_SOURCE}": neem die bron over, en zo'n vraag is nooit kritiek` : '';
+      return `- ${topic.question} [${topic.topic}] ${coverage}${conflict}${own}`;
     })
     .join('\n');
 
 /**
+ * Wat kopers de klantenservice van de aanvrager vragen, als aanwijzing.
+ *
+ * Eén winkel mag geen meetlat leggen, dus dit draagt alleen onderwerpen aan:
+ * het telt niet als site en verhoogt geen dekking. De app dwingt dat daarna
+ * zelf af (`withoutSupportCoverage`); deze tekst zegt het het model vooraf.
+ */
+const supportBlock = (state: RunState) => {
+  const hints = state.brief.support ?? [];
+  if (hints.length === 0) return '';
+  const lines = hints.map((hint) => {
+    const extra = [hint.theme, hint.count === undefined ? '' : `${hint.count}×`].filter(Boolean).join(', ');
+    return `- ${hint.question}${extra ? ` (${extra})` : ''}`;
+  });
+  return `
+De aanvrager gaf mee wat kopers zijn klantenservice vragen, met thema en aantal
+mails waar hij dat telde:
+${lines.join('\n')}
+
+Dit is een AANWIJZING en geen bron. Het is de mail van één winkel, en een bank
+hoort bij de markt:
+- Behandelt het panel het onderwerp al, dan verandert er niets: dekking en
+  bronnen blijven wat de oogst zegt. Noem de klantenservice nooit in
+  "coverageSites".
+- Mist de oogst een onderwerp dat hier staat en dat een koper vóór de aankoop
+  heeft, voeg het dan toe met lege "coverageSites", dekking 0 en bron
+  "${SUPPORT_SOURCE}". Vragen over een lopende bestelling vallen af.
+`;
+};
+
+/**
  * De oogst zonder de indeling per site. De samenvoegstap weegt onderwerpen, en de
- * menu's van vijf winkels zijn daar ruis; de fase die de indeling wél weegt
+ * menu's van acht winkels zijn daar ruis; de fase die de indeling wél weegt
  * krijgt ze apart.
  */
 const withoutSegments = (site: RunState['harvest'][number]) => ({
@@ -266,10 +307,44 @@ const segmentSourcesBlock = (state: RunState, category: string, profiles: string
 };
 
 /**
+ * De categorienamen uit de catalogus van de aanvrager, als mogelijke alias.
+ *
+ * Zijn site toont een categorie soms onder een andere naam dan zijn catalogus
+ * hem voert ("Onderhoudsproducten" tegenover "Onderhoudsprodukten"), en de scan
+ * plaatst zijn producten op de naam uit de catalogus. Zonder die naam als alias
+ * vindt het segment zijn eigen producten niet.
+ */
+function requesterNames(state: RunState): string {
+  const own = requesterSite(state);
+  if (!own || state.brief.segments.length === 0) return '';
+  return `
+De aanvrager (${own}) voert in zijn catalogus deze categorienamen:
+${list(state.brief.segments.map((segment) => segment.name))}
+Toont zijn site een segment onder een andere naam dan hier staat, zet dan de naam
+uit deze lijst er als extra alias bij, met "${own}" als site en letterlijk zoals
+hij hier staat. Alleen bij een segment dat het panel al kent: deze lijst maakt
+geen nieuwe segmenten.
+`;
+}
+
+/** Het zoveelste nummer van een laag, in de vorm waarin de app het zelf zet. */
+const numbered = (state: RunState, nth: number) =>
+  String((state.brief.firstNumber ?? 1) + nth - 1).padStart(2, '0');
+
+/** De kenmerken waar de bank op leunt, elk met één vraag als toelichting. */
+export function exampleTargets(state: RunState): { attribute: string; question: string }[] {
+  const seen = new Map<string, string>();
+  for (const question of [...(state.base?.questions ?? []), ...state.overlays.flatMap((overlay) => overlay.questions)]) {
+    for (const key of question.evidence) if (!seen.has(key)) seen.set(key, question.questionNl);
+  }
+  return [...seen].map(([attribute, question]) => ({ attribute, question }));
+}
+
+/**
  * De vraag die bij deze stap hoort.
  *
  * Elke fase krijgt alleen wat hij nodig heeft en niet de hele toestand. Dat is
- * geen zuinigheid maar kwaliteit: een basislaag die de ruwe oogst van vijf sites
+ * geen zuinigheid maar kwaliteit: een basislaag die de ruwe oogst van acht sites
  * naast zich heeft liggen gaat die oogst herhalen in plaats van hem te wegen.
  */
 export function promptFor(phase: Phase, state: RunState): PhasePrompt {
@@ -292,11 +367,11 @@ ${state.brief.suggestedSites.length > 0 ? `\nWebshops die hij aandroeg:\n${list(
 
 Doe twee dingen.
 
-EEN — stel een panel van precies vijf sites samen. Wat de merchant aandroeg wordt
+EEN — stel een panel van precies ${PANEL_SIZE} sites samen. Wat de merchant aandroeg wordt
 toegevoegd, niet overgenomen: zou hij het panel bepalen, dan kiest hij zijn
 zwakste concurrenten en meet hij zichzelf rijk. Zijn eigen winkel is één
-panelsite en nooit de enige. Vul aan tot vijf met: twee categorieleiders in de
-thuismarkt, één specialist, één merk- of fabrikantsite, één buitenlandse (DE/UK,
+panelsite en nooit de enige. Vul aan tot ${PANEL_SIZE} met: vier categorieleiders in de
+thuismarkt, één specialist, één merk- of fabrikantsite, twee buitenlandse (DE/UK,
 die publiceren vrijwel altijd meer technische data).
 
 Kies op na te lopen signalen, in deze volgorde: reviews onder een keurmerk
@@ -398,13 +473,90 @@ Voeg samen tot één lijst onderwerpen.
    misgaat. Markeer ze met dekking 0 en bron "vakkennis". Zonder deze stap
    reproduceer je de blinde vlekken van de hele branche, en juist daar zit het
    onderscheidend vermogen.
-
+${supportBlock(state)}
 Sorteer op dekking, hoogste eerst.
 
 Antwoord met dit JSON-object:
 {
-  "topics": [{"topic": "korte sleutel", "question": "de klantvraag", "coverage": 0, "coverageSites": ["..."], "sources": ["faq|categorietekst|blog|productpagina|review|vakkennis"], "conflict": "alleen als sites elkaar tegenspreken"}],
+  "topics": [{"topic": "korte sleutel", "question": "de klantvraag", "coverage": 0, "coverageSites": ["..."], "sources": ["faq|categorietekst|blog|productpagina|review|vakkennis${state.brief.support?.length ? `|${SUPPORT_SOURCE}` : ''}"], "conflict": "alleen als sites elkaar tegenspreken"}],
   "findings": ["wat een mens moet weten"]
+}`,
+      };
+
+    case 'recheck':
+      return {
+        model: 'judge',
+        web: false,
+        maxTokens: 32000,
+        prompt: `Markt: ${vertical}. Panel van ${state.panel.length} sites: ${state.panel.map((site) => site.name).join(', ')}.
+
+Bij het samenvoegen van de oogst vallen vragen weg: een vraag die maar één site
+stelt, of die onder een segment staat, verdwijnt in een breder onderwerp of
+verdwijnt helemaal. Loop dat na.
+
+Dit zijn de geoogste vragen, per site, met het segment waaronder ze stonden:
+
+${JSON.stringify(state.harvest.map((site) => ({ site: site.site, questions: site.questions.map((question) => ({ question: question.question, segment: question.segment || undefined })) })), null, 1)}
+
+Dit is de onderwerpenlijst na het samenvoegen:
+
+${JSON.stringify(state.topics.map((topic) => ({ topic: topic.topic, question: topic.question })), null, 1)}
+
+Geef de onderwerpen die ONTBREKEN: een geoogste vraag die een koper werkelijk
+anders stelt dan elk onderwerp in de lijst. Een andere formulering van een
+bestaand onderwerp is geen nieuw onderwerp. Let vooral op vragen die onder één
+segment staan (garen, voering, tassen, onderhoud): die verdwijnen het eerst, en
+zonder hen krijgt dat segment straks geen eigen vragen.
+
+Noem bij elk onderwerp de sites die de vraag stellen, onder precies de naam uit
+de lijst hierboven; de app telt de dekking zelf. Zie je bij een segment een vraag
+die elke koper heeft maar geen site stelt, dan mag je die toevoegen met een lege
+"coverageSites" en bron "vakkennis".
+${supportBlock(state)}
+Antwoord met dit JSON-object:
+{
+  "topics": [{"topic": "korte sleutel", "question": "de klantvraag", "coverageSites": ["..."], "sources": ["faq|categorietekst|blog|productpagina|review|vakkennis${state.brief.support?.length ? `|${SUPPORT_SOURCE}` : ''}"]}],
+  "findings": ["wat een mens moet weten"]
+}`,
+      };
+
+    case 'examples':
+      return {
+        model: 'reader',
+        web: true,
+        maxTokens: 32000,
+        prompt: `Markt: ${vertical}.
+
+De vragenbank is klaar. Zoek bij de kenmerken hieronder een ECHT VOORBEELD: een
+waarde zoals hij op een productpagina van een panelsite staat. Het rapport toont
+hem aan een merchant die het kenmerk nog niet vastlegt, zodat hij ziet hoe het
+gevuld hoort te zijn.
+
+De panelsites:
+${state.panel.map((site) => `- ${site.name}: ${site.url}`).join('\n')}
+
+De kenmerken, met een vraag die erop leunt:
+${exampleTargets(state).map((target) => `- ${target.attribute} — ${target.question}`).join('\n')}
+
+Regels, en ze zijn hard:
+1. Alleen een waarde die je op een productpagina hebt GELEZEN, uit de
+   specificatietabel of de kenmerkenlijst. Niets uit je geheugen, niets afgeleid.
+2. Neem de waarde LETTERLIJK over, teken voor teken zoals hij op de pagina staat,
+   zonder de naam van het kenmerk ervoor. De app haalt de pagina zelf op en gooit
+   elk voorbeeld weg dat er niet letterlijk op staat.
+3. De waarde moet de vraag beantwoorden. "Brandvertragend: ja" beantwoordt niet
+   welke brandnorm; een gewicht per strekkende meter is geen gewicht per m².
+4. Geef het adres van die ene productpagina, geen categorie- of zoekpagina.
+5. Eén voorbeeld per kenmerk is genoeg. Vind je er geen, laat het kenmerk dan weg
+   — geen voorbeeld is beter dan een verzonnen voorbeeld.
+
+Lees van elke panelsite een paar productpagina's uit verschillende segmenten;
+één pagina met een volle specificatietabel levert vaak meerdere kenmerken.
+
+Antwoord met dit JSON-object:
+{
+  "examples": [{"attribute": "de kenmerknaam uit de lijst", "value": "letterlijk van de pagina", "url": "https://..."}],
+  "findings": ["welke sites geen specificaties tonen, en wat verder opviel"]
 }`,
       };
 
@@ -454,7 +606,7 @@ suggereert dat de vragenlijst niet maakt. Bij twijfel: profiel.
 
 Een segment dat maar één site voert, is de menukeuze van één winkel. Neem het op
 met wat je erover weet; de app geeft het geen eigen vragenset.
-
+${requesterNames(state)}
 Antwoord met dit JSON-object:
 {
   "segments": [{"category": "werknaam", "kind": "overlay|profiel|facet|losstaand", "parent": "alleen bij profiel: de werknaam van de overlay", "aliases": [{"site": "naam van de panelsite", "name": "letterlijk zoals die site hem noemt"}], "reason": "in één zin; bij losstaand welke algemene vragen er niet op slaan", "distinct": ["alleen bij overlay: vragen die alleen hier gesteld worden"]}],
@@ -480,12 +632,12 @@ ongeacht toepassing of categorie. Laat categoriespecifieke vragen liggen, die
 komen straks in de overlays.
 
 Per vraag:
-- een id in de vorm BAS-01, oplopend
+- een id in de vorm BAS-${numbered(state, 1)}, oplopend
 ${QUESTION_FIELDS}
 
 Antwoord met dit JSON-object:
 {
-  "questions": [${questionShape('BAS-01')}],
+  "questions": [${questionShape(`BAS-${numbered(state, 1)}`)}],
   "findings": ["beredeneerde drempels en andere open punten"]
 }`,
       };
@@ -549,7 +701,7 @@ ${QUESTION_FIELDS}
 
 Antwoord met dit JSON-object:
 {
-  "questions": [${questionShape(`${(category.slice(0, 3) || 'CAT').toUpperCase()}-01`)}],
+  "questions": [${questionShape(`${(category.slice(0, 3) || 'CAT').toUpperCase()}-${numbered(state, 1)}`)}],
   "reweight": [{"id": "BAS-03", "importance": "kritiek", "reason": "...", "criticalTest": {"decisive": "...", "irreversible": "...", "product": "...", "catalogue": "..."}}],
   "findings": ["..."]
 }`,

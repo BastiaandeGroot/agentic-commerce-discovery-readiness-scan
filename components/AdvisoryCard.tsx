@@ -29,9 +29,9 @@ function n(value: number): string {
 
 /** Wat werk is eerst: niet gevonden, dan deels, dan wat er staat. */
 const STATUS_ORDER: Record<SiteAnswerStatus, number> = { 'not-found': 0, partial: 1, answered: 2, 'not-checked': 3 };
-const STATUS_TONE = { answered: 'ok', partial: 'warn', 'not-found': 'danger', 'not-checked': 'neutral' } as const;
+export const STATUS_TONE = { answered: 'ok', partial: 'warn', 'not-found': 'danger', 'not-checked': 'neutral' } as const;
 
-export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, defaultSite, saveHint, pending, pendingFailed }: {
+export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, defaultSite, saveHint, pending, pendingFailed, extraQuestions = [] }: {
   s: Strings;
   locale: Locale;
   model: ReportModel;
@@ -47,6 +47,8 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
   pending?: boolean;
   /** Die toets op de achtergrond mislukte, met de reden. */
   pendingFailed?: 'forbidden' | 'not-configured' | 'too-many' | 'failed';
+  /** Vragen van buiten de bank die mee getoetst worden: de klantvragen die de bank niet kent. */
+  extraQuestions?: { id: string; label: string }[];
 }) {
   const { user } = useAuth();
   const [setId, setSetId] = useState('all');
@@ -76,8 +78,10 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
       ? (STATUS_ORDER[a.answer?.status ?? 'not-checked'] - STATUS_ORDER[b.answer?.status ?? 'not-checked'])
       : 0));
   // De telling hoort bij de lijst eronder, dus ook zonder de voorraadvragen.
+  // De klantvragen tellen hier niet mee: die staan in hun eigen blok.
+  const listed = new Set(advisory.map((entry) => entry.id));
   const totals = siteCheck
-    ? siteCheckTotals({ ...siteCheck, answers: siteCheck.answers.filter((answer) => answer.skipped !== 'stock') })
+    ? siteCheckTotals({ ...siteCheck, answers: siteCheck.answers.filter((answer) => answer.skipped !== 'stock' && listed.has(answer.questionId)) })
     : undefined;
 
   /** Wat er misging, en wat de retailer nu kan doen. */
@@ -98,7 +102,7 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
     try {
       const check = await requestSiteCheck(
         site.trim(),
-        advisory.map((entry) => ({ id: entry.id, label: entry.label })),
+        [...advisory.map((entry) => ({ id: entry.id, label: entry.label })), ...extraQuestions],
         // De namen van zijn eigen categorieën, zodat hun pagina's als eerste gelezen worden.
         [...new Set(model.categories.flatMap((c) => [c.category, c.subcategory ?? '']).filter(Boolean))],
       );
@@ -256,7 +260,7 @@ export function AdvisoryCard({ s, locale, model, siteCheck, onSiteCheck, default
 }
 
 /** Het bewijs onder een vraag: het citaat, waar het staat, en wat eraan schort. */
-function AnswerDetail({ s, answer }: { s: Strings; answer: SiteAnswer }) {
+export function AnswerDetail({ s, answer }: { s: Strings; answer: SiteAnswer }) {
   if (!answer.quote) return null;
   const link = quoteLink(answer);
   return (

@@ -20,7 +20,10 @@ Vul overal `{{...}}` in. Draai dit in een **aparte sessie** waarin de productexp
 > | {{url_2}} | categorieleider |
 > | {{url_3}} | specialist |
 > | {{url_4}} | merk/fabrikant |
-> | {{url_5}} | buitenlands (DE/UK) |
+> | {{url_5}} | categorieleider |
+> | {{url_6}} | categorieleider |
+> | {{url_7}} | buitenlands (DE/UK) |
+> | {{url_8}} | buitenlands (DE/UK) |
 >
 > Het doel is niet om attributen te bedenken, maar om vast te leggen welke vragen een koper stelt en welk bewijs nodig is om die te beantwoorden. De attributen leid ik daar later uit af.
 >
@@ -40,7 +43,7 @@ Vul overal `{{...}}` in. Draai dit in een **aparte sessie** waarin de productexp
 
 ## Prompt 1 — Bronoogst per site
 
-Draai dit per site, of in groepjes van twee tot drie. Niet alle vijf tegelijk: dan vervlakt de opbrengst.
+Draai dit per site, of in groepjes van twee tot drie. Niet alle acht tegelijk: dan vervlakt de opbrengst.
 
 > Oogst nu de klantvragen van **{{url}}** ({{type}}).
 >
@@ -78,6 +81,20 @@ Draai dit per site, of in groepjes van twee tot drie. Niet alle vijf tegelijk: d
 > Punt 5 is belangrijk: als ik alleen oogst wat sites publiceren, reproduceer ik de blinde vlekken van de hele branche. Juist die vragen zijn commercieel interessant.
 >
 > Lever de geconsolideerde lijst gesorteerd op dekking, met per vraag de bronsites.
+
+---
+
+## Prompt 1c — Samenvoegen nalopen
+
+> Leg de ruwe oogst per site naast de onderwerpenlijst uit prompt 1b.
+>
+> Geef de onderwerpen die **ontbreken**: een geoogste vraag die een koper werkelijk anders stelt dan elk onderwerp in de lijst. Een andere formulering van een bestaand onderwerp is geen nieuw onderwerp. Let vooral op vragen die onder één segment staan; die verdwijnen het eerst, en zonder hen krijgt dat segment straks geen eigen vragen.
+>
+> Noem bij elk onderwerp de sites die de vraag stellen. Tel de dekking uit de oogst; neem geen aantal over. Een vraag die elke koper in een segment heeft maar geen site stelt, mag erbij met `dekking: 0` en bron vakkennis.
+>
+> *Gaf de aanvrager klantvragen uit zijn klantenservice mee, dan krijgen prompt 1b en 1c ze erbij:*
+>
+> Dit is wat kopers de klantenservice van de aanvrager vragen. Het is een aanwijzing en geen bron: het telt niet als site en verhoogt de dekking van geen enkel onderwerp. Behandelt het panel het onderwerp al, dan verandert er niets. Mist de oogst een onderwerp dat hier staat en dat een koper vóór de aankoop heeft, voeg het dan toe met `dekking: 0` en bron `klantenservice aanvrager`. Zo'n vraag is nooit kritiek.
 
 ---
 
@@ -196,6 +213,20 @@ Herhaal per hoofdcategorie.
 > Lever YAML met per attribuut: `dekking`, `bronsites`, `benoemd_als`, en of het als filter beschikbaar is of alleen als specificatie op de productpagina.
 >
 > Dit is mijn cold-startbenchmark: hiermee kan ik een eerste klant vertellen hoe hij zich verhoudt tot de markt, voordat ik genoeg klanten heb voor een echte onderlinge vergelijking. Markeer het expliciet als publieke-databenchmark, niet als merchantbenchmark, want het meet wat sites tónen en niet wat ze vastleggen.
+
+---
+
+## Prompt 4c — Voorbeelden
+
+> De vragenbank is klaar. Zoek bij elk kenmerk een **echt voorbeeld**: een waarde zoals hij op een productpagina van een panelsite staat, uit de specificatietabel of de kenmerkenlijst.
+>
+> - Alleen een waarde die je op de pagina hebt gelezen. Niets uit je geheugen, niets afgeleid.
+> - Neem hem letterlijk over, teken voor teken, zonder de naam van het kenmerk ervoor. De pagina wordt daarna opnieuw opgehaald; wat er niet letterlijk op staat vervalt.
+> - De waarde moet de vraag beantwoorden. "Brandvertragend: ja" beantwoordt niet welke brandnorm.
+> - Geef het adres van die ene productpagina, geen categorie- of zoekpagina.
+> - Eén voorbeeld per kenmerk. Vind je er geen, laat het kenmerk weg.
+>
+> Lever per voorbeeld: kenmerk, waarde, adres. In de tabel komen ze in `voorbeeld` (`kenmerk: waarde`) en `voorbeeld_bron` (`kenmerk: adres`).
 
 ---
 

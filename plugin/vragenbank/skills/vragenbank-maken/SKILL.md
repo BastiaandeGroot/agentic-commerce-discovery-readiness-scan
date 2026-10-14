@@ -1,6 +1,6 @@
 ---
 name: vragenbank-maken
-description: Bouwt een vragenbank met consumentenvragen voor een markt of vertical, door een panel van vijf webshops te onderzoeken. Gebruik dit wanneer iemand vraagt om een vragenbank, klantvragen, consumentenvragen of een vragenlijst voor een nieuwe markt, branche of productcategorie — bijvoorbeeld "maak een vragenbank voor woontextiel", "welke vragen stellen kopers van tuinmeubelen", of "we hebben een nieuwe vertical, verf". Levert één tweetalige CSV op die de readiness-scan kan inlezen.
+description: Bouwt een vragenbank met consumentenvragen voor een markt of vertical, door een panel van acht webshops te onderzoeken. Gebruik dit wanneer iemand vraagt om een vragenbank, klantvragen, consumentenvragen of een vragenlijst voor een nieuwe markt, branche of productcategorie — bijvoorbeeld "maak een vragenbank voor woontextiel", "welke vragen stellen kopers van tuinmeubelen", of "we hebben een nieuwe vertical, verf". Levert één tweetalige CSV op die de readiness-scan kan inlezen.
 ---
 
 # Een vragenbank bouwen voor een markt
@@ -43,9 +43,9 @@ een vraag onbeantwoordbaar is. Categorienamen met aantallen mag je wel gebruiken
 Werk `references/promptreeks.md` af, prompt 0 tot en met 5, in volgorde. Voeg ze
 niet samen. Vraag om 130 vragen in één keer en je krijgt 130 middelmatige.
 
-**Stap 0 — panel en vorm van de markt.** Stel een panel samen van vijf
-sites: twee tot drie categorieleiders, een specialist, twee merk- of
-fabrikantsites, en één tot twee buitenlandse (Duitse webshops publiceren in
+**Stap 0 — panel en vorm van de markt.** Stel een panel samen van acht
+sites: vier categorieleiders, een specialist, een merk- of
+fabrikantsite, en twee buitenlandse (Duitse webshops publiceren in
 vrijwel elke markt meer technische data dan Nederlandse). Beantwoord dan de zeven
 vragen uit prompt 0. De belangrijkste is: **welke aankoopfout kan de koper niet
 terugdraaien?** Die bepaalt straks wat `kritiek` is.
@@ -63,6 +63,12 @@ welke. Markeer tegenspraak tussen sites — dat is een discussiepunt voor de
 domeinexpert, geen fout. Voeg dan bewust vragen toe die op **geen enkele site**
 beantwoord worden maar die klanten wel hebben, met `dekking: 0`. Sla die stap
 nooit over: zonder hem reproduceer je de blinde vlekken van de hele branche.
+
+**Stap 1c — het samenvoegen nalopen.** Leg de ruwe oogst naast de
+onderwerpenlijst en zet terug wat bij het samenvoegen wegviel: een vraag die een
+koper werkelijk anders stelt dan elk onderwerp dat er staat. Vragen onder één
+segment (garen, voering, onderhoud) verdwijnen het eerst. Tel de dekking van wat
+je terugzet opnieuw uit de oogst.
 
 **Stap 2 — basislaag.** De vragen die voor elk product in deze markt gelden.
 
@@ -101,8 +107,17 @@ maar horen een attribuutwaarde te zijn. Toets het talig: kun je zeggen "ik zoek
 een lampenkapstof"? Dat loopt, dus categorie. "Ik zoek een effen"? Dat loopt
 niet, dus eigenschap.
 
+**Stap 4c — voorbeelden.** Zoek bij elk kenmerk één echte waarde op een
+productpagina van een panelsite, letterlijk overgenomen, met het adres van die
+pagina. Haal de pagina daarna opnieuw op en controleer dat de waarde er
+letterlijk staat én de vraag beantwoordt. Geen vondst is geen voorbeeld; verzin
+er nooit een.
+
 **Stap 5 — de CSV.** Zet alles om naar één bestand volgens
 `references/kolomvorm.md`. Eén rij per vraag, met `vraag_nl` én `vraag_en`.
+Nummer boven het hoogste nummer van een eerdere bank voor dezelfde markt: bij
+het eerstvolgende honderdtal plus één (101, 201, …). Zet geen los algemeen woord
+(lengte, breedte, gewicht) als synoniem bij een smaller kenmerk.
 
 ## Vijf regels die de kwaliteit bepalen
 

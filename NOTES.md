@@ -975,6 +975,62 @@ een kolom wijst die de intake als standaardveld plaatste (`samenstelling` →
 het bij elk product als leeg. Of dat in de echte keten ook zo loopt, is niet
 nagegaan.
 
+## Klantvragen uit de klantenservice — 14 oktober 2026
+
+Een retailer kan bij "Data aanleveren" een CSV met klantvragen uit zijn
+klantenservice aanleveren (gemodelleerd op de mailanalyse van De Groot: Thema,
+"Komt voort uit (aantal)", Vraag, antwoord, status). Bewust níet in de vragenbank:
+die hoort bij de markt. In het rapport een eigen blok "Vragen uit je
+klantenservice": per vraag het aantal mails, en of het antwoord uit de catalogus
+komt (een bankvraag die hetzelfde vraagt, met hoeveel producten hem beantwoorden)
+of van de website (de sitetoets neemt de vragen mee die de bank niet kent).
+
+Koppelen aan de bank op woorden, gemeten op De Groot tegen woontextiel v5: zes van
+de 28 vinden een bankvraag. Woorden die in meer dan 8% van de bankvragen staan
+tellen niet ("stof" legde "is die stof nog te krijgen" op de stofbreedte). Een
+productvraag met maar één onderscheidend woord ("Welke stoffen zijn
+brandvertragend?") vindt geen koppeling en gaat door de sitetoets; bij twijfel
+niet koppelen.
+
+**Deel drie, ook op 14 oktober: de klantvragen als aanwijzing bij een nieuwe
+bank** (`GENERATION_VERSION` 2.2.0). Wie een bank aanvraagt en klantvragen
+aanleverde, kan die meegeven (vinkje in het aanvraagformulier, standaard aan).
+Ze gaan als `support_questions` op `bank_requests` (migratie 0016, nog zelf
+draaien; zonder de kolom gaat de aanvraag zonder klantvragen) en als
+`RunBrief.support` de generatie in, alleen in samenvoegen en nalopen. Ze mogen
+een onderwerp aandragen maar tellen niet als panelsite: de app zet zo'n
+onderwerp zelf op dekking 0 met bron `klantenservice aanvrager`
+(`withoutSupportCoverage`), haalt de klantenservice uit `coverageSites` als het
+model hem daar toch neerzet, en `enforceCriticalTest` zet een vraag die alleen
+daarop rust op hoog. Het telt ook niet als vakkennis-stap. Sluit een merchant
+aan bij een aanvraag die al openstaat voor zijn markt, dan gaan zijn klantvragen
+niet mee — de generatie loopt al.
+
+## De werkwijze van woontextiel v5 is de standaard — 11 oktober 2026
+
+Op verzoek van de opdrachtgever: wat voor v5 met de hand is gedaan, doet de
+generatie nu zelf (`GENERATION_VERSION` 2.1.0), en de methode en de plugin zeggen
+hetzelfde.
+
+- **Panel van acht** (`PANEL_SIZE`): vier categorieleiders, één specialist, één
+  merk, twee buitenlandse; de aanvrager is er één van. Dit draait de eerdere
+  keuze voor vijf terug.
+- **Nalopen na het samenvoegen** (fase `recheck`): geoogste vragen die wegvielen
+  komen terug als onderwerp. De app telt de dekking zelf, alleen over panelsites.
+- **Catalogusnamen van de aanvrager als alias** in de indeling. Ze dragen geen
+  segment en tellen niet als site.
+- **Nummers boven een eerdere bank** (`firstFreeNumber`, `RunBrief.firstNumber`):
+  101, 201, … De app nummert zelf; het nummer van het model wordt niet gevolgd.
+- **Te algemene synoniemen eruit** (`withoutGenericSynonyms`): één los woord uit
+  de generieke woordenlijst bij een smaller kenmerk.
+- **Voorbeelden** (fase `examples`): een model wijst per kenmerk een waarde op een
+  productpagina van een panelsite aan; de server haalt die pagina's op
+  (`src/server/examplePages.ts`) en alleen wat er letterlijk op staat blijft. Of
+  de waarde de vraag beantwoordt, ziet die controle niet: een mens loopt ze na.
+
+Niet gedaan: geen echte run tegen de API met deze versie. Een bank kost nu vijf
+aanroepen meer (drie sites, nalopen, voorbeelden), vier daarvan met het web.
+
 ## Bewust afgevallen
 
 Niet opnieuw voorstellen zonder dat er iets veranderd is.

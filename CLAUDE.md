@@ -123,9 +123,10 @@ vragenlijst en niet om een bestandsformaat. Vier regels die altijd gelden:
 - **Een bank hoort bij een vertical, niet bij een merchant.** Nooit een bank
   genereren uit de site of de catalogus van één winkel: dan meet je zijn blinde
   vlekken mee en zijn twee merchants in dezelfde markt niet meer vergelijkbaar.
-  Zijn site is één van de vijf panelsites.
+  Zijn site is één van de acht panelsites (`PANEL_SIZE`).
 - **Een bankaanvraag draagt geen productdata.** Categorienamen met aantallen en
-  een URL, verder niets — ook geen kolomnamen. Dat is fase 3 van de methode
+  een URL, verder niets — ook geen kolomnamen. Wel mogen de klantvragen uit zijn
+  klantenservice mee (vraag, thema, aantal), als aanwijzing en nooit als bron. Dat is fase 3 van de methode
   (blinderen) én de privacybelofte. Het type kan het niet dragen; houd het zo.
 - **Herkomst staat bij elk getal.** Een gepubliceerde drempel noemt zijn site,
   een beredeneerde zijn onderbouwing, en `dekking: 0` (niemand behandelt dit)
@@ -138,6 +139,16 @@ vragenlijst en niet om een bestandsformaat. Vier regels die altijd gelden:
   bron vervalt het voorbeeld. De eigen invulling van de merchant
   (`ScanReport.ownExamples`) staat alleen in een verse scan en gaat nooit mee de
   opslag in: het zijn waarden uit zijn catalogus.
+- **Klantvragen uit de klantenservice gaan nooit de bank in.** Een retailer kan
+  naast zijn catalogus een analyse van zijn klantenservicemails aanleveren
+  (`src/questions/support.ts`). Alleen vraag, thema en aantal worden gelezen; een
+  e-mailadres of telefoonnummer wordt weggepoetst. In zijn eigen rapport krijgt
+  een vraag die ook in de bank staat het aantal mails erbij (`matchSupport`,
+  deterministisch en streng), en gaat een vraag die de bank niet kent door de
+  sitetoets. Ze reizen mee in de snapshot (`ScanSnapshot.support`). Bij een
+  bankaanvraag mogen ze mee als aanwijzing (`RunBrief.support`): ze dragen een
+  onderwerp aan, maar tellen niet als panelsite — dekking 0, bron
+  `klantenservice aanvrager`, nooit kritiek.
 - **Een overlay herweegt, maar herschrijft niet.** Zou een categorie de tekst
   van een basisvraag mogen veranderen, dan meten twee categorieën verschillende
   dingen onder hetzelfde id.
