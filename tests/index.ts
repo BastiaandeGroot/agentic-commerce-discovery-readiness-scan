@@ -37,3 +37,4 @@ import './placement.test';
 import './siteanswers.test';
 import './inherit.test';
 import './examples.test';
+import './support.test';

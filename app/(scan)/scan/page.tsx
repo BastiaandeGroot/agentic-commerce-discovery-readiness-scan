@@ -22,6 +22,7 @@ import { bankStore, LOCAL_ACCOUNT, type StoredBank } from '../../../src/storage/
 import { snapshotStoreFor } from '../../../src/storage/snapshots';
 import { isScored } from '../../../src/questions/compose';
 import { isStockQuestion, reusableSiteCheck, siteKey } from '../../../src/collect/answers';
+import { matchSupport, unmatchedSupport, type SupportList } from '../../../src/questions/support';
 import { requestShopMappings } from '../../../src/shopmapping/remote';
 import { SiteCheckRefused, requestSiteCheck } from '../../../src/sitecheck/remote';
 import { LocalSettingsStore, SupabaseSettingsStore, type SettingsStore } from '../../../src/storage/settings';
@@ -148,6 +149,12 @@ export default function Home() {
    * een volgende scan niet opnieuw hoeft te typen.
    */
   const [knownSite, setKnownSite] = useState<string>();
+  /**
+   * De klantvragen uit zijn klantenservice. Aangeleverd bij de catalogus, of
+   * overgenomen uit zijn meest recente analyse; zie `src/questions/support.ts`.
+   */
+  const [support, setSupport] = useState<SupportList>();
+  const supportTouched = useRef(false);
   useEffect(() => {
     let alive = true;
     const target = snapshotStoreFor(supabase(), accountId);
@@ -155,6 +162,9 @@ export default function Home() {
       .then((list) => {
         const recent = list.find((one) => one.siteUrl ?? one.siteCheck?.site);
         if (alive && recent) setKnownSite(recent.siteUrl ?? recent.siteCheck?.site);
+        // Alleen als hij zelf nog niets koos: weghalen of vervangen gaat voor.
+        const withSupport = list.find((one) => one.support);
+        if (alive && withSupport?.support && !supportTouched.current) setSupport(withSupport.support);
       })
       .catch(() => undefined);
     return () => { alive = false; };
@@ -487,6 +497,17 @@ export default function Home() {
    * staat; alleen anders wordt de site opnieuw gelezen. Eén keer per winkel en
    * per vragenlijst in deze sessie.
    */
+  /** De klantvragen naast de vragensets van nu: welke bankvraag hetzelfde vraagt. */
+  const matchedSupport = useMemo<SupportList | undefined>(() => {
+    if (!support || !questionState) return support;
+    const seen = new Set<string>();
+    const bank = questionState.sets
+      .flatMap((set) => set.questions)
+      .filter((question) => !question.disabled && (seen.has(question.id) ? false : (seen.add(question.id), true)))
+      .map((question) => ({ id: question.id, label: question.label[locale], scored: isScored(question) }));
+    return { ...support, questions: matchSupport(support.questions, bank) };
+  }, [support, questionState, locale]);
+
   const [siteProgress, setSiteProgress] = useState<SiteCheckProgress>({ status: 'idle' });
   const siteStartedFor = useRef<string>(undefined);
   useEffect(() => {
@@ -496,11 +517,15 @@ export default function Home() {
     const site = shopUrl ?? knownSite;
     if (!user || !site || !questionState) return;
     const seen = new Set<string>();
-    const questions = questionState.sets
-      .flatMap((set) => set.questions)
-      .filter((question) => !question.disabled && !isScored(question) && !isStockQuestion(question.label[locale]))
-      .filter((question) => (seen.has(question.id) ? false : (seen.add(question.id), true)))
-      .map((question) => ({ id: question.id, label: question.label[locale] }));
+    const questions = [
+      ...questionState.sets
+        .flatMap((set) => set.questions)
+        .filter((question) => !question.disabled && !isScored(question) && !isStockQuestion(question.label[locale]))
+        .filter((question) => (seen.has(question.id) ? false : (seen.add(question.id), true)))
+        .map((question) => ({ id: question.id, label: question.label[locale] })),
+      // De klantvragen die de bank niet kent: die toetsen we op zijn site.
+      ...unmatchedSupport(matchedSupport),
+    ];
     if (questions.length === 0) return;
     const key = `${site}|${questions.map((question) => question.id).sort().join(',')}`;
     if (siteStartedFor.current === key) return;
@@ -530,7 +555,7 @@ export default function Home() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, user, shopUrl, knownSite, questionState, locale]);
+  }, [step, user, shopUrl, knownSite, questionState, locale, matchedSupport]);
 
   /**
    * Eerdere keuzes overnemen voor kenmerken die onder een andere naam terugkomen.
@@ -839,7 +864,14 @@ export default function Home() {
         ) : null}
         {step === 'upload' && !resumeReady ? <Card><SkeletonLines lines={4} /></Card> : null}
         {step === 'upload' && resumeReady ? (
-          <UploadStep s={s} onReady={handleReady} resume={resuming} owner={authSettled ? accountId ?? LOCAL_ACCOUNT : undefined} />
+          <UploadStep
+            s={s}
+            onReady={handleReady}
+            resume={resuming}
+            owner={authSettled ? accountId ?? LOCAL_ACCOUNT : undefined}
+            support={support}
+            onSupport={(list) => { supportTouched.current = true; setSupport(list); }}
+          />
         ) : null}
 
         {step === 'segments' && catalog ? (
@@ -951,6 +983,7 @@ export default function Home() {
             onRestart={restart}
             pristine={reportPristine}
             siteUrl={shopUrl ?? knownSite}
+            support={matchedSupport}
             siteProgress={siteProgress}
             // Naar het koppelscherm; "Scan uitvoeren" daar brengt hem terug naar het rapport.
             onLinkAttributes={() => setStep('mapping')}

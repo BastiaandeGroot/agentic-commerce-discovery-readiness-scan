@@ -102,6 +102,7 @@ export function SnapshotReport({ s, locale, snapshot, detail, work, onReviewQues
         onLinkAttributes={onLinkAttributes}
         siteCheck={fresh?.id === snapshot.id ? fresh.check : snapshot.siteCheck}
         defaultSite={snapshot.siteUrl}
+        support={snapshot.support}
         onSiteCheck={onSiteCheck ? async (check) => { setFresh({ id: snapshot.id, check }); await onSiteCheck(check); } : undefined}
       />
     </div>

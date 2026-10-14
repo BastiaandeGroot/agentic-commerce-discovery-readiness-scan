@@ -138,6 +138,13 @@ vragenlijst en niet om een bestandsformaat. Vier regels die altijd gelden:
   bron vervalt het voorbeeld. De eigen invulling van de merchant
   (`ScanReport.ownExamples`) staat alleen in een verse scan en gaat nooit mee de
   opslag in: het zijn waarden uit zijn catalogus.
+- **Klantvragen uit de klantenservice gaan nooit de bank in.** Een retailer kan
+  naast zijn catalogus een analyse van zijn klantenservicemails aanleveren
+  (`src/questions/support.ts`). Alleen vraag, thema en aantal worden gelezen; een
+  e-mailadres of telefoonnummer wordt weggepoetst. In zijn eigen rapport krijgt
+  een vraag die ook in de bank staat het aantal mails erbij (`matchSupport`,
+  deterministisch en streng), en gaat een vraag die de bank niet kent door de
+  sitetoets. Ze reizen mee in de snapshot (`ScanSnapshot.support`).
 - **Een overlay herweegt, maar herschrijft niet.** Zou een categorie de tekst
   van een basisvraag mogen veranderen, dan meten twee categorieën verschillende
   dingen onder hetzelfde id.

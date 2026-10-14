@@ -975,6 +975,27 @@ een kolom wijst die de intake als standaardveld plaatste (`samenstelling` →
 het bij elk product als leeg. Of dat in de echte keten ook zo loopt, is niet
 nagegaan.
 
+## Klantvragen uit de klantenservice — 14 oktober 2026
+
+Een retailer kan bij "Data aanleveren" een CSV met klantvragen uit zijn
+klantenservice aanleveren (gemodelleerd op de mailanalyse van De Groot: Thema,
+"Komt voort uit (aantal)", Vraag, antwoord, status). Bewust níet in de vragenbank:
+die hoort bij de markt. In het rapport een eigen blok "Vragen uit je
+klantenservice": per vraag het aantal mails, en of het antwoord uit de catalogus
+komt (een bankvraag die hetzelfde vraagt, met hoeveel producten hem beantwoorden)
+of van de website (de sitetoets neemt de vragen mee die de bank niet kent).
+
+Koppelen aan de bank op woorden, gemeten op De Groot tegen woontextiel v5: zes van
+de 28 vinden een bankvraag. Woorden die in meer dan 8% van de bankvragen staan
+tellen niet ("stof" legde "is die stof nog te krijgen" op de stofbreedte). Een
+productvraag met maar één onderscheidend woord ("Welke stoffen zijn
+brandvertragend?") vindt geen koppeling en gaat door de sitetoets; bij twijfel
+niet koppelen.
+
+Nog niet gebouwd: de klantvragen als aanwijzing bij het maken van een nieuwe bank
+(deel drie van het voorstel). Vraagt een kolom op `bank_requests` en een veld in
+het aanvraagformulier.
+
 ## De werkwijze van woontextiel v5 is de standaard — 11 oktober 2026
 
 Op verzoek van de opdrachtgever: wat voor v5 met de hand is gedaan, doet de
