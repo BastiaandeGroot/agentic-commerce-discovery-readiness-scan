@@ -9,6 +9,8 @@ const hint = (key: string, field: string) => ({ attributeKey: key, label: { nl: 
 const outcome = (questionId: string, answered: boolean, missing: string[], importance = 'critical') => ({
   questionId, label: { nl: `Vraag ${questionId}`, en: `Question ${questionId}` }, state: answered ? 'answered' : 'empty',
   answered, missing, found: [], scored: true, importance,
+  // Zoals een echte scan: per kenmerk de velden die het kunnen dragen.
+  evidence: [hint(questionId === 'LICHT' ? 'lichtdoorlatendheid' : questionId.toLowerCase(), questionId === 'LICHT' ? 'attr:licht' : `attr:${questionId.toLowerCase()}`)],
 });
 const product = (key: string, qualified: boolean, questions: ReturnType<typeof outcome>[]) => ({
   key, unmatched: false, findable: false, qualified, weight: 0, earned: 0, questions, gaps: [], setId: 'gordijn',
