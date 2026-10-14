@@ -650,3 +650,17 @@ test('een lijst met maar één taal meldt dat', () => {
   assert.deepEqual(result.errors, []);
   assert.ok(result.warnings.some((w) => w.includes('maar één taal')));
 });
+
+test('twee maten bij één vraag zijn allebei een getal, een losse naam niet', () => {
+  const csv = [
+    'id,vraag_nl,vraag_en,laag,belang,benodigde_attributen,antwoordtype,beantwoordbaar_uit_attributen',
+    'BAS-105,Hoe groot is het patroon?,How large is the pattern repeat?,basis,hoog,"rapport_hoogte_cm, rapport_breedte_cm",getal,true',
+    'BAS-106,Hoe was ik dit?,How do I wash this?,basis,hoog,"wasvoorschrift, wastemperatuur",getal,true',
+  ].join('\n');
+  const read = importQuestionList([{ name: 'bank.csv', text: csv }]);
+  assert.deepEqual(read.errors, []);
+  const typeOf = (key: string) => read.bank?.attributes.find((attribute) => attribute.key === key)?.type;
+  assert.equal(typeOf('rapport_hoogte_cm'), 'number');
+  assert.equal(typeOf('rapport_breedte_cm'), 'number');
+  assert.equal(typeOf('wastemperatuur'), 'text', 'zonder eenheid in de naam is niet te zeggen welk van de twee het getal is');
+});
