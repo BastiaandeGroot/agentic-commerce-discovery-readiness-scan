@@ -3,9 +3,8 @@
 // Een bewaarde analyse terugzien, in hetzelfde rapport als na een scan.
 //
 // Het scherm is hetzelfde (`ReportBody`), zodat een merchant niet twee manieren
-// hoeft te leren om dezelfde uitkomst te lezen. Wat de producten zelf vraagt —
-// per product kijken, de pdf — staat er niet, en op de plek van de verkenner zegt
-// het scherm waarom.
+// hoeft te leren om dezelfde uitkomst te lezen. Per product kijken staat er niet;
+// de pdf en het Excel-bestand wel, zie `SavedExports`.
 //
 // Bewaarde de scan ook zijn vragensets en metingen (`SnapshotDetail`), dan telt
 // het rapport opnieuw op met het werk van nu: een vraag die de merchant daarna
@@ -20,6 +19,7 @@ import type { QuestionWork } from '../src/questions/work';
 import { modelFromReport, modelFromSnapshot } from '../src/report/model';
 import { savedAnalysis } from '../src/report/saved';
 import { ReportBody } from './ReportView';
+import { SavedExports } from './SavedExports';
 import type { SiteCheck } from '../src/collect/answers';
 import { RemoveSnapshotButton } from './ScanList';
 import { Button, Card, CardTitle } from './ui';
@@ -104,6 +104,17 @@ export function SnapshotReport({ s, locale, snapshot, detail, work, onReviewQues
         defaultSite={snapshot.siteUrl}
         support={snapshot.support}
         onSiteCheck={onSiteCheck ? async (check) => { setFresh({ id: snapshot.id, check }); await onSiteCheck(check); } : undefined}
+        footer={(
+          <SavedExports
+            s={s}
+            locale={locale}
+            snapshot={snapshot}
+            detail={detail}
+            work={work}
+            report={saved?.report}
+            siteCheck={fresh?.id === snapshot.id ? fresh.check : snapshot.siteCheck}
+          />
+        )}
       />
     </div>
   );
