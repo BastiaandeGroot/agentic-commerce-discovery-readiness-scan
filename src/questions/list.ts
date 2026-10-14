@@ -701,8 +701,9 @@ function collectAttributes(rows: Row[], columns: ColumnMap, warnings: string[]):
         label: same(readable),
         // Het antwoordtype van de vraag zegt wat dit kenmerk hoort te bevatten,
         // maar alleen als de vraag op dit ene kenmerk leunt: bij twee kenmerken
-        // is niet te zeggen welk van de twee het getal is.
-        type: needed.length === 1 ? attributeType(cell(row, columns, 'answerType')) : 'text',
+        // is niet te zeggen welk van de twee het getal is. Tenzij de naam het
+        // zegt: `rapport_hoogte_cm` en `rapport_breedte_cm` zijn allebei een maat.
+        type: needed.length === 1 || WITH_UNIT.test(key) ? attributeType(cell(row, columns, 'answerType')) : 'text',
         level: 'product',
         legal: legal ? legalNote(row, columns) : undefined,
         namedAs: namedAs.length > 0 ? namedAs : undefined,
@@ -723,6 +724,9 @@ function attributeType(raw: string): AnswerType {
   const type = answerType(raw);
   return type === 'number' || type === 'boolean' || type === 'enum' ? type : 'text';
 }
+
+/** Een kenmerknaam die op een eenheid eindigt, draagt een getal. */
+const WITH_UNIT = /_(mm|cm|m|m2|gm2|g|kg|pct|n|tex)$/;
 
 /**
  * De voorbeelden van één rij: `kenmerk: waarde` in de ene kolom, `kenmerk: adres`
